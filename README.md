@@ -1,174 +1,110 @@
-# Wellness Connect Design System
+# WellnessConnect Frontend Prototype
 
-> A mobile-first design-system foundation for a premium wellness application.
+WellnessConnect is a polished React + Vite frontend prototype for a combined wellness platform covering counselling psychology, personal training, appointment booking, client progress tracking, help desk workflows, and future store integration.
 
-![Version](https://img.shields.io/badge/version-1.2.0-blue)
-![React](https://img.shields.io/badge/React-18+-61dafb)
-![TypeScript](https://img.shields.io/badge/TypeScript-5+-3178c6)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind-4.0-38bdf8)
+This version is UI only. It uses mock data, dummy routing, and no backend, database, authentication, or API calls.
 
-## Overview
+## Current Scope
 
-**Wellness Connect** is a design system for a wellness platform that combines counselling, personal training, appointment booking, progress tracking, and support.
+- Public welcome / landing screen
+- Login and signup UI simulation
+- Client dashboard for counselling + training users
+- Counsellor dashboard
+- Gym trainer dashboard
+- Help desk / assistant dashboard
+- Admin dashboard
+- Appointment booking flow
+- Programs, progress, messages, and profile pages
+- Mobile bottom navigation and desktop sidebar navigation
 
-Brand principles:
+## Tech Stack
 
-- Calm
-- Trustworthy
-- Motivating
-- Professional
-- Human
-- Premium
-- Supportive
+- React + Vite
+- TypeScript-flavored TSX components
+- React Router for dummy frontend routing
+- CSS with WellnessConnect design tokens
+- Lucide React icons
+- Mock data only
 
-Tagline: **Mind. Body. Better Together.**
-
-## Current Maturity
-
-This project is a foundation moving toward enterprise-grade maturity. It now includes brand guidance, roadmap, token architecture, accessibility guidance, layout primitives, and a growing React component library.
-
-It is not yet a fully enterprise-grade system because automated tests, visual regression, Storybook, Figma variable mapping, and full design-code parity are still roadmap items.
-
-## Component Library
-
-### Core Components
-
-- Alert
-- Avatar
-- Badge
-- BottomNav
-- Button
-- Card
-- Checkbox
-- Input
-- ListItem
-- ProgressBar
-- SearchInput
-- StatCard
-- Tabs
-- Toggle
-
-### Layout Components
-
-- AppShell
-- ContentContainer
-- PageHeader
-- SectionHeader
-- Stack
-- Cluster
-- ResponsiveGrid
-- Topbar
-- Sidebar
-
-## Design Tokens
-
-Tokens are defined in `src/styles/theme.css`.
-
-The token system has three layers:
-
-- Primitive tokens: raw palette, spacing, radius, type, and shadow values
-- Semantic tokens: product meaning such as `surface`, `text`, `border`, `action`, and `status`
-- Component tokens: component-specific aliases for buttons, inputs, cards, and navigation
-
-Prefer semantic tokens in product UI:
-
-```tsx
-<div className="bg-surface-elevated text-text-primary border border-border-default">
-  <Button variant="primary">Book appointment</Button>
-</div>
-```
-
-## Quick Start
-
-```tsx
-import {
-  AppShell,
-  Button,
-  Card,
-  ContentContainer,
-  PageHeader,
-  ResponsiveGrid,
-} from './components';
-```
-
-```tsx
-<AppShell>
-  <PageHeader
-    title="Appointments"
-    description="Review upcoming counselling and training sessions."
-    actions={<Button>Book session</Button>}
-  />
-  <ResponsiveGrid columns={3}>
-    <Card variant="elevated" padding="lg">Upcoming session</Card>
-    <Card variant="elevated" padding="lg">Progress summary</Card>
-    <Card variant="elevated" padding="lg">Support status</Card>
-  </ResponsiveGrid>
-</AppShell>
-```
-
-## Project Structure
+## Folder Structure
 
 ```text
 src/
   app/
-    components/
-      layout/               Layout primitives
-      ui/                   Generated Radix/shadcn primitives
-      *.tsx                 Wellness Connect public components
-    App.tsx                 Design-system showcase
+    App.tsx                 Main routed prototype
+    data/
+      mockData.ts           Mock sessions, users, tickets, stats, goals
+    components/             Existing reusable design-system components
   styles/
-    theme.css               Design tokens and Tailwind theme bridge
+    wellnessconnect.css     Prototype UI styles and design tokens
+    index.css               Global style imports
 ```
 
-The public design-system API is `src/app/components/index.ts`. Treat `src/app/components/ui/` as lower-level generated primitives unless a component is explicitly promoted into the public API.
-
-## Documentation
-
-| Document | Purpose |
-| --- | --- |
-| `BRAND_GUIDELINES.md` | Brand source of truth, voice, terminology, and content safety |
-| `ROADMAP.md` | Enterprise maturity roadmap from v1.1 to v2.0 |
-| `COMPONENT_INVENTORY.md` | Component list, maturity, props, and gaps |
-| `DESIGN_TOKENS_REFERENCE.md` | Token quick reference |
-| `TOKENS_ARCHITECTURE.md` | Primitive, semantic, and component token strategy |
-| `ACCESSIBILITY_GUIDELINES.md` | Accessibility baseline and review checklist |
-| `LAYOUT_GUIDELINES.md` | Responsive layout rules and primitives |
-| `CHANGELOG.md` | Release notes and migration history |
-
-## Accessibility
-
-The system targets WCAG 2.2 AA for stable releases. Current improvements include:
-
-- Visible focus states on interactive components
-- ARIA state wiring for tabs, alerts, progress, navigation, and inputs
-- Keyboard activation for clickable list rows
-- Accessible labels for icon-only actions
-
-Automated accessibility testing is still a roadmap item.
-
-## Development Notes
-
-Available scripts:
+## Run Locally
 
 ```bash
+npm install
 npm run dev
+```
+
+Build for production:
+
+```bash
 npm run build
 ```
 
-This environment may not have Node or npm installed, so local command availability can vary by machine.
+Check dependencies:
 
-## Roadmap Priorities
+```bash
+npm audit
+```
 
-Near-term priorities:
+## Design Direction
 
-- Add Storybook or an equivalent component gallery
-- Add unit and accessibility tests
-- Expand core form, overlay, feedback, navigation, and data components
-- Add Wellness Connect domain components such as AppointmentCard, ExpertCard, SessionCard, MoodSelector, and ProgressSummaryCard
-- Map tokens and component variants back to Figma
+The UI follows a calm, premium, trustworthy wellness identity:
 
-## License
+- Primary purple / indigo CTA: `#4F46E5`
+- Dark primary: `#4338CA`
+- Light primary: `#E0E7FF`
+- Green wellness accent: `#16A34A`
+- Soft pastel backgrounds
+- White cards with subtle shadows
+- Rounded UI surfaces
+- Clean Inter-like typography
+- Mobile-first responsive layout
 
-Created for the Wellness Connect application.
+## Future Laravel + MariaDB Plan
 
-**Mind. Body. Better Together.**
+When backend work begins, Laravel can expose REST or JSON API endpoints for:
+
+- User accounts and role permissions
+- Client profiles and intake preferences
+- Appointment availability and booking
+- Counselling session notes
+- Training programs and measurements
+- Progress history and goals
+- Help desk tickets and follow-up tasks
+
+MariaDB can store normalized tables for users, roles, appointments, sessions, programs, progress entries, notes, messages, and audit logs.
+
+## Future Google Workspace Plan
+
+Google Workspace can be added after the backend exists:
+
+- Google Calendar for expert availability and appointment events
+- Google Meet links for online counselling or training sessions
+- Google Drive for secure document storage
+- Google Sheets for controlled exports and reporting
+
+OAuth, service account strategy, privacy controls, and audit logging should be designed before integration.
+
+## Future Shopify Plan
+
+The wellness store should initially integrate with Shopify rather than custom ecommerce. Future frontend work can link to Shopify collections, embedded buy flows, or a headless Shopify storefront for:
+
+- Wellness products
+- Fitness accessories
+- Digital programs
+- Supplements, if approved by business and compliance rules
+
+Orders, payments, inventory, taxes, and fulfillment should remain in Shopify unless a later phase requires deeper custom operations.
