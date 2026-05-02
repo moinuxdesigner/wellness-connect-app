@@ -1,3 +1,26 @@
 @import './fonts.css';
 @import './tailwind.css';
-@import './theme.css';
+
+/* Deprecated: old token system intentionally not imported.
+   - src/styles/theme.css
+   - src/styles/wellnessconnect.css */
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  margin: 0;
+  background: #f8fafc;
+  color: #0f172a;
+}
+
+.dashboard-content {
+  margin-left: 0;
+}
+
+@media (min-width: 1024px) {
+  .dashboard-content {
+    margin-left: var(--sidebar-offset, 288px);
+  }
+}

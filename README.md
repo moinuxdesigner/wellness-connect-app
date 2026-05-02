@@ -1,110 +1,66 @@
-# WellnessConnect Frontend Prototype
+# WellnessConnect Frontend + Backend (Dockerized)
 
-WellnessConnect is a polished React + Vite frontend prototype for a combined wellness platform covering counselling psychology, personal training, appointment booking, client progress tracking, help desk workflows, and future store integration.
+WellnessConnect now includes:
+- React + Vite frontend
+- Laravel API backend with real token auth (Sanctum)
+- MariaDB
+- phpMyAdmin
+- Nginx
 
-This version is UI only. It uses mock data, dummy routing, and no backend, database, authentication, or API calls.
-
-## Current Scope
-
-- Public welcome / landing screen
-- Login and signup UI simulation
-- Client dashboard for counselling + training users
-- Counsellor dashboard
-- Gym trainer dashboard
-- Help desk / assistant dashboard
-- Admin dashboard
-- Appointment booking flow
-- Programs, progress, messages, and profile pages
-- Mobile bottom navigation and desktop sidebar navigation
-
-## Tech Stack
-
-- React + Vite
-- TypeScript-flavored TSX components
-- React Router for dummy frontend routing
-- CSS with WellnessConnect design tokens
-- Lucide React icons
-- Mock data only
-
-## Folder Structure
-
-```text
-src/
-  app/
-    App.tsx                 Main routed prototype
-    data/
-      mockData.ts           Mock sessions, users, tickets, stats, goals
-    components/             Existing reusable design-system components
-  styles/
-    wellnessconnect.css     Prototype UI styles and design tokens
-    index.css               Global style imports
-```
-
-## Run Locally
+## Frontend Run
 
 ```bash
 npm install
 npm run dev
 ```
 
-Build for production:
+Frontend API base is configured in `.env.local`:
 
-```bash
-npm run build
+```env
+VITE_API_BASE_URL=http://localhost:8080/api
 ```
 
-Check dependencies:
+## Backend Run (Docker)
 
 ```bash
-npm audit
+cp .env.docker.example .env
+docker compose up -d --build
 ```
 
-## Design Direction
+Run migrations + seeders:
 
-The UI follows a calm, premium, trustworthy wellness identity:
+```bash
+docker compose exec app php artisan migrate --force
+docker compose exec app php artisan db:seed --force
+```
 
-- Primary purple / indigo CTA: `#4F46E5`
-- Dark primary: `#4338CA`
-- Light primary: `#E0E7FF`
-- Green wellness accent: `#16A34A`
-- Soft pastel backgrounds
-- White cards with subtle shadows
-- Rounded UI surfaces
-- Clean Inter-like typography
-- Mobile-first responsive layout
+## Access URLs
 
-## Future Laravel + MariaDB Plan
+- Laravel app / API: `http://localhost:8080`
+- phpMyAdmin: `http://localhost:8081`
+- MariaDB host port: `3307`
 
-When backend work begins, Laravel can expose REST or JSON API endpoints for:
+## Real Auth API Endpoints
 
-- User accounts and role permissions
-- Client profiles and intake preferences
-- Appointment availability and booking
-- Counselling session notes
-- Training programs and measurements
-- Progress history and goals
-- Help desk tickets and follow-up tasks
+- `POST /api/auth/register`
+- `POST /api/auth/login`
+- `GET /api/auth/me` (Bearer token)
+- `POST /api/auth/logout` (Bearer token)
 
-MariaDB can store normalized tables for users, roles, appointments, sessions, programs, progress entries, notes, messages, and audit logs.
+## Seeded Login Credentials
 
-## Future Google Workspace Plan
+- Admin:
+  - Email: `admin@wellnessconnect.local`
+  - Password: `Admin@12345`
+- Client:
+  - Email: `client@wellnessconnect.local`
+  - Password: `Client@12345`
+- Counsellor:
+  - Email: `counsellor@wellnessconnect.local`
+  - Password: `Counsellor@12345`
 
-Google Workspace can be added after the backend exists:
+## Notes
 
-- Google Calendar for expert availability and appointment events
-- Google Meet links for online counselling or training sessions
-- Google Drive for secure document storage
-- Google Sheets for controlled exports and reporting
-
-OAuth, service account strategy, privacy controls, and audit logging should be designed before integration.
-
-## Future Shopify Plan
-
-The wellness store should initially integrate with Shopify rather than custom ecommerce. Future frontend work can link to Shopify collections, embedded buy flows, or a headless Shopify storefront for:
-
-- Wellness products
-- Fitness accessories
-- Digital programs
-- Supplements, if approved by business and compliance rules
-
-Orders, payments, inventory, taxes, and fulfillment should remain in Shopify unless a later phase requires deeper custom operations.
+- Frontend now uses Laravel API login/logout instead of demo-only local auth.
+- Current frontend route implementation remains admin-first; non-admin users can authenticate but their module pages are not fully built yet.
+- Next phase can add full module UIs per role and connect domain entities (appointments, programs, tickets, etc.) to backend APIs.
