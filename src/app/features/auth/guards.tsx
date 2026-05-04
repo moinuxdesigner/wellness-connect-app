@@ -1,6 +1,7 @@
 import { Navigate, Outlet } from 'react-router';
 import type { Role } from '../../types';
 import { getAuthState } from './auth';
+import { getRoleHomePath } from './roleRedirects';
 
 export function RequireAuth() {
   const auth = getAuthState();
@@ -16,7 +17,7 @@ export function RequireRole({ allow }: { allow: Role[] }) {
   const auth = getAuthState();
 
   if (!auth.user?.role || !allow.includes(auth.user.role)) {
-    return <Navigate to="/login" replace />;
+    return <Navigate to={auth.user?.role ? getRoleHomePath(auth.user.role) : '/login'} replace />;
   }
 
   return <Outlet />;

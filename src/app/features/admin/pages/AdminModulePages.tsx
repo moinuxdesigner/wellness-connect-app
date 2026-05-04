@@ -33,6 +33,54 @@ export function ProfessionalApprovalsPage() {
   return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={users.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
 }
 
+export function TrainerApplicationsPage() {
+  return (
+    <div className="space-y-6">
+      <PageTitle title="Trainer Applications" subtitle="Review trainer onboarding submissions, documents, demo videos, interviews, and approval decisions." />
+      <Panel title="Application Queue">
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-slate-500">
+              <tr>
+                <th className="py-2">Trainer</th>
+                <th className="py-2">Status</th>
+                <th className="py-2">Safety Score</th>
+                <th className="py-2">Next Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                ['Aarav Mehta', 'Under Review', '82%', 'Verify documents'],
+                ['Sneha Rao', 'Skill Test Pending', '64%', 'Assign safety training'],
+                ['Imran Khan', 'Interview Scheduled', '91%', 'Lead coach demo review'],
+              ].map(([name, status, score, action]) => (
+                <tr key={name} className="border-t border-slate-200">
+                  <td className="py-2 font-medium text-slate-900">{name}</td>
+                  <td className="py-2"><ToneBadge tone={status === 'Skill Test Pending' ? 'warning' : 'neutral'}>{status}</ToneBadge></td>
+                  <td className="py-2 text-slate-700">{score}</td>
+                  <td className="py-2 text-slate-600">{action}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+      <SimpleList
+        title="Review Actions"
+        subtitle="Admin, lead coach, legal, and owner checkpoints."
+        items={[
+          'Verify ID and certificates',
+          'Review demo videos',
+          'Request corrections for missing or incorrect data',
+          'Schedule interview or practical demo',
+          'Approve, reject, suspend, or blacklist trainer',
+          'Activate trainer dashboard only after admin and lead coach approval',
+        ]}
+      />
+    </div>
+  );
+}
+
 export function WorkflowConfigurationPage() {
   return <SimpleList title="Workflow Configuration" subtitle="Operational flows for booking, escalation, and follow-ups." items={['Intake assignment workflow', 'Session no-show handling', 'Critical risk escalation path', 'Cross-team follow-up SLA policy']} />;
 }

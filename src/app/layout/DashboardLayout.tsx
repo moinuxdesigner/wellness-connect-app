@@ -3,9 +3,11 @@ import { Outlet } from 'react-router';
 import { motion } from 'motion/react';
 import Sidebar, { type NavItem } from './Sidebar';
 import Topbar from './Topbar';
+import { BottomNav } from '../components/BottomNav';
 
-export default function DashboardLayout({ navItems, children }: { navItems: NavItem[]; children?: ReactNode }) {
+export default function DashboardLayout({ navItems, title, children }: { navItems: NavItem[]; title?: string; children?: ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
   const sidebarWidth = collapsed ? 80 : 288;
 
   return (
@@ -15,6 +17,9 @@ export default function DashboardLayout({ navItems, children }: { navItems: NavI
         collapsed={collapsed}
         width={sidebarWidth}
         onToggle={() => setCollapsed((prev) => !prev)}
+        title={title}
+        mobileOpen={mobileSidebarOpen}
+        onMobileClose={() => setMobileSidebarOpen(false)}
       />
       <motion.div
         initial={false}
@@ -23,9 +28,14 @@ export default function DashboardLayout({ navItems, children }: { navItems: NavI
         transition={{ type: 'spring', stiffness: 240, damping: 28 }}
         className="dashboard-content min-w-0"
       >
-        <Topbar collapsed={collapsed} onToggleSidebar={() => setCollapsed((prev) => !prev)} />
-        <main className="mx-auto max-w-7xl p-4 lg:p-6">{children ?? <Outlet />}</main>
+        <Topbar
+          collapsed={collapsed}
+          onToggleSidebar={() => setCollapsed((prev) => !prev)}
+          onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+        />
+        <main className="mx-auto max-w-7xl p-4 pb-24 lg:p-6">{children ?? <Outlet />}</main>
       </motion.div>
+      <BottomNav items={navItems} onOpenMenu={() => setMobileSidebarOpen(true)} />
     </div>
   );
 }

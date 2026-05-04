@@ -1,10 +1,18 @@
-import { Bell, LogOut, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Bell, LogOut, Menu, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { getAuthState } from '../features/auth/auth';
 import { logoutRequest } from '../features/auth/apiAuth';
 
-export default function Topbar({ collapsed, onToggleSidebar }: { collapsed: boolean; onToggleSidebar: () => void }) {
+export default function Topbar({
+  collapsed,
+  onToggleSidebar,
+  onOpenMobileSidebar,
+}: {
+  collapsed: boolean;
+  onToggleSidebar: () => void;
+  onOpenMobileSidebar: () => void;
+}) {
   const navigate = useNavigate();
   const auth = getAuthState();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -13,6 +21,14 @@ export default function Topbar({ collapsed, onToggleSidebar }: { collapsed: bool
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-6">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={onOpenMobileSidebar}
+            className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 lg:hidden"
+            aria-label="Open sidebar"
+          >
+            <Menu size={16} />
+          </button>
           <button
             type="button"
             onClick={onToggleSidebar}

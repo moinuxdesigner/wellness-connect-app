@@ -1,4 +1,5 @@
 import { clearAuthState, getAuthState, setAuthState, type AuthUser } from './auth';
+import type { Role } from '../../types';
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api';
 
@@ -24,6 +25,36 @@ export async function loginRequest(email: string, password: string) {
 
   if (!response.ok) {
     const message = payload?.message ?? payload?.errors?.email?.[0] ?? 'Login failed.';
+    throw new Error(message);
+  }
+
+  const token = payload.token as string;
+  const user = payload.user as AuthUser;
+
+  setAuthState(token, user);
+
+  return user;
+}
+
+export async function registerRequest(name: string, email: string, password: string, role: Role = 'client') {
+  const response = await fetch(`${API_BASE}/auth/register`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    },
+    body: JSON.stringify({ name, email, password, role }),
+  });
+
+  const payload = await readJson(response);
+
+  if (!response.ok) {
+    const message =
+      payload?.message ??
+      payload?.errors?.email?.[0] ??
+      payload?.errors?.password?.[0] ??
+      payload?.errors?.name?.[0] ??
+      'Registration failed.';
     throw new Error(message);
   }
 

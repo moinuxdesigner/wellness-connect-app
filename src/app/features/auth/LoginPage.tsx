@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { loginRequest } from './apiAuth';
+import { getRoleHomePath } from './roleRedirects';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -23,13 +24,7 @@ export default function LoginPage() {
 
           try {
             const user = await loginRequest(email, password);
-
-            if (user.role === 'admin') {
-              navigate('/admin');
-              return;
-            }
-
-            setNotice('This role is authenticated, but only admin routes are implemented in this phase.');
+            navigate(getRoleHomePath(user.role));
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to login.';
             setNotice(message);
