@@ -7,12 +7,26 @@
 
 :root {
   color-scheme: light;
+  --ds-brand: #2f4f88;
+  --ds-brand-strong: #1e3a70;
+  --ds-surface: #ffffff;
+  --ds-surface-muted: #f8fafc;
+  --ds-border: #dbe4f0;
+  --ds-text-primary: #0f172a;
+  --ds-text-secondary: #475569;
+  --ds-success: #15803d;
+  --ds-warning: #b45309;
+  --ds-danger: #dc2626;
 }
 
 body {
   margin: 0;
   background: #f8fafc;
   color: #0f172a;
+}
+
+body {
+  padding-bottom: env(safe-area-inset-bottom);
 }
 
 .dashboard-content {

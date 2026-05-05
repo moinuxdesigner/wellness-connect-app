@@ -16,8 +16,8 @@ export default function DashboardLayout({ navItems, title, children }: { navItem
         items={navItems}
         collapsed={collapsed}
         width={sidebarWidth}
-        onToggle={() => setCollapsed((prev) => !prev)}
         title={title}
+        onToggle={() => setCollapsed((prev) => !prev)}
         mobileOpen={mobileSidebarOpen}
         onMobileClose={() => setMobileSidebarOpen(false)}
       />

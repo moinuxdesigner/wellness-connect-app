@@ -10,23 +10,39 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
 
-#[Fillable(['name', 'email', 'password', 'role'])]
+#[Fillable(['name', 'email', 'password', 'role', 'phone', 'wellness_goal', 'consent_to_terms', 'status'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
     use HasApiTokens, HasFactory, Notifiable;
 
-    /**
-     * Get the attributes that should be cast.
-     *
-     * @return array<string, string>
-     */
     protected function casts(): array
     {
         return [
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
+            'consent_to_terms' => 'boolean',
         ];
+    }
+
+    public function clientProfile()
+    {
+        return $this->hasOne(ClientProfile::class);
+    }
+
+    public function practitioner()
+    {
+        return $this->hasOne(Practitioner::class);
+    }
+
+    public function intakeFlows()
+    {
+        return $this->hasMany(IntakeFlow::class, 'client_user_id');
+    }
+
+    public function clientAppointments()
+    {
+        return $this->hasMany(Appointment::class, 'client_user_id');
     }
 }

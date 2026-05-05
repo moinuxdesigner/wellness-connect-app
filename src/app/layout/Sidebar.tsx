@@ -6,6 +6,7 @@ export interface NavItem {
   label: string;
   to: string;
   icon: LucideIcon;
+  end?: boolean;
 }
 
 export default function Sidebar({
@@ -121,6 +122,7 @@ function SidebarContent({
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               title={collapsed ? item.label : undefined}
               onClick={onMobileClose}
               className={({ isActive }) =>

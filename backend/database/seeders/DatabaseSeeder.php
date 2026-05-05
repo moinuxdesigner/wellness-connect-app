@@ -2,7 +2,13 @@
 
 namespace Database\Seeders;
 
+use App\Models\AvailabilitySlot;
+use App\Models\ClientProfile;
+use App\Models\Practitioner;
+use App\Models\PractitionerSpecialty;
+use App\Models\ServiceCatalog;
 use App\Models\User;
+use App\Models\WellnessPackage;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
 use Illuminate\Database\Seeder;
 
@@ -10,40 +16,79 @@ class DatabaseSeeder extends Seeder
 {
     use WithoutModelEvents;
 
-    /**
-     * Seed the application's database.
-     */
     public function run(): void
     {
-        $users = [
-            [
-                'name' => 'Admin User',
-                'email' => 'admin@wellnessconnect.local',
-                'password' => 'Admin@12345',
-                'role' => 'admin',
-            ],
-            [
-                'name' => 'Client User',
-                'email' => 'client@wellnessconnect.local',
-                'password' => 'Client@12345',
-                'role' => 'client',
-            ],
-            [
-                'name' => 'Counsellor User',
-                'email' => 'counsellor@wellnessconnect.local',
-                'password' => 'Counsellor@12345',
-                'role' => 'counsellor',
-            ],
+        foreach ([
+            ['code' => 'psychology', 'name' => 'Psychology Support', 'description' => 'Counselling support'],
+            ['code' => 'training', 'name' => 'Personal Training', 'description' => 'Fitness training'],
+            ['code' => 'combined', 'name' => 'Combined Wellness', 'description' => 'Mind + body support'],
+            ['code' => 'package', 'name' => 'Wellness Packages', 'description' => 'Bundled plans'],
+        ] as $service) {
+            ServiceCatalog::updateOrCreate(['code' => $service['code']], $service + ['is_active' => true]);
+        }
+
+        foreach ([
+            ['code' => 'mind-care-starter', 'name' => 'Mind Care Starter', 'description' => '2 counselling sessions - 4 weeks', 'duration_weeks' => 4, 'sessions_counselling' => 2, 'sessions_training' => 0],
+            ['code' => 'fit-start-plan', 'name' => 'Fit Start Plan', 'description' => '4 PT sessions - 4 weeks', 'duration_weeks' => 4, 'sessions_counselling' => 0, 'sessions_training' => 4],
+            ['code' => 'mind-body-reset', 'name' => 'Mind + Body Reset', 'description' => '4 counselling + 4 PT sessions - 8 weeks', 'duration_weeks' => 8, 'sessions_counselling' => 4, 'sessions_training' => 4],
+        ] as $package) {
+            WellnessPackage::updateOrCreate(['code' => $package['code']], $package + ['is_active' => true]);
+        }
+
+        $admin = User::updateOrCreate(
+            ['email' => 'admin@wellnessconnect.local'],
+            ['name' => 'Admin User', 'password' => 'Admin@12345', 'role' => 'admin', 'status' => 'active', 'phone' => '+91 9000000001', 'consent_to_terms' => true]
+        );
+
+        $client = User::updateOrCreate(
+            ['email' => 'client@wellnessconnect.local'],
+            ['name' => 'Client User', 'password' => 'Client@12345', 'role' => 'client', 'status' => 'active', 'phone' => '+91 9000000002', 'consent_to_terms' => true, 'wellness_goal' => 'both']
+        );
+
+        $counsellorUser = User::updateOrCreate(
+            ['email' => 'counsellor@wellnessconnect.local'],
+            ['name' => 'Dr. Aisha Sharma', 'password' => 'Counsellor@12345', 'role' => 'counsellor', 'status' => 'active', 'phone' => '+91 9000000003', 'consent_to_terms' => true]
+        );
+
+        $trainerUser = User::updateOrCreate(
+            ['email' => 'trainer@wellnessconnect.local'],
+            ['name' => 'Arjun Mehta', 'password' => 'Trainer@12345', 'role' => 'trainer', 'status' => 'active', 'phone' => '+91 9000000004', 'consent_to_terms' => true]
+        );
+
+        ClientProfile::updateOrCreate(
+            ['user_id' => $client->id],
+            ['primary_goal' => 'both', 'timezone' => 'Asia/Kolkata', 'preferred_language' => 'en']
+        );
+
+        $counsellor = Practitioner::updateOrCreate(
+            ['user_id' => $counsellorUser->id],
+            ['practitioner_type' => 'counsellor', 'bio' => 'Specializes in anxiety, stress and burnout.', 'rating' => 4.9, 'is_active' => true]
+        );
+
+        $trainer = Practitioner::updateOrCreate(
+            ['user_id' => $trainerUser->id],
+            ['practitioner_type' => 'trainer', 'bio' => 'Focuses on mobility and consistency.', 'rating' => 4.8, 'is_active' => true]
+        );
+
+        foreach (['anxiety', 'stress', 'burnout'] as $specialty) {
+            PractitionerSpecialty::updateOrCreate(['practitioner_id' => $counsellor->id, 'specialty_code' => $specialty]);
+        }
+
+        foreach (['fat_loss', 'mobility', 'consistency'] as $specialty) {
+            PractitionerSpecialty::updateOrCreate(['practitioner_id' => $trainer->id, 'specialty_code' => $specialty]);
+        }
+
+        $slots = [
+            ['practitioner_id' => $counsellor->id, 'starts_at' => '2026-05-20 18:30:00', 'ends_at' => '2026-05-20 19:20:00'],
+            ['practitioner_id' => $counsellor->id, 'starts_at' => '2026-05-21 19:00:00', 'ends_at' => '2026-05-21 19:50:00'],
+            ['practitioner_id' => $trainer->id, 'starts_at' => '2026-05-20 08:00:00', 'ends_at' => '2026-05-20 09:00:00'],
+            ['practitioner_id' => $trainer->id, 'starts_at' => '2026-05-21 17:30:00', 'ends_at' => '2026-05-21 18:30:00'],
         ];
 
-        foreach ($users as $payload) {
-            User::updateOrCreate(
-                ['email' => $payload['email']],
-                [
-                    'name' => $payload['name'],
-                    'password' => $payload['password'],
-                    'role' => $payload['role'],
-                ]
+        foreach ($slots as $slot) {
+            AvailabilitySlot::updateOrCreate(
+                ['practitioner_id' => $slot['practitioner_id'], 'starts_at' => $slot['starts_at']],
+                ['ends_at' => $slot['ends_at'], 'slot_status' => 'open']
             );
         }
     }

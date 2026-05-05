@@ -24,6 +24,12 @@ import {
   UserManagementPage,
   WorkflowConfigurationPage,
 } from '../features/admin/pages/AdminModulePages';
+import { ClientLayout } from '../features/client/ClientLayout';
+import ClientDashboardPage from '../features/client/pages/ClientDashboardPage';
+import ClientProfilePage from '../features/client/pages/ClientProfilePage';
+import ClientAppointmentsPage from '../features/client/pages/ClientAppointmentsPage';
+import ClientProgramsPage from '../features/client/pages/ClientProgramsPage';
+import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage';
 import { RoleDashboardLayout } from '../features/roleDashboards/RoleDashboardLayout';
 import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboards/RoleDashboardPage';
 import TrainerOnboardingPage from '../features/trainer/TrainerOnboardingPage';
@@ -61,10 +67,12 @@ export default function AppRoutes() {
         </Route>
 
         <Route element={<RequireRole allow={['client']} />}>
-          <Route path="/client" element={<RoleDashboardLayout role="client" />}>
-            <Route index element={<RoleDashboardPage role="client" />} />
-            <Route path="appointments" element={<RolePlaceholderPage role="client" title="Appointments" />} />
-            <Route path="programs" element={<RolePlaceholderPage role="client" title="Programs" />} />
+          <Route path="/client" element={<ClientLayout />}>
+            <Route index element={<ClientDashboardPage />} />
+            <Route path="intake" element={<ClientIntakeFlowPage />} />
+            <Route path="appointments" element={<ClientAppointmentsPage />} />
+            <Route path="programs" element={<ClientProgramsPage />} />
+            <Route path="profile" element={<ClientProfilePage />} />
           </Route>
         </Route>
 

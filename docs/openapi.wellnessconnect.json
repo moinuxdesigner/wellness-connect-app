@@ -1,0 +1,167 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "WellnessConnect API",
+    "version": "1.0.0"
+  },
+  "servers": [
+    { "url": "/api/v1" }
+  ],
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Anita Reddy",
+                "email": "anita.reddy@email.com",
+                "password": "StrongPass@123",
+                "role": "client",
+                "phone": "+919999999999",
+                "primary_goal": "both",
+                "consent_to_terms": true
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Registered",
+            "content": {
+              "application/json": {
+                "example": {
+                  "token": "1|sanctum-token",
+                  "user": { "id": 12, "name": "Anita Reddy", "email": "anita.reddy@email.com", "role": "client", "status": "active" },
+                  "profile": { "user_id": 12, "primary_goal": "both" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "email": "anita.reddy@email.com", "password": "StrongPass@123" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Authenticated",
+            "content": {
+              "application/json": {
+                "example": {
+                  "token": "1|sanctum-token",
+                  "user": { "id": 12, "role": "client" },
+                  "profile": { "primary_goal": "both" }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/auth/me": { "get": { "responses": { "200": { "description": "Current user" } } } },
+    "/auth/logout": { "post": { "responses": { "200": { "description": "Logged out" } } } },
+    "/client/profile": {
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Anita Reddy",
+                "phone": "+919999999999",
+                "primary_goal": "fitness",
+                "timezone": "Asia/Kolkata",
+                "preferred_language": "en",
+                "consent_to_terms": true
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Profile updated" } }
+      }
+    },
+    "/intake-flows": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "service_type": "combined" } } }
+        },
+        "responses": { "201": { "description": "Flow created" } }
+      }
+    },
+    "/intake-flows/{id}": { "get": { "responses": { "200": { "description": "Flow details" } } } },
+    "/intake-flows/{id}/service": {
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "service_type": "package", "wellness_package_id": 3 } } }
+        },
+        "responses": { "200": { "description": "Service step updated" } }
+      }
+    },
+    "/intake-flows/{id}/intake": {
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "answers": [
+                  { "section_key": "combined", "question_key": "focus_month_1", "answer_type": "single", "answer_json": "balanced" }
+                ]
+              }
+            }
+          }
+        },
+        "responses": { "200": { "description": "Answers saved" } }
+      }
+    },
+    "/intake-flows/{id}/submit": { "post": { "responses": { "200": { "description": "Flow submitted" } } } },
+    "/intake-flows/{id}/confirmation": { "get": { "responses": { "200": { "description": "Confirmation state" } } } },
+    "/intake-flows/{id}/recommended-practitioners": { "get": { "responses": { "200": { "description": "Recommended practitioners" } } } },
+    "/practitioners/{id}/slots": { "get": { "responses": { "200": { "description": "Open slots" } } } },
+    "/client/appointments": { "get": { "responses": { "200": { "description": "Client appointments list" } } } },
+    "/appointments": {
+      "post": {
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "intake_flow_id": 41,
+                "practitioner_id": 3,
+                "slot_id": 55,
+                "service_type": "combined",
+                "mode": "online"
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Appointment booked" } }
+      }
+    },
+    "/appointments/{id}/reschedule": {
+      "put": {
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "slot_id": 89 } } }
+        },
+        "responses": { "200": { "description": "Appointment rescheduled" } }
+      }
+    },
+    "/appointments/{id}/cancel": {
+      "post": {
+        "requestBody": {
+          "content": { "application/json": { "example": { "reason": "Timing conflict" } } }
+        },
+        "responses": { "200": { "description": "Appointment cancelled" } }
+      }
+    }
+  }
+}

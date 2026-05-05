@@ -19,7 +19,7 @@ import {
 import DashboardLayout from '../../layout/DashboardLayout';
 
 export const adminNavItems = [
-  { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop },
+  { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop, end: true },
   { label: 'User Management', to: '/admin/users', icon: Users },
   { label: 'Role Management', to: '/admin/roles', icon: UserCog },
   { label: 'Permission Matrix', to: '/admin/permissions', icon: Lock },
@@ -37,7 +37,7 @@ export const adminNavItems = [
 ];
 
 export function AdminLayout() {
-  return <DashboardLayout navItems={adminNavItems}><Outlet /></DashboardLayout>;
+  return <DashboardLayout navItems={adminNavItems} title="Admin Console"><Outlet /></DashboardLayout>;
 }
 
 export function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {

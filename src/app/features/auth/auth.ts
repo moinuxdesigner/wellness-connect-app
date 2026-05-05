@@ -7,6 +7,11 @@ export interface AuthUser {
   name: string;
   email: string;
   role: Role;
+  phone?: string | null;
+  wellness_goal?: string | null;
+  primary_goal?: 'fitness' | 'mental_health' | 'both' | null;
+  consent_to_terms?: boolean;
+  status?: 'active' | 'pending' | 'suspended';
 }
 
 export interface AuthState {

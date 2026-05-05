@@ -15,12 +15,21 @@ const signupRoles: Array<{ label: string; value: Role }> = [
   { label: 'Content', value: 'content' },
 ];
 
+const goals = [
+  { value: 'fitness', label: 'Fitness' },
+  { value: 'mental_health', label: 'Mental Health' },
+  { value: 'both', label: 'Both' },
+] as const;
+
 export default function SignupPage() {
   const navigate = useNavigate();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
+  const [phone, setPhone] = useState('');
   const [password, setPassword] = useState('');
   const [role, setRole] = useState<Role>('client');
+  const [goal, setGoal] = useState<(typeof goals)[number]['value']>('fitness');
+  const [consent, setConsent] = useState(true);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
 
@@ -36,7 +45,15 @@ export default function SignupPage() {
           setLoading(true);
 
           try {
-            const user = await registerRequest(name, email, password, role);
+            const user = await registerRequest({
+              name,
+              email,
+              password,
+              role,
+              phone: phone || undefined,
+              primary_goal: role === 'client' ? goal : undefined,
+              consent_to_terms: consent,
+            });
             navigate(getRoleHomePath(user.role));
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to create account.';
@@ -68,6 +85,15 @@ export default function SignupPage() {
           />
         </div>
         <div>
+          <label className="mb-1 block text-sm font-medium text-slate-700">Phone</label>
+          <input
+            className="w-full rounded-xl border border-slate-300 px-3 py-2"
+            value={phone}
+            onChange={(event) => setPhone(event.target.value)}
+            placeholder="Optional phone number"
+          />
+        </div>
+        <div>
           <label className="mb-1 block text-sm font-medium text-slate-700">Password</label>
           <input
             className="w-full rounded-xl border border-slate-300 px-3 py-2"
@@ -93,11 +119,31 @@ export default function SignupPage() {
             ))}
           </select>
         </div>
+        {role === 'client' ? (
+          <div>
+            <label className="mb-1 block text-sm font-medium text-slate-700">Primary Goal</label>
+            <select
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2"
+              value={goal}
+              onChange={(event) => setGoal(event.target.value as (typeof goals)[number]['value'])}
+            >
+              {goals.map((item) => (
+                <option key={item.value} value={item.value}>
+                  {item.label}
+                </option>
+              ))}
+            </select>
+          </div>
+        ) : null}
+        <label className="flex items-center gap-2 text-sm text-slate-700">
+          <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} />
+          I agree to the platform terms and privacy policy.
+        </label>
         {notice ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p> : null}
         <button
           className="rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"
           type="submit"
-          disabled={loading}
+          disabled={loading || !consent}
         >
           {loading ? (
             <span className="inline-flex items-center justify-center gap-2">
