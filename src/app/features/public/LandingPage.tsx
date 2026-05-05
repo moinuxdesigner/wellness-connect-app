@@ -42,7 +42,9 @@ export default function LandingPage() {
   const [nextHeroPhoto, setNextHeroPhoto] = useState<HeroPhoto | null>(null);
   const [isNextHeroPhotoVisible, setIsNextHeroPhotoVisible] = useState(false);
   const isLoadingHeroPhoto = useRef(false);
+  const isHeroPhotoFetchDisabled = useRef(false);
   const fadeTimeout = useRef<number>();
+  const heroFadeClass = nextHeroPhoto ? 'transition-opacity duration-[1500ms] ease-in-out' : '';
 
   useEffect(() => {
     if (!unsplashAccessKey) {
@@ -51,7 +53,7 @@ export default function LandingPage() {
 
     const controller = new AbortController();
     const params = new URLSearchParams({
-      query: 'wellness meditation therapy',
+      query: 'wellness meditation therapy gym fitness lifestyle psychology services',
       orientation: 'landscape',
       content_filter: 'high',
       client_id: unsplashAccessKey,
@@ -74,7 +76,7 @@ export default function LandingPage() {
     }
 
     async function loadRandomHeroPhoto() {
-      if (isLoadingHeroPhoto.current) {
+      if (isLoadingHeroPhoto.current || isHeroPhotoFetchDisabled.current) {
         return;
       }
 
@@ -86,6 +88,11 @@ export default function LandingPage() {
         });
 
         if (!response.ok) {
+          if (response.status === 401 || response.status === 403) {
+            isHeroPhotoFetchDisabled.current = true;
+            console.warn('Unsplash hero photos are disabled because the API request was not authorized.');
+          }
+
           throw new Error('Unable to load Unsplash photo');
         }
 
@@ -127,7 +134,7 @@ export default function LandingPage() {
     }
 
     loadRandomHeroPhoto();
-    const intervalId = window.setInterval(loadRandomHeroPhoto, 5000);
+    const intervalId = window.setInterval(loadRandomHeroPhoto, 10000);
 
     return () => {
       window.clearInterval(intervalId);
@@ -171,22 +178,22 @@ export default function LandingPage() {
         </div>
         <figure className="relative h-[420px] overflow-hidden rounded-3xl shadow-lg">
           <img
-            className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1500ms] ease-in-out ${isNextHeroPhotoVisible ? 'opacity-0' : 'opacity-100'}`}
+            className={`absolute inset-0 h-full w-full object-cover ${heroFadeClass} ${isNextHeroPhotoVisible ? 'opacity-0' : 'opacity-100'}`}
             src={heroPhoto.src}
             alt={heroPhoto.alt}
           />
           {nextHeroPhoto ? (
             <img
-              className={`absolute inset-0 h-full w-full object-cover transition-opacity duration-[1500ms] ease-in-out ${isNextHeroPhotoVisible ? 'opacity-100' : 'opacity-0'}`}
+              className={`absolute inset-0 h-full w-full object-cover ${heroFadeClass} ${isNextHeroPhotoVisible ? 'opacity-100' : 'opacity-0'}`}
               src={nextHeroPhoto.src}
               alt={nextHeroPhoto.alt}
             />
           ) : null}
-          <div className={`transition-opacity duration-[1500ms] ease-in-out ${isNextHeroPhotoVisible ? 'opacity-0' : 'opacity-100'}`}>
+          <div className={`${heroFadeClass} ${isNextHeroPhotoVisible ? 'opacity-0' : 'opacity-100'}`}>
             {renderAttribution(heroPhoto)}
           </div>
           {nextHeroPhoto ? (
-            <div className={`transition-opacity duration-[1500ms] ease-in-out ${isNextHeroPhotoVisible ? 'opacity-100' : 'opacity-0'}`}>
+            <div className={`${heroFadeClass} ${isNextHeroPhotoVisible ? 'opacity-100' : 'opacity-0'}`}>
               {renderAttribution(nextHeroPhoto)}
             </div>
           ) : null}
