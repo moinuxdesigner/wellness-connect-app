@@ -4,7 +4,7 @@ import DashboardLayout from '../../layout/DashboardLayout';
 
 export const clientNavItems = [
   { label: 'Dashboard', to: '/client', icon: HeartPulse, end: true },
-  { label: 'Intake', to: '/client/intake', icon: ListChecks },
+  { label: 'Book Session', to: '/client/intake', icon: ListChecks },
   { label: 'My Appointments', to: '/client/appointments', icon: Calendar },
   { label: 'My Programs', to: '/client/programs', icon: ClipboardList },
   { label: 'Profile', to: '/client/profile', icon: UserCircle },

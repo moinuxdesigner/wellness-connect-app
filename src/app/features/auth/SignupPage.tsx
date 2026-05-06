@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import type { Role } from '../../types';
 import { registerRequest } from './apiAuth';
-import { getRoleHomePath } from './roleRedirects';
+import { getPostAuthRedirectPath } from './roleRedirects';
 
 const signupRoles: Array<{ label: string; value: Role }> = [
   { label: 'Client', value: 'client' },
@@ -54,7 +54,7 @@ export default function SignupPage() {
               primary_goal: role === 'client' ? goal : undefined,
               consent_to_terms: consent,
             });
-            navigate(getRoleHomePath(user.role));
+            navigate(getPostAuthRedirectPath(user));
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to create account.';
             setNotice(message);

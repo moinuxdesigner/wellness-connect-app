@@ -94,6 +94,8 @@ class AuthController extends Controller
 
     private function userPayload(User $user): array
     {
+        $requiresClientIntake = $user->role === 'client' && !$user->intakeFlows()->exists();
+
         return [
             'id' => $user->id,
             'name' => $user->name,
@@ -102,6 +104,7 @@ class AuthController extends Controller
             'phone' => $user->phone,
             'consent_to_terms' => (bool) $user->consent_to_terms,
             'status' => $user->status ?? 'active',
+            'requires_client_intake' => $requiresClientIntake,
         ];
     }
 }

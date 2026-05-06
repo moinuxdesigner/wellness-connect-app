@@ -1,4 +1,5 @@
 import type { Role } from '../../types';
+import type { AuthUser } from './auth';
 
 export const roleHomePaths: Record<Role, string> = {
   client: '/client',
@@ -14,4 +15,12 @@ export const roleHomePaths: Record<Role, string> = {
 
 export function getRoleHomePath(role: Role): string {
   return roleHomePaths[role];
+}
+
+export function getPostAuthRedirectPath(user: AuthUser): string {
+  if (user.role === 'client' && user.requires_client_intake) {
+    return '/client/intake';
+  }
+
+  return getRoleHomePath(user.role);
 }

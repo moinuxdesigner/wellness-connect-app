@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { loginRequest } from './apiAuth';
-import { getRoleHomePath } from './roleRedirects';
+import { getPostAuthRedirectPath } from './roleRedirects';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -24,7 +24,7 @@ export default function LoginPage() {
 
           try {
             const user = await loginRequest(email, password);
-            navigate(getRoleHomePath(user.role));
+            navigate(getPostAuthRedirectPath(user));
           } catch (error) {
             const message = error instanceof Error ? error.message : 'Unable to login.';
             setNotice(message);

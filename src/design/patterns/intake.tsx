@@ -1,10 +1,10 @@
 import type { ReactNode } from 'react';
 
-export function IntakeStepper({ current }: { current: 1 | 2 | 3 | 4 }) {
-  const steps = ['Service', 'Intake', 'Schedule', 'Confirm'];
+export function IntakeStepper({ current, steps = ['Service', 'Intake', 'Schedule', 'Confirm'] }: { current: number; steps?: string[] }) {
+  const columns = steps.length <= 4 ? 'grid-cols-4' : steps.length === 5 ? 'grid-cols-5' : 'grid-cols-3 sm:grid-cols-6';
 
   return (
-    <div className="grid grid-cols-4 gap-2 text-center text-xs font-medium text-slate-600">
+    <div className={`grid ${columns} gap-2 text-center text-xs font-medium text-slate-600`}>
       {steps.map((step, index) => {
         const number = index + 1;
         const active = number <= current;

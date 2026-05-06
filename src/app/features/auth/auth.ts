@@ -12,6 +12,7 @@ export interface AuthUser {
   primary_goal?: 'fitness' | 'mental_health' | 'both' | null;
   consent_to_terms?: boolean;
   status?: 'active' | 'pending' | 'suspended';
+  requires_client_intake?: boolean;
 }
 
 export interface AuthState {
