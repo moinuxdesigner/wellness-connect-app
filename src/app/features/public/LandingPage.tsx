@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router';
 import {
   Brain,
@@ -14,26 +14,6 @@ import {
   Menu,
   X,
 } from 'lucide-react';
-
-/* ─── Types ─────────────────────────────────────────────────────────── */
-type HeroPhoto = {
-  src: string;
-  alt: string;
-  photographerName?: string;
-  photographerUrl?: string;
-  photoUrl?: string;
-};
-
-/* ─── Fallback hero ─────────────────────────────────────────────────── */
-const FALLBACK_HERO: HeroPhoto = {
-  src: 'https://images.unsplash.com/photo-1648995361141-30676a75fd27?auto=format&fit=crop&fm=jpg&q=80&w=1400',
-  alt: 'Wellness coaching session',
-  photographerName: 'sour moha',
-  photographerUrl:
-    'https://unsplash.com/@sour_moha?utm_source=wellness_connect&utm_medium=referral',
-  photoUrl:
-    'https://unsplash.com/photos/a-man-running-on-a-treadmill-in-a-gym-_cUZkx0wTyM?utm_source=wellness_connect&utm_medium=referral',
-};
 
 /* ─── Static content ────────────────────────────────────────────────── */
 const NAV_LINKS = [
@@ -134,83 +114,7 @@ const TESTIMONIALS = [
 
 /* ─── Component ─────────────────────────────────────────────────────── */
 export default function LandingPage() {
-  const [heroPhoto, setHeroPhoto] = useState<HeroPhoto>(FALLBACK_HERO);
-  const [nextPhoto, setNextPhoto] = useState<HeroPhoto | null>(null);
-  const [nextVisible, setNextVisible] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const loadingRef = useRef(false);
-  const disabledRef = useRef(false);
-  const fadeTimer = useRef<number>();
-
-  /* Unsplash hero rotation */
-  useEffect(() => {
-    const key = import.meta.env.VITE_UNSPLASH_ACCESS_KEY;
-    if (!key) return;
-
-    const ctrl = new AbortController();
-    const params = new URLSearchParams({
-      query: 'wellness meditation therapy fitness lifestyle',
-      orientation: 'landscape',
-      content_filter: 'high',
-      client_id: key,
-    });
-
-    async function load() {
-      if (loadingRef.current || disabledRef.current) return;
-      loadingRef.current = true;
-      try {
-        const res = await fetch(
-          `https://api.unsplash.com/photos/random?${params}`,
-          { signal: ctrl.signal },
-        );
-        if (!res.ok) {
-          if (res.status === 401 || res.status === 403) disabledRef.current = true;
-          throw new Error('Unsplash error');
-        }
-        const data = await res.json();
-        const next: HeroPhoto = {
-          src: data.urls.regular,
-          alt: data.alt_description || 'Wellness session',
-          photographerName: data.user.name,
-          photographerUrl: `${data.user.links.html}?utm_source=wellness_connect&utm_medium=referral`,
-          photoUrl: `${data.links.html}?utm_source=wellness_connect&utm_medium=referral`,
-        };
-        await new Promise<void>((resolve, reject) => {
-          const img = new Image();
-          img.onload = () => resolve();
-          img.onerror = reject;
-          img.src = next.src;
-        });
-        if (ctrl.signal.aborted) return;
-        setNextPhoto(next);
-        requestAnimationFrame(() => {
-          if (!ctrl.signal.aborted) setNextVisible(true);
-        });
-        fadeTimer.current = window.setTimeout(() => {
-          if (!ctrl.signal.aborted) {
-            setHeroPhoto(next);
-            setNextPhoto(null);
-            setNextVisible(false);
-            loadingRef.current = false;
-          }
-        }, 1500);
-      } catch {
-        if (!ctrl.signal.aborted) loadingRef.current = false;
-      }
-    }
-
-    load();
-    const interval = window.setInterval(load, 10000);
-    return () => {
-      window.clearInterval(interval);
-      if (fadeTimer.current) window.clearTimeout(fadeTimer.current);
-      ctrl.abort();
-    };
-  }, []);
-
-  const fadeClass = nextPhoto
-    ? 'transition-opacity duration-[1500ms] ease-in-out'
-    : '';
 
   return (
     <div className="min-h-screen bg-white" style={{ fontFamily: "'Segoe UI', system-ui, sans-serif" }}>
@@ -363,72 +267,15 @@ export default function LandingPage() {
 
           {/* Right — hero image */}
           <div className="order-1 lg:order-2">
-            <figure className="relative h-[320px] overflow-hidden rounded-3xl shadow-2xl sm:h-[420px] lg:h-[500px]">
+            <div className="relative h-[320px] overflow-hidden rounded-3xl shadow-2xl sm:h-[420px] lg:h-[500px]">
               <img
-                className={`absolute inset-0 h-full w-full object-cover ${fadeClass} ${nextVisible ? 'opacity-0' : 'opacity-100'}`}
-                src={heroPhoto.src}
-                alt={heroPhoto.alt}
+                src="/exercise-couple.png"
+                alt="Couple exercising together — fitness and wellness"
+                className="h-full w-full object-cover object-center"
               />
-              {nextPhoto && (
-                <img
-                  className={`absolute inset-0 h-full w-full object-cover ${fadeClass} ${nextVisible ? 'opacity-100' : 'opacity-0'}`}
-                  src={nextPhoto.src}
-                  alt={nextPhoto.alt}
-                />
-              )}
               {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/25 to-transparent" />
-
-              {/* Photo attribution */}
-              {heroPhoto.photographerName && (
-                <figcaption
-                  className={`absolute bottom-3 right-3 rounded-full bg-slate-950/60 px-3 py-1 text-xs text-white backdrop-blur ${fadeClass} ${nextVisible ? 'opacity-0' : 'opacity-100'}`}
-                >
-                  Photo by{' '}
-                  <a
-                    className="underline underline-offset-2"
-                    href={heroPhoto.photographerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {heroPhoto.photographerName}
-                  </a>{' '}
-                  on{' '}
-                  <a
-                    className="underline underline-offset-2"
-                    href={heroPhoto.photoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Unsplash
-                  </a>
-                </figcaption>
-              )}
-              {nextPhoto?.photographerName && (
-                <figcaption
-                  className={`absolute bottom-3 right-3 rounded-full bg-slate-950/60 px-3 py-1 text-xs text-white backdrop-blur ${fadeClass} ${nextVisible ? 'opacity-100' : 'opacity-0'}`}
-                >
-                  Photo by{' '}
-                  <a
-                    className="underline underline-offset-2"
-                    href={nextPhoto.photographerUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    {nextPhoto.photographerName}
-                  </a>{' '}
-                  on{' '}
-                  <a
-                    className="underline underline-offset-2"
-                    href={nextPhoto.photoUrl}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Unsplash
-                  </a>
-                </figcaption>
-              )}
-            </figure>
+              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
+            </div>
           </div>
         </div>
       </section>
