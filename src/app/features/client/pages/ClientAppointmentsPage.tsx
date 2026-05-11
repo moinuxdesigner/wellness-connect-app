@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { CalendarClock, Video } from 'lucide-react';
 import {
   bookAppointmentRequest,
   cancelAppointmentRequest,
@@ -43,23 +44,42 @@ export default function ClientAppointmentsPage() {
   }, [selectedPractitioner]);
 
   return (
-    <div className="space-y-4">
-      <ClientPageTitle title="My Appointments" subtitle="Book and manage your sessions." />
+    <div className="mx-auto max-w-md space-y-4 pb-2">
+      <ClientPageTitle title="My Schedule" subtitle="View and manage both training and counselling sessions." />
 
-      <DSCard>
-        <h2 className="text-lg font-semibold text-slate-900">Book a session</h2>
+      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+        <h2 className="text-base font-semibold text-slate-900">Today's Sessions</h2>
+        <div className="mt-3 space-y-3">
+          {sortedAppointments.length === 0 ? (
+            <p className="rounded-xl bg-slate-50 p-3 text-sm text-slate-600">No sessions planned for today.</p>
+          ) : (
+            sortedAppointments.slice(0, 2).map((a) => (
+              <article key={`today-${a.id}`} className="rounded-2xl bg-slate-50 p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold capitalize text-slate-900">{a.service_type} Session</p>
+                  <span className="rounded-full bg-indigo-100 px-2 py-1 text-xs font-medium text-indigo-700">{a.status}</span>
+                </div>
+                <p className="mt-1 flex items-center gap-1 text-xs text-slate-600"><CalendarClock size={14} /> {new Date(a.starts_at).toLocaleString()}</p>
+              </article>
+            ))
+          )}
+        </div>
+      </DSCard>
+
+      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+        <h2 className="text-base font-semibold text-slate-900">Book New Session</h2>
         <div className="mt-3 grid gap-3">
-          <select className="rounded-xl border border-slate-300 px-3 py-2" value={serviceType} onChange={(e) => setServiceType(e.target.value as 'psychology' | 'training' | 'combined' | 'package')}>
+          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={serviceType} onChange={(e) => setServiceType(e.target.value as 'psychology' | 'training' | 'combined' | 'package')}>
             <option value="psychology">Psychology</option>
             <option value="training">Training</option>
             <option value="combined">Combined</option>
             <option value="package">Package</option>
           </select>
-          <select className="rounded-xl border border-slate-300 px-3 py-2" value={selectedPractitioner ?? ''} onChange={(e) => setSelectedPractitioner(Number(e.target.value) || null)}>
+          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={selectedPractitioner ?? ''} onChange={(e) => setSelectedPractitioner(Number(e.target.value) || null)}>
             <option value="">Select practitioner</option>
             {practitioners.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
           </select>
-          <select className="rounded-xl border border-slate-300 px-3 py-2" value={selectedSlot ?? ''} onChange={(e) => setSelectedSlot(Number(e.target.value) || null)}>
+          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={selectedSlot ?? ''} onChange={(e) => setSelectedSlot(Number(e.target.value) || null)}>
             <option value="">Select slot</option>
             {slots.map((s) => <option key={s.id} value={s.id}>{new Date(s.starts_at).toLocaleString()}</option>)}
           </select>
@@ -81,20 +101,21 @@ export default function ClientAppointmentsPage() {
             }}
             type="button"
           >
-            {loading ? 'Booking...' : 'Book appointment'}
+            {loading ? 'Booking...' : 'Book new session'}
           </DSButton>
         </div>
       </DSCard>
 
-      {notice ? <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</p> : null}
+      {notice ? <p className="rounded-xl bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</p> : null}
 
-      <DSCard>
-        <h2 className="text-lg font-semibold text-slate-900">Upcoming and past appointments</h2>
+      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+        <h2 className="text-base font-semibold text-slate-900">Upcoming and Past Sessions</h2>
         <div className="mt-3 space-y-2">
           {sortedAppointments.length === 0 ? <p className="text-sm text-slate-600">No appointments yet.</p> : sortedAppointments.map((a) => (
-            <article key={a.id} className="rounded-xl border border-slate-200 p-3">
-              <p className="text-sm font-semibold text-slate-900">{a.service_type} • {new Date(a.starts_at).toLocaleString()}</p>
+            <article key={a.id} className="rounded-2xl border border-slate-200 p-3">
+              <p className="text-sm font-semibold capitalize text-slate-900">{a.service_type} - {new Date(a.starts_at).toLocaleString()}</p>
               <p className="text-xs capitalize text-slate-600">status: {a.status}</p>
+              <p className="mt-1 flex items-center gap-1 text-xs text-slate-500"><Video size={14} /> Online session</p>
               {a.status !== 'cancelled' ? (
                 <DSSecondaryButton
                   className="mt-2"

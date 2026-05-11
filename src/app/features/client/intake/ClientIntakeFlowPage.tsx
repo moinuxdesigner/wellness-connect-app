@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { Check, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, Check, Dumbbell, HeartHandshake, Info, Package2, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import {
   bookAppointmentRequest,
@@ -15,11 +15,15 @@ import {
 import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
 import { IntakeStepper, MobileSectionTitle } from '../../../../design/patterns/intake';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { Calendar } from '../../../components/ui/calendar';
 
 type ServiceType = 'psychology' | 'training' | 'combined' | 'package';
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 type ConcernOption = { value: string; label: string };
 type PickerMode = 'single' | 'psychologist' | 'trainer';
+type SlotPickerMode = 'single' | 'psychologist' | 'trainer';
+type PractitionerWithAvatar = PractitionerItem & { avatarUrl: string };
+type DisplaySlot = { id: number; starts_at: string; source: 'api' | 'generated' };
 
 interface State {
   step: Step;
@@ -74,6 +78,30 @@ const concernOptions: Record<ServiceType, ConcernOption[]> = {
 
 const defaultSteps = ['Service', 'Intake', 'Schedule', 'Confirm'];
 const combinedSteps = ['Service', 'Intake', 'Psychologist', 'Trainer', 'Review', 'Confirm'];
+const mockPractitioners: PractitionerItem[] = [
+  { id: 9101, name: 'Dr. Aisha Sharma', type: 'counsellor', specialties: ['anxiety', 'burnout', 'stress'] },
+  { id: 9102, name: 'Dr. Neha Kapoor', type: 'counsellor', specialties: ['sleep', 'relationships', 'mood'] },
+  { id: 9103, name: 'Dr. Rahul Mehta', type: 'counsellor', specialties: ['stress', 'emotional resilience', 'focus'] },
+  { id: 9104, name: 'Dr. Kavya Iyer', type: 'counsellor', specialties: ['mindfulness', 'work stress', 'self-esteem'] },
+  { id: 9201, name: 'Coach Arjun Singh', type: 'trainer', specialties: ['fat loss', 'strength', 'mobility'] },
+  { id: 9202, name: 'Coach Priya Nair', type: 'trainer', specialties: ['posture', 'core', 'toning'] },
+  { id: 9203, name: 'Coach Vikram Das', type: 'trainer', specialties: ['conditioning', 'athletic fitness', 'endurance'] },
+  { id: 9204, name: 'Coach Rohan Patel', type: 'trainer', specialties: ['weight loss', 'functional training', 'flexibility'] },
+];
+
+const psychologistImages = [
+  'https://images.unsplash.com/photo-1559839734-2b71ea197ec2?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1614608682850-e0d6ed316d47?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1594824804732-ca8db7d7311b?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?auto=format&fit=crop&w=300&q=80',
+];
+
+const trainerImages = [
+  'https://images.unsplash.com/photo-1567013127542-490d757e6349?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1579758629938-03607ccdbaba?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1583454110551-21f2fa2afe61?auto=format&fit=crop&w=300&q=80',
+  'https://images.unsplash.com/photo-1517836357463-d25dfeac3438?auto=format&fit=crop&w=300&q=80',
+];
 
 function getConcernOptions(serviceType: ServiceType) {
   return concernOptions[serviceType];
@@ -125,10 +153,68 @@ function formatDateTime(value?: string) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
+function toLocalDateKey(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+function fromLocalDateKey(value: string) {
+  const [year, month, day] = value.split('-').map(Number);
+  if (!year || !month || !day) return undefined;
+  return new Date(year, month - 1, day);
+}
+
+function dateKey(value?: string) {
+  return value ? toLocalDateKey(new Date(value)) : '';
+}
+
 function practitionerLabel(type: PractitionerItem['type']) {
   if (type === 'trainer') return 'Fitness trainer';
   if (type === 'counsellor') return 'Psychologist';
   return 'Coach';
+}
+
+function withAvatar(practitioner: PractitionerItem): PractitionerWithAvatar {
+  const imageSet = practitioner.type === 'trainer' ? trainerImages : psychologistImages;
+  const avatarUrl = imageSet[Math.abs(practitioner.id) % imageSet.length];
+  return { ...practitioner, avatarUrl };
+}
+
+function ensureMinCards(primary: PractitionerItem[], fallback: PractitionerItem[], minCards = 4): PractitionerItem[] {
+  const seen = new Set<number>();
+  const merged: PractitionerItem[] = [];
+
+  for (const item of [...primary, ...fallback]) {
+    if (seen.has(item.id)) continue;
+    seen.add(item.id);
+    merged.push(item);
+    if (merged.length >= minCards) break;
+  }
+
+  return merged;
+}
+
+function generateFallbackSlots(date: string): DisplaySlot[] {
+  if (!date) return [];
+  const slots = ['09:00', '10:30', '12:00', '15:00', '17:30'];
+  return slots.map((time, index) => ({
+    id: -1 * (index + 1),
+    starts_at: `${date}T${time}:00`,
+    source: 'generated',
+  }));
+}
+
+function getPreviousStep(step: Step, isCombined: boolean): Step | null {
+  if (step <= 1) return null;
+  if (!isCombined && step === 3) return 2;
+  if (!isCombined && step === 2) return 1;
+  if (isCombined && step === 5) return 4;
+  if (isCombined && step === 4) return 3;
+  if (isCombined && step === 3) return 2;
+  if (step === 2) return 1;
+  return null;
 }
 
 export default function ClientIntakeFlowPage() {
@@ -137,10 +223,18 @@ export default function ClientIntakeFlowPage() {
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [pickerMode, setPickerMode] = useState<PickerMode | null>(null);
+  const [slotPickerMode, setSlotPickerMode] = useState<SlotPickerMode | null>(null);
   const [practitioners, setPractitioners] = useState<PractitionerItem[]>([]);
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [psychologistSlots, setPsychologistSlots] = useState<SlotItem[]>([]);
   const [trainerSlots, setTrainerSlots] = useState<SlotItem[]>([]);
+  const [singleDate, setSingleDate] = useState<string>(toLocalDateKey(new Date()));
+  const [psychologistDate, setPsychologistDate] = useState<string>(toLocalDateKey(new Date()));
+  const [trainerDate, setTrainerDate] = useState<string>(toLocalDateKey(new Date()));
+  const [pendingSlotId, setPendingSlotId] = useState<number | null>(null);
+  const [generatedSingleSlot, setGeneratedSingleSlot] = useState<string | null>(null);
+  const [generatedPsychologistSlot, setGeneratedPsychologistSlot] = useState<string | null>(null);
+  const [generatedTrainerSlot, setGeneratedTrainerSlot] = useState<string | null>(null);
   const [confirmation, setConfirmation] = useState<{ state: string; message?: string } | null>(null);
 
   const selectedPractitioner = useMemo(() => practitioners.find((p) => p.id === state.selectedPractitionerId), [practitioners, state.selectedPractitionerId]);
@@ -153,6 +247,9 @@ export default function ClientIntakeFlowPage() {
   const isCombined = state.serviceType === 'combined';
   const stepperSteps = isCombined ? combinedSteps : defaultSteps;
   const stepperCurrent = isCombined ? state.step : Math.min(state.step, 4);
+  const mobileTotalSteps = isCombined ? 5 : 3;
+  const mobileCurrentStep = !isCombined && state.step > 3 ? 3 : Math.min(state.step, mobileTotalSteps);
+  const previousStep = getPreviousStep(state.step, isCombined);
 
   const singlePractitioners = useMemo(() => {
     if (state.serviceType === 'training') return practitioners.filter((p) => ['trainer', 'coach'].includes(p.type));
@@ -165,6 +262,17 @@ export default function ClientIntakeFlowPage() {
     if (pickerMode === 'trainer') return practitioners.filter((p) => p.type === 'trainer');
     return singlePractitioners;
   }, [pickerMode, practitioners, singlePractitioners]);
+
+  const displayPractitioners = useMemo<PractitionerWithAvatar[]>(() => {
+    const fallback = pickerMode === 'trainer'
+      ? mockPractitioners.filter((p) => p.type === 'trainer')
+      : pickerMode === 'psychologist'
+        ? mockPractitioners.filter((p) => p.type === 'counsellor')
+        : mockPractitioners;
+
+    const source = ensureMinCards(pickerPractitioners, fallback, 4);
+    return source.map(withAvatar);
+  }, [pickerMode, pickerPractitioners]);
 
   useEffect(() => {
     if (state.step < 3 || !state.flowId) return;
@@ -244,6 +352,13 @@ export default function ClientIntakeFlowPage() {
     setNotice('');
 
     try {
+      const isDemoSelection = state.selectedPractitionerId >= 9000 || state.selectedSlotId < 0;
+      if (isDemoSelection) {
+        dispatch({ type: 'SET_FIELD', payload: { status: 'booked' } });
+        dispatch({ type: 'SET_STEP', payload: 6 });
+        setNotice('Demo slot selected successfully.');
+        return;
+      }
       await bookAppointmentRequest({
         intake_flow_id: state.flowId,
         practitioner_id: state.selectedPractitionerId,
@@ -266,6 +381,17 @@ export default function ClientIntakeFlowPage() {
     setNotice('');
 
     try {
+      const isDemoSelection =
+        state.selectedPsychologistId >= 9000 ||
+        state.selectedTrainerId >= 9000 ||
+        state.selectedPsychologistSlotId < 0 ||
+        state.selectedTrainerSlotId < 0;
+      if (isDemoSelection) {
+        dispatch({ type: 'SET_FIELD', payload: { status: 'booked' } });
+        dispatch({ type: 'SET_STEP', payload: 6 });
+        setNotice('Demo slots selected successfully.');
+        return;
+      }
       await bookAppointmentRequest({
         intake_flow_id: state.flowId,
         practitioner_id: state.selectedPsychologistId,
@@ -329,6 +455,59 @@ export default function ClientIntakeFlowPage() {
     );
   }
 
+  function openSlotPicker(mode: SlotPickerMode) {
+    const modeSlots = mode === 'psychologist' ? psychologistSlots : mode === 'trainer' ? trainerSlots : slots;
+    const availableKeys = [...new Set(modeSlots.map((slot) => dateKey(slot.starts_at)).filter(Boolean))].sort();
+    const firstDate = availableKeys[0];
+    const current = mode === 'psychologist' ? psychologistDate : mode === 'trainer' ? trainerDate : singleDate;
+    const nextDate = availableKeys.includes(current) ? current : (firstDate ?? current);
+
+    if (mode === 'psychologist') setPsychologistDate(nextDate);
+    if (mode === 'trainer') setTrainerDate(nextDate);
+    if (mode === 'single') setSingleDate(nextDate);
+    const existingSelection =
+      mode === 'psychologist' ? state.selectedPsychologistSlotId : mode === 'trainer' ? state.selectedTrainerSlotId : state.selectedSlotId;
+    setPendingSlotId(existingSelection);
+    setSlotPickerMode(mode);
+  }
+
+  const activeDate = slotPickerMode === 'psychologist' ? psychologistDate : slotPickerMode === 'trainer' ? trainerDate : singleDate;
+  const activeSlots = slotPickerMode === 'psychologist' ? psychologistSlots : slotPickerMode === 'trainer' ? trainerSlots : slots;
+  const activeAvailableDateKeys = useMemo(
+    () => [...new Set(activeSlots.map((slot) => dateKey(slot.starts_at)).filter(Boolean))].sort(),
+    [activeSlots],
+  );
+  const activeDateSlots = activeSlots.filter((slot) => dateKey(slot.starts_at) === activeDate);
+  const displayDateSlots: DisplaySlot[] = activeDateSlots.length
+    ? activeDateSlots.map((slot) => ({ id: slot.id, starts_at: slot.starts_at, source: 'api' }))
+    : generateFallbackSlots(activeDate);
+
+  function selectedSlotLabel(mode: SlotPickerMode) {
+    const targetId = mode === 'psychologist' ? state.selectedPsychologistSlotId : mode === 'trainer' ? state.selectedTrainerSlotId : state.selectedSlotId;
+    const targetSlot = (mode === 'psychologist' ? psychologistSlots : mode === 'trainer' ? trainerSlots : slots).find((slot) => slot.id === targetId);
+    if (targetSlot) return formatDateTime(targetSlot.starts_at);
+    if (mode === 'psychologist' && generatedPsychologistSlot) return formatDateTime(generatedPsychologistSlot);
+    if (mode === 'trainer' && generatedTrainerSlot) return formatDateTime(generatedTrainerSlot);
+    if (mode === 'single' && generatedSingleSlot) return formatDateTime(generatedSingleSlot);
+    return 'Select time slot';
+  }
+
+  function selectSlotAndClose(slotId: number) {
+    const selectedDisplaySlot = displayDateSlots.find((slot) => slot.id === slotId);
+    if (slotPickerMode === 'psychologist') {
+      dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } });
+      setGeneratedPsychologistSlot(selectedDisplaySlot?.source === 'generated' ? selectedDisplaySlot.starts_at : null);
+    } else if (slotPickerMode === 'trainer') {
+      dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } });
+      setGeneratedTrainerSlot(selectedDisplaySlot?.source === 'generated' ? selectedDisplaySlot.starts_at : null);
+    } else {
+      dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } });
+      setGeneratedSingleSlot(selectedDisplaySlot?.source === 'generated' ? selectedDisplaySlot.starts_at : null);
+    }
+    setSlotPickerMode(null);
+    setPendingSlotId(null);
+  }
+
   function renderAppointmentSummary(title: string, practitioner: PractitionerItem | undefined, slot: SlotItem | undefined) {
     return (
       <DSCard className="space-y-1 bg-slate-50 shadow-none">
@@ -338,6 +517,41 @@ export default function ClientIntakeFlowPage() {
         <p className="text-sm text-slate-700">{formatDateTime(slot?.starts_at)}</p>
         <p className="text-sm text-slate-600">Mode: Online</p>
       </DSCard>
+    );
+  }
+
+  function renderStepActions({
+    onNext,
+    nextLabel,
+    nextDisabled = false,
+    onBack,
+    desktopBackLabel = 'Back',
+  }: {
+    onNext: () => void | Promise<void>;
+    nextLabel: string;
+    nextDisabled?: boolean;
+    onBack?: () => void;
+    desktopBackLabel?: string;
+  }) {
+    return (
+      <>
+        <div className="hidden justify-between gap-2 sm:flex">
+          {onBack ? <DSSecondaryButton onClick={onBack}>{desktopBackLabel}</DSSecondaryButton> : <span />}
+          <DSButton onClick={onNext} disabled={nextDisabled}>{nextLabel}</DSButton>
+        </div>
+        <div className="grid grid-cols-[48px_1fr] gap-2 sm:hidden">
+          <button
+            type="button"
+            aria-label="Go back"
+            onClick={onBack}
+            disabled={!onBack}
+            className="inline-flex h-12 items-center justify-center rounded-xl border border-slate-300 bg-white text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <ArrowLeft size={18} />
+          </button>
+          <DSButton onClick={onNext} disabled={nextDisabled} className="h-12 w-full">{nextLabel}</DSButton>
+        </div>
+      </>
     );
   }
 
@@ -374,25 +588,57 @@ export default function ClientIntakeFlowPage() {
 
   return (
     <div className="mx-auto max-w-3xl space-y-4 pb-20">
-      <DSCard className="space-y-4">
-        <IntakeStepper current={stepperCurrent} steps={stepperSteps} />
+      <DSCard className="space-y-4 rounded-[28px] border-slate-200/80 p-4 sm:p-6">
+        <div className="hidden sm:block">
+          <IntakeStepper current={stepperCurrent} steps={stepperSteps} />
+        </div>
+        <div className="rounded-xl bg-slate-50 px-3 py-2 text-xs font-medium text-slate-600 sm:hidden">
+          Step {mobileCurrentStep} of {mobileTotalSteps}
+        </div>
 
         {state.step === 1 ? (
           <>
             <MobileSectionTitle title="Select the support you need" subtitle="Choose your main service type to continue." />
-            <div className="grid gap-2 sm:grid-cols-2">
-              {(['psychology', 'training', 'combined', 'package'] as ServiceType[]).map((service) => (
+            <div className="grid gap-3 sm:grid-cols-2">
+              {([
+                { key: 'psychology', label: 'Psychology Support', icon: Brain, description: 'Counselling for stress, anxiety, low mood, burnout, relationships, and emotional wellbeing.' },
+                { key: 'training', label: 'Personal Training', icon: Dumbbell, description: 'Goal-based coaching for fat loss, strength, mobility, fitness, and healthy routines.' },
+                { key: 'combined', label: 'Combined Wellness', icon: HeartHandshake, description: 'A blended mind + body plan with counselling and personal training support.' },
+                { key: 'package', label: 'Wellness Packages', icon: Package2, description: 'Structured packages with bundled sessions and guided progress plans.' },
+              ] as const).map(({ key, label, icon: Icon, description }) => (
                 <button
-                  key={service}
+                  key={key}
                   type="button"
-                  onClick={() => dispatch({ type: 'SET_SERVICE', payload: service })}
-                  className={`rounded-xl border px-3 py-3 text-left text-sm capitalize ${state.serviceType === service ? 'border-[var(--ds-brand)] bg-indigo-50 text-[var(--ds-brand)]' : 'border-[var(--ds-border)] bg-white text-slate-700'}`}
+                  onClick={() => dispatch({ type: 'SET_SERVICE', payload: key })}
+                  className={`rounded-2xl border p-4 text-left transition ${state.serviceType === key ? 'border-[var(--ds-brand)] bg-indigo-50/60 shadow-[inset_0_0_0_1px_var(--ds-brand)]' : 'border-[var(--ds-border)] bg-white hover:bg-slate-50'}`}
                 >
-                  {service}
+                  <div className="flex items-start gap-3">
+                    <span className={`grid h-10 w-10 place-items-center rounded-full ${state.serviceType === key ? 'bg-indigo-100 text-[var(--ds-brand)]' : 'bg-slate-100 text-slate-500'}`}>
+                      <Icon size={18} />
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold text-slate-900">{label}</span>
+                      <span className="mt-1 block text-xs leading-5 text-slate-600">{description}</span>
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>
-            <div className="flex justify-end"><DSButton onClick={onContinueFromService} disabled={loading}>{loading ? 'Starting...' : 'Continue'}</DSButton></div>
+            <div className="rounded-2xl bg-slate-100 p-4 text-sm text-slate-700">
+              <p className="mb-2 flex items-center gap-2 font-semibold text-slate-900"><Info size={16} /> How this works</p>
+              <ul className="space-y-1 text-xs leading-5 text-slate-600">
+                <li>Answer tailored intake questions.</li>
+                <li>Get the right practitioner or package.</li>
+                <li>Book your first session.</li>
+              </ul>
+            </div>
+            {renderStepActions({
+              onNext: onContinueFromService,
+              nextLabel: loading ? 'Starting...' : 'Next',
+              nextDisabled: loading,
+              onBack: () => navigate('/client'),
+              desktopBackLabel: 'Back to Dashboard',
+            })}
           </>
         ) : null}
 
@@ -420,7 +666,12 @@ export default function ClientIntakeFlowPage() {
                 placeholder="Example: I want to feel calmer, sleep better, build a consistent fitness routine, and know which first steps to follow each week."
               />
             </label>
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 1 })}>Back</DSSecondaryButton><DSButton onClick={onContinueFromIntake} disabled={loading}>{loading ? 'Submitting...' : 'Continue'}</DSButton></div>
+            {renderStepActions({
+              onNext: onContinueFromIntake,
+              nextLabel: loading ? 'Submitting...' : 'Next',
+              nextDisabled: loading,
+              onBack: () => dispatch({ type: 'SET_STEP', payload: 1 }),
+            })}
           </>
         ) : null}
 
@@ -429,8 +680,19 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Select Psychologist" subtitle="Choose a psychologist and select your session time." />
             {renderPractitionerButton('psychologist', selectedPsychologist, 'Select Psychologist', 'Open psychologist list')}
             {selectedPsychologist ? <p className="text-xs text-slate-600">Specialties: {selectedPsychologist.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(psychologistSlots, state.selectedPsychologistSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })} disabled={!state.selectedPsychologistId || !state.selectedPsychologistSlotId}>Continue</DSButton></div>
+            <button
+              type="button"
+              onClick={() => openSlotPicker('psychologist')}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-left text-slate-700 transition hover:bg-slate-50"
+            >
+              {selectedSlotLabel('psychologist')}
+            </button>
+            {renderStepActions({
+              onNext: () => dispatch({ type: 'SET_STEP', payload: 4 }),
+              nextLabel: 'Next',
+              nextDisabled: !state.selectedPsychologistId || !state.selectedPsychologistSlotId,
+              onBack: () => dispatch({ type: 'SET_STEP', payload: 2 }),
+            })}
           </>
         ) : null}
 
@@ -439,8 +701,19 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Select Fitness Trainer" subtitle="Choose a trainer and select your session time." />
             {renderPractitionerButton('trainer', selectedTrainer, 'Select Fitness Trainer', 'Open trainer list')}
             {selectedTrainer ? <p className="text-xs text-slate-600">Specialties: {selectedTrainer.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(trainerSlots, state.selectedTrainerSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>Back</DSSecondaryButton><DSButton onClick={() => dispatch({ type: 'SET_STEP', payload: 5 })} disabled={!state.selectedTrainerId || !state.selectedTrainerSlotId}>Review</DSButton></div>
+            <button
+              type="button"
+              onClick={() => openSlotPicker('trainer')}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-left text-slate-700 transition hover:bg-slate-50"
+            >
+              {selectedSlotLabel('trainer')}
+            </button>
+            {renderStepActions({
+              onNext: () => dispatch({ type: 'SET_STEP', payload: 5 }),
+              nextLabel: 'Next',
+              nextDisabled: !state.selectedTrainerId || !state.selectedTrainerSlotId,
+              onBack: () => dispatch({ type: 'SET_STEP', payload: 3 }),
+            })}
           </>
         ) : null}
 
@@ -451,7 +724,12 @@ export default function ClientIntakeFlowPage() {
               {renderAppointmentSummary('Psychologist appointment', selectedPsychologist, selectedPsychologistSlot)}
               {renderAppointmentSummary('Fitness trainer appointment', selectedTrainer, selectedTrainerSlot)}
             </div>
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })}>Back</DSSecondaryButton><DSButton onClick={onReserveCombinedSlots} disabled={loading}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
+            {renderStepActions({
+              onNext: onReserveCombinedSlots,
+              nextLabel: loading ? 'Reserving...' : 'Reserve Slot',
+              nextDisabled: loading,
+              onBack: () => dispatch({ type: 'SET_STEP', payload: 4 }),
+            })}
           </>
         ) : null}
 
@@ -460,9 +738,33 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Schedule your first session" subtitle="Pick practitioner and time slot." />
             {renderPractitionerButton('single', selectedPractitioner, 'Select practitioner', 'Choose from recommended matches')}
             {selectedPractitioner ? <p className="text-xs text-slate-600">Specialties: {selectedPractitioner.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(slots, state.selectedSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton onClick={onReserveSingleSlot} disabled={loading || !state.selectedSlotId || !state.selectedPractitionerId}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
+            <button
+              type="button"
+              onClick={() => openSlotPicker('single')}
+              className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-left text-slate-700 transition hover:bg-slate-50"
+            >
+              {selectedSlotLabel('single')}
+            </button>
+            {renderStepActions({
+              onNext: onReserveSingleSlot,
+              nextLabel: loading ? 'Reserving...' : 'Reserve Slot',
+              nextDisabled: loading || !state.selectedSlotId || !state.selectedPractitionerId,
+              onBack: () => dispatch({ type: 'SET_STEP', payload: 2 }),
+            })}
           </>
+        ) : null}
+
+        {state.step > 1 && previousStep ? (
+          <div className="pt-1 sm:hidden">
+            <button
+              type="button"
+              onClick={() => dispatch({ type: 'SET_STEP', payload: previousStep })}
+              className="inline-flex items-center gap-1 text-xs font-medium text-slate-500"
+            >
+              <ArrowLeft size={14} />
+              Previous step
+            </button>
+          </div>
         ) : null}
 
         <Dialog open={pickerMode !== null} onOpenChange={(open) => setPickerMode(open ? pickerMode : null)}>
@@ -473,8 +775,9 @@ export default function ClientIntakeFlowPage() {
                 {pickerMode === 'trainer' ? 'Choose a trainer for your fitness session.' : pickerMode === 'psychologist' ? 'Choose a psychologist for your counselling session.' : 'Choose a practitioner from your recommended matches.'}
               </DialogDescription>
             </DialogHeader>
-            <div className="mx-auto grid w-full max-w-3xl gap-3 pb-6">
-              {pickerPractitioners.length ? pickerPractitioners.map((practitioner) => {
+            <div className="mx-auto w-full max-w-3xl pb-6">
+              <div className="grid max-h-[calc(100dvh-170px)] gap-3 overflow-y-auto pr-1">
+              {displayPractitioners.length ? displayPractitioners.map((practitioner) => {
                 const selected = practitioner.id === state.selectedPractitionerId || practitioner.id === state.selectedPsychologistId || practitioner.id === state.selectedTrainerId;
 
                 return (
@@ -482,12 +785,15 @@ export default function ClientIntakeFlowPage() {
                     key={practitioner.id}
                     type="button"
                     onClick={() => selectPractitioner(practitioner)}
-                    className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-[var(--ds-brand)] bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                    className={`flex items-start justify-between gap-3 rounded-2xl border px-4 py-4 text-left transition ${selected ? 'border-[var(--ds-brand)] bg-indigo-50/70' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
                   >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-slate-900">{practitioner.name}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">{practitionerLabel(practitioner.type)}</span>
-                      {practitioner.specialties.length ? <span className="mt-2 block text-xs text-slate-600">{practitioner.specialties.join(', ')}</span> : null}
+                    <span className="flex min-w-0 items-start gap-3">
+                      <img src={practitioner.avatarUrl} alt={`${practitioner.name} profile`} className="h-14 w-14 shrink-0 rounded-full object-cover ring-1 ring-slate-200" />
+                      <span className="min-w-0">
+                        <span className="block text-base font-semibold text-slate-900">{practitioner.name}</span>
+                        <span className="mt-0.5 block text-sm text-slate-500">{practitionerLabel(practitioner.type)}</span>
+                        {practitioner.specialties.length ? <span className="mt-2 block text-sm text-slate-600">{practitioner.specialties.join(', ')}</span> : null}
+                      </span>
                     </span>
                     {selected ? <Check className="h-5 w-5 shrink-0 text-[var(--ds-brand)]" aria-hidden="true" /> : null}
                   </button>
@@ -495,6 +801,93 @@ export default function ClientIntakeFlowPage() {
               }) : (
                 <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">No practitioners are available for this selection yet.</p>
               )}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        <Dialog open={slotPickerMode !== null} onOpenChange={(open) => setSlotPickerMode(open ? slotPickerMode : null)}>
+          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-white p-4 sm:max-w-none sm:p-6">
+            <DialogHeader className="max-w-3xl">
+              <DialogTitle>Select Time Slot</DialogTitle>
+              <DialogDescription>Choose a date and then select an available time slot.</DialogDescription>
+            </DialogHeader>
+            <div className="mx-auto w-full max-w-3xl space-y-4 pb-6">
+              <div className="rounded-2xl border border-slate-200 bg-white p-2">
+                <Calendar
+                  mode="single"
+                  selected={activeDate ? fromLocalDateKey(activeDate) : undefined}
+                  modifiers={{
+                    hasSlots: (date) => activeAvailableDateKeys.includes(toLocalDateKey(date)),
+                  }}
+                  modifiersClassNames={{
+                    hasSlots: 'font-semibold text-[var(--ds-brand)]',
+                  }}
+                  onSelect={(date) => {
+                    const key = date ? toLocalDateKey(date) : '';
+                    if (slotPickerMode === 'psychologist') setPsychologistDate(key);
+                    else if (slotPickerMode === 'trainer') setTrainerDate(key);
+                    else setSingleDate(key);
+                  }}
+                />
+              </div>
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2">
+                  <p className="text-sm font-semibold text-slate-900">Available slots</p>
+                  {activeDate ? <span className="rounded-full bg-indigo-50 px-2 py-1 text-xs font-medium text-indigo-700">{new Date(activeDate).toLocaleDateString()}</span> : null}
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {displayDateSlots.map((slot) => {
+                    const selected = pendingSlotId === slot.id;
+                    return (
+                      <button
+                        key={slot.id}
+                        type="button"
+                        onClick={() => setPendingSlotId(slot.id)}
+                        className={`rounded-full border px-3 py-2 text-sm transition ${
+                          selected
+                            ? 'border-[var(--ds-brand)] bg-indigo-50 text-[var(--ds-brand)]'
+                            : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                        }`}
+                      >
+                        {new Date(slot.starts_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </button>
+                    );
+                  })}
+                </div>
+                {!activeDateSlots.length ? (
+                  <div className="space-y-2">
+                    <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                      Showing generated time chips for this date.
+                    </p>
+                    {activeAvailableDateKeys[0] ? (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (slotPickerMode === 'psychologist') setPsychologistDate(activeAvailableDateKeys[0]);
+                          else if (slotPickerMode === 'trainer') setTrainerDate(activeAvailableDateKeys[0]);
+                          else setSingleDate(activeAvailableDateKeys[0]);
+                        }}
+                        className="text-xs font-medium text-[var(--ds-brand)]"
+                      >
+                        Jump to next available date
+                      </button>
+                    ) : null}
+                  </div>
+                ) : null}
+                <div className="pt-1">
+                  <DSButton
+                    type="button"
+                    className="w-full"
+                    disabled={!pendingSlotId}
+                    onClick={() => {
+                      if (pendingSlotId) selectSlotAndClose(pendingSlotId);
+                    }}
+                  >
+                    Select
+                  </DSButton>
+                </div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>
