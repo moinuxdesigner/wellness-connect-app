@@ -8,16 +8,16 @@ services:
     volumes:
       - ./backend:/var/www
     environment:
-      APP_ENV: local
-      APP_DEBUG: "true"
+      APP_ENV: ${APP_ENV:-local}
+      APP_DEBUG: ${APP_DEBUG:-false}
       APP_URL: http://localhost:${APP_PORT:-8080}
-      FRONTEND_URL: http://localhost:5173
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       DB_CONNECTION: mysql
       DB_HOST: db
       DB_PORT: 3306
       DB_DATABASE: ${DB_DATABASE:-wellness_connect}
       DB_USERNAME: ${DB_USERNAME:-wellness_user}
-      DB_PASSWORD: ${DB_PASSWORD:-wellness_pass}
+      DB_PASSWORD: ${DB_PASSWORD}
     depends_on:
       db:
         condition: service_healthy
@@ -40,8 +40,8 @@ services:
     environment:
       MARIADB_DATABASE: ${DB_DATABASE:-wellness_connect}
       MARIADB_USER: ${DB_USERNAME:-wellness_user}
-      MARIADB_PASSWORD: ${DB_PASSWORD:-wellness_pass}
-      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      MARIADB_PASSWORD: ${DB_PASSWORD}
+      MARIADB_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
     ports:
       - "${DB_PORT_FORWARD:-3307}:3306"
     volumes:
@@ -62,7 +62,7 @@ services:
       PMA_HOST: db
       PMA_PORT: 3306
       PMA_USER: root
-      PMA_PASSWORD: ${DB_ROOT_PASSWORD:-rootpass}
+      PMA_PASSWORD: ${DB_ROOT_PASSWORD}
       UPLOAD_LIMIT: 128M
     depends_on:
       db:

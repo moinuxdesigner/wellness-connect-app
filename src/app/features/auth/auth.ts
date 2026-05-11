@@ -21,6 +21,9 @@ export interface AuthState {
   user: AuthUser | null;
 }
 
+// NOTE: Token is stored in localStorage for PWA offline support.
+// Ensure all API calls use HTTPS and Content-Security-Policy headers
+// are set server-side to mitigate XSS risk.
 export function getAuthState(): AuthState {
   const raw = localStorage.getItem(AUTH_KEY);
 

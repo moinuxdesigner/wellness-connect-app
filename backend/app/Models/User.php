@@ -6,6 +6,8 @@ use Database\Factories\UserFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Laravel\Sanctum\HasApiTokens;
@@ -26,22 +28,22 @@ class User extends Authenticatable
         ];
     }
 
-    public function clientProfile()
+    public function clientProfile(): HasOne
     {
         return $this->hasOne(ClientProfile::class);
     }
 
-    public function practitioner()
+    public function practitioner(): HasOne
     {
         return $this->hasOne(Practitioner::class);
     }
 
-    public function intakeFlows()
+    public function intakeFlows(): HasMany
     {
         return $this->hasMany(IntakeFlow::class, 'client_user_id');
     }
 
-    public function clientAppointments()
+    public function clientAppointments(): HasMany
     {
         return $this->hasMany(Appointment::class, 'client_user_id');
     }

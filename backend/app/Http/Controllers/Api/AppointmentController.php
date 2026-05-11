@@ -10,6 +10,7 @@ use App\Services\SlotBookingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use RuntimeException;
 
 class AppointmentController extends Controller
 {
@@ -58,40 +59,44 @@ class AppointmentController extends Controller
             'slot_id' => ['required', 'integer', 'exists:availability_slots,id'],
         ]);
 
-        DB::transaction(function () use ($appointment, $validated, $request) {
-            $slot = AvailabilitySlot::query()->lockForUpdate()->findOrFail($validated['slot_id']);
+        try {
+            DB::transaction(function () use ($appointment, $validated, $request): void {
+                $slot = AvailabilitySlot::query()->lockForUpdate()->findOrFail($validated['slot_id']);
 
-            if ($slot->slot_status !== 'open') {
-                abort(422, 'Selected slot is no longer available.');
-            }
+                if ($slot->slot_status !== 'open') {
+                    throw new RuntimeException('Selected slot is no longer available.');
+                }
 
-            $oldSlot = AvailabilitySlot::query()
-                ->where('practitioner_id', $appointment->practitioner_id)
-                ->where('starts_at', $appointment->starts_at)
-                ->where('ends_at', $appointment->ends_at)
-                ->first();
+                $oldSlot = AvailabilitySlot::query()
+                    ->where('practitioner_id', $appointment->practitioner_id)
+                    ->where('starts_at', $appointment->starts_at)
+                    ->where('ends_at', $appointment->ends_at)
+                    ->first();
 
-            if ($oldSlot && $oldSlot->slot_status === 'booked') {
-                $oldSlot->update(['slot_status' => 'open']);
-            }
+                if ($oldSlot && $oldSlot->slot_status === 'booked') {
+                    $oldSlot->update(['slot_status' => 'open']);
+                }
 
-            $appointment->update([
-                'starts_at' => $slot->starts_at,
-                'ends_at' => $slot->ends_at,
-                'status' => 'rescheduled',
-                'reschedule_count' => $appointment->reschedule_count + 1,
-            ]);
+                $appointment->update([
+                    'starts_at' => $slot->starts_at,
+                    'ends_at' => $slot->ends_at,
+                    'status' => 'rescheduled',
+                    'reschedule_count' => $appointment->reschedule_count + 1,
+                ]);
 
-            $slot->update(['slot_status' => 'booked']);
+                $slot->update(['slot_status' => 'booked']);
 
-            AppointmentEvent::create([
-                'appointment_id' => $appointment->id,
-                'event_type' => 'rescheduled',
-                'actor_user_id' => $request->user()->id,
-                'meta_json' => ['slot_id' => $slot->id],
-                'created_at' => now(),
-            ]);
-        });
+                AppointmentEvent::create([
+                    'appointment_id' => $appointment->id,
+                    'event_type' => 'rescheduled',
+                    'actor_user_id' => $request->user()->id,
+                    'meta_json' => ['slot_id' => $slot->id],
+                    'created_at' => now(),
+                ]);
+            });
+        } catch (RuntimeException $e) {
+            return response()->json(['message' => $e->getMessage()], 422);
+        }
 
         return response()->json(['appointment' => $appointment->fresh()]);
     }

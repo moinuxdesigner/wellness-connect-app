@@ -30,7 +30,7 @@ class AuthController extends Controller
             'password' => $validated['password'],
             'role' => $validated['role'] ?? 'client',
             'phone' => $validated['phone'] ?? null,
-            'consent_to_terms' => $validated['consent_to_terms'] ?? true,
+            'consent_to_terms' => (bool) ($validated['consent_to_terms'] ?? false),
             'wellness_goal' => $validated['primary_goal'] ?? null,
         ]);
 
