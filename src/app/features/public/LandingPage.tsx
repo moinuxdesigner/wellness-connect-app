@@ -267,15 +267,11 @@ export default function LandingPage() {
 
           {/* Right — hero image */}
           <div className="order-1 lg:order-2">
-            <div className="relative h-[320px] overflow-hidden rounded-3xl shadow-2xl sm:h-[420px] lg:h-[500px]">
-              <img
-                src="/exercise-couple.png"
-                alt="Couple exercising together — fitness and wellness"
-                className="h-full w-full object-cover object-center"
-              />
-              {/* Subtle gradient overlay */}
-              <div className="absolute inset-0 bg-gradient-to-t from-slate-900/20 to-transparent" />
-            </div>
+            <img
+              src="/exercise-couple.png"
+              alt="Couple exercising together — fitness and wellness"
+              className="h-auto w-full object-cover"
+            />
           </div>
         </div>
       </section>
