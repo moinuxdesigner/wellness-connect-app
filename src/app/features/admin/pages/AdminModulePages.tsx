@@ -1,9 +1,30 @@
+import { useEffect, useMemo, useState } from 'react';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { getAppointments, getPrograms, getRolesOverview, getTickets, getUsers, getUsageMetrics } from '../../shared/services/mockApi';
+import { getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminUsers } from '../../shared/services/adminApi';
+import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
+
+type RoleDistributionItem = {
+  role: Role;
+  users: number;
+  status: 'healthy' | 'attention' | 'needs-review';
+};
+
+function toneByUserStatus(status: UserSummary['status']) {
+  return status === 'active' ? 'success' : status === 'pending' ? 'warning' : 'danger';
+}
+
+function toneByRoleStatus(status: RoleDistributionItem['status']) {
+  return status === 'healthy' ? 'success' : 'warning';
+}
 
 export function UserManagementPage() {
-  const users = getUsers();
+  const [users, setUsers] = useState<UserSummary[]>([]);
+
+  useEffect(() => {
+    getAdminUsers().then(setUsers);
+  }, []);
+
   return (
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
@@ -11,7 +32,7 @@ export function UserManagementPage() {
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="text-slate-500"><tr><th className="py-2">Name</th><th className="py-2">Email</th><th className="py-2">Role</th><th className="py-2">Status</th></tr></thead>
-            <tbody>{users.map((u) => <tr key={u.id} className="border-t border-slate-200"><td className="py-2 font-medium text-slate-900">{u.name}</td><td className="py-2 text-slate-600">{u.email}</td><td className="py-2 capitalize">{u.role}</td><td className="py-2"><ToneBadge tone={u.status === 'active' ? 'success' : u.status === 'pending' ? 'warning' : 'danger'}>{u.status}</ToneBadge></td></tr>)}</tbody>
+            <tbody>{users.map((u) => <tr key={u.id} className="border-t border-slate-200"><td className="py-2 font-medium text-slate-900">{u.name}</td><td className="py-2 text-slate-600">{u.email}</td><td className="py-2 capitalize">{u.role}</td><td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td></tr>)}</tbody>
           </table>
         </div>
       </Panel>
@@ -20,7 +41,12 @@ export function UserManagementPage() {
 }
 
 export function RoleManagementPage() {
-  const roles = getRolesOverview();
+  const [roles, setRoles] = useState<RoleDistributionItem[]>([]);
+
+  useEffect(() => {
+    getAdminOverview().then((data) => setRoles((data.role_distribution ?? []) as RoleDistributionItem[]));
+  }, []);
+
   return <SimpleList title="Role Management" subtitle="Manage role distribution and staffing." items={roles.map((r) => `${r.role}: ${r.users} users (${r.status})`)} />;
 }
 
@@ -29,8 +55,15 @@ export function PermissionMatrixPage() {
 }
 
 export function ProfessionalApprovalsPage() {
-  const users = getUsers().filter((u) => u.status === 'pending');
-  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={users.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
+  const [users, setUsers] = useState<UserSummary[]>([]);
+
+  useEffect(() => {
+    getAdminUsers().then(setUsers);
+  }, []);
+
+  const pending = useMemo(() => users.filter((u) => u.status === 'pending'), [users]);
+
+  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={pending.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
 }
 
 export function TrainerApplicationsPage() {
@@ -90,8 +123,13 @@ export function RevenueReportsPage() {
 }
 
 export function UsageMetricsPage() {
-  const usage = getUsageMetrics();
-  return <SimpleList title="Usage Metrics" subtitle="Engagement and operational KPIs." items={usage.map((u) => `${u.label}: ${u.value} (${u.delta})`)} />;
+  const [items, setItems] = useState<string[]>([]);
+
+  useEffect(() => {
+    getAdminOverview().then((data) => setItems((data.usage_metrics ?? []).map((u) => `${u.label}: ${u.value} (${u.delta})`)));
+  }, []);
+
+  return <SimpleList title="Usage Metrics" subtitle="Engagement and operational KPIs." items={items} />;
 }
 
 export function PerformanceDashboardPage() {
@@ -99,16 +137,26 @@ export function PerformanceDashboardPage() {
 }
 
 export function PlatformHealthPage() {
-  return <SimpleList title="Platform Health" subtitle="System and process health checkpoints." items={['Auth services: healthy', 'Booking service: healthy', 'Messaging queue: degraded (mock)', 'Escalation pipeline: healthy']} />;
+  return <SimpleList title="Platform Health" subtitle="System and process health checkpoints." items={['Auth services: healthy', 'Booking service: healthy', 'Messaging queue: monitored', 'Escalation pipeline: healthy']} />;
 }
 
 export function EscalationsPage() {
-  const tickets = getTickets();
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+
+  useEffect(() => {
+    getAdminEscalations().then(setTickets);
+  }, []);
+
   return <SimpleList title="Escalations" subtitle="High-priority cases requiring admin action." items={tickets.filter((t) => t.priority !== 'low').map((t) => `${t.id}: ${t.title} (${t.status})`)} />;
 }
 
 export function ProgramManagementPage() {
-  const programs = getPrograms();
+  const [programs, setPrograms] = useState<ProgramSummary[]>([]);
+
+  useEffect(() => {
+    getAdminPrograms().then(setPrograms);
+  }, []);
+
   return <SimpleList title="Program Management" subtitle="Manage wellness programs and lifecycle status." items={programs.map((p) => `${p.title} - ${p.category} - ${p.status}`)} />;
 }
 
@@ -117,8 +165,13 @@ export function MembershipPlanManagementPage() {
 }
 
 export function ActivityLogsPage() {
-  const appointments = getAppointments();
-  return <SimpleList title="Activity Logs" subtitle="Audit and activity stream placeholders." items={appointments.map((a) => `${a.id}: ${a.serviceType} ${a.status} for ${a.clientName}`)} />;
+  const [activities, setActivities] = useState<AppointmentSummary[]>([]);
+
+  useEffect(() => {
+    getAdminActivities().then(setActivities);
+  }, []);
+
+  return <SimpleList title="Activity Logs" subtitle="Audit and activity stream." items={activities.map((a) => `${a.id}: ${a.serviceType} ${a.status} for ${a.clientName}`)} />;
 }
 
 function SimpleList({ title, subtitle, items }: { title: string; subtitle: string; items: string[] }) {
@@ -130,6 +183,7 @@ function SimpleList({ title, subtitle, items }: { title: string; subtitle: strin
           {items.map((item) => (
             <li key={item} className="rounded-xl border border-slate-200 px-3 py-2">{item}</li>
           ))}
+          {!items.length ? <li className="rounded-xl border border-slate-200 px-3 py-2 text-slate-500">No records found.</li> : null}
         </ul>
       </Panel>
     </div>

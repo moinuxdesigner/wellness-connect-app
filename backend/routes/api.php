@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
@@ -38,5 +39,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/appointments', [AppointmentController::class, 'store']);
         Route::put('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+
+        Route::prefix('admin')->group(function (): void {
+            Route::get('/overview', [AdminController::class, 'overview']);
+            Route::get('/users', [AdminController::class, 'users']);
+            Route::get('/programs', [AdminController::class, 'programs']);
+            Route::get('/escalations', [AdminController::class, 'escalations']);
+            Route::get('/activities', [AdminController::class, 'activities']);
+        });
     });
 });
