@@ -20,6 +20,7 @@ const NAV_LINKS = [
   { label: 'Services', href: '#services' },
   { label: 'How It Works', href: '#how-it-works' },
   { label: 'Testimonials', href: '#testimonials' },
+  { label: 'Careers', to: '/careers' },
   { label: 'Pricing', href: '/pricing' },
 ];
 
@@ -136,13 +137,23 @@ export default function LandingPage() {
           {/* Desktop nav links */}
           <nav className="hidden items-center gap-7 lg:flex">
             {NAV_LINKS.map((l) => (
-              <a
-                key={l.label}
-                href={l.href}
-                className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600"
-              >
-                {l.label}
-              </a>
+              l.to ? (
+                <Link
+                  key={l.label}
+                  to={l.to}
+                  className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600"
+                >
+                  {l.label}
+                </Link>
+              ) : (
+                <a
+                  key={l.label}
+                  href={l.href}
+                  className="text-sm font-medium text-slate-600 transition-colors hover:text-indigo-600"
+                >
+                  {l.label}
+                </a>
+              )
             ))}
           </nav>
 
@@ -178,14 +189,25 @@ export default function LandingPage() {
           <div className="border-t border-slate-100 bg-white px-4 pb-5 lg:hidden">
             <nav className="flex flex-col gap-1 pt-3">
               {NAV_LINKS.map((l) => (
-                <a
-                  key={l.label}
-                  href={l.href}
-                  onClick={() => setMobileOpen(false)}
-                  className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
-                >
-                  {l.label}
-                </a>
+                l.to ? (
+                  <Link
+                    key={l.label}
+                    to={l.to}
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {l.label}
+                  </Link>
+                ) : (
+                  <a
+                    key={l.label}
+                    href={l.href}
+                    onClick={() => setMobileOpen(false)}
+                    className="rounded-lg px-3 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50"
+                  >
+                    {l.label}
+                  </a>
+                )
               ))}
             </nav>
             <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-4">
