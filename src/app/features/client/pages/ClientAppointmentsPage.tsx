@@ -1,15 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Video } from 'lucide-react';
+import type { ClientAppointment, PractitionerItem, SlotItem } from '../../shared/services/api';
 import {
-  bookAppointmentRequest,
-  cancelAppointmentRequest,
-  getClientAppointmentsRequest,
-  getPractitionerSlots,
-  getRecommendedPractitioners,
-  type ClientAppointment,
-  type PractitionerItem,
-  type SlotItem,
-} from '../../shared/services/api';
+  bookAppointmentAdapter,
+  cancelAppointmentAdapter,
+  listAppointmentsAdapter,
+  listPractitionersAdapter,
+  listSlotsAdapter,
+} from '../../shared/services/demoAdapter';
 import { ClientPageTitle } from '../ClientLayout';
 import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
 
@@ -26,19 +24,19 @@ export default function ClientAppointmentsPage() {
   const sortedAppointments = useMemo(() => [...appointments].sort((a, b) => (b.starts_at ?? '').localeCompare(a.starts_at ?? '')), [appointments]);
 
   async function refresh() {
-    setAppointments(await getClientAppointmentsRequest());
+    setAppointments(await listAppointmentsAdapter());
   }
 
   useEffect(() => {
     refresh().catch((error) => setNotice(error instanceof Error ? error.message : 'Unable to load appointments'));
-    getRecommendedPractitioners(1).then(setPractitioners).catch(() => {
+    listPractitionersAdapter().then(setPractitioners).catch(() => {
       // quiet fallback
     });
   }, []);
 
   useEffect(() => {
     if (!selectedPractitioner) return;
-    getPractitionerSlots(selectedPractitioner, '2026-05-01', '2026-06-30').then(setSlots).catch(() => {
+    listSlotsAdapter(selectedPractitioner).then(setSlots).catch(() => {
       setSlots([]);
     });
   }, [selectedPractitioner]);
@@ -90,7 +88,7 @@ export default function ClientAppointmentsPage() {
               setLoading(true);
               setNotice('');
               try {
-                await bookAppointmentRequest({ practitioner_id: selectedPractitioner, slot_id: selectedSlot, service_type: serviceType, mode: 'online' });
+                await bookAppointmentAdapter({ practitioner_id: selectedPractitioner, slot_id: selectedSlot, service_type: serviceType, mode: 'online' });
                 await refresh();
                 setNotice('Appointment booked successfully.');
               } catch (error) {
@@ -120,7 +118,7 @@ export default function ClientAppointmentsPage() {
                 <DSSecondaryButton
                   className="mt-2"
                   onClick={async () => {
-                    await cancelAppointmentRequest(a.id, 'User requested');
+                    await cancelAppointmentAdapter(a.id, 'User requested');
                     await refresh();
                   }}
                   type="button"

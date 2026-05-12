@@ -33,6 +33,14 @@ import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage
 import { RoleDashboardLayout } from '../features/roleDashboards/RoleDashboardLayout';
 import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboards/RoleDashboardPage';
 import TrainerOnboardingPage from '../features/trainer/TrainerOnboardingPage';
+import CounsellorSessionsPage from '../features/counsellor/CounsellorSessionsPage';
+import CounsellorClientsPage from '../features/counsellor/CounsellorClientsPage';
+import TrainerPlansPage from '../features/trainer/TrainerPlansPage';
+import TrainerCheckinsPage from '../features/trainer/TrainerCheckinsPage';
+import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
+import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
+import ContentProgramsPage from '../features/content/ContentProgramsPage';
+import ContentAssetsPage from '../features/content/ContentAssetsPage';
 
 export default function AppRoutes() {
   return (
@@ -79,8 +87,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['counsellor']} />}>
           <Route path="/counsellor" element={<RoleDashboardLayout role="counsellor" />}>
             <Route index element={<RoleDashboardPage role="counsellor" />} />
-            <Route path="sessions" element={<RolePlaceholderPage role="counsellor" title="Sessions" />} />
-            <Route path="clients" element={<RolePlaceholderPage role="counsellor" title="Clients" />} />
+            <Route path="sessions" element={<CounsellorSessionsPage />} />
+            <Route path="clients" element={<CounsellorClientsPage />} />
           </Route>
         </Route>
 
@@ -88,8 +96,8 @@ export default function AppRoutes() {
           <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
             <Route index element={<RoleDashboardPage role="trainer" />} />
             <Route path="onboarding" element={<TrainerOnboardingPage />} />
-            <Route path="plans" element={<RolePlaceholderPage role="trainer" title="Plans" />} />
-            <Route path="check-ins" element={<RolePlaceholderPage role="trainer" title="Check-ins" />} />
+            <Route path="plans" element={<TrainerPlansPage />} />
+            <Route path="check-ins" element={<TrainerCheckinsPage />} />
           </Route>
         </Route>
 
@@ -104,8 +112,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['helpdesk']} />}>
           <Route path="/helpdesk" element={<RoleDashboardLayout role="helpdesk" />}>
             <Route index element={<RoleDashboardPage role="helpdesk" />} />
-            <Route path="tickets" element={<RolePlaceholderPage role="helpdesk" title="Tickets" />} />
-            <Route path="knowledge-base" element={<RolePlaceholderPage role="helpdesk" title="Knowledge Base" />} />
+            <Route path="tickets" element={<HelpdeskTicketsPage />} />
+            <Route path="knowledge-base" element={<HelpdeskKnowledgeBasePage />} />
           </Route>
         </Route>
 
@@ -128,8 +136,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['content']} />}>
           <Route path="/content" element={<RoleDashboardLayout role="content" />}>
             <Route index element={<RoleDashboardPage role="content" />} />
-            <Route path="programs" element={<RolePlaceholderPage role="content" title="Programs" />} />
-            <Route path="assets" element={<RolePlaceholderPage role="content" title="Assets" />} />
+            <Route path="programs" element={<ContentProgramsPage />} />
+            <Route path="assets" element={<ContentAssetsPage />} />
           </Route>
         </Route>
       </Route>
