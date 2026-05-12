@@ -1,6 +1,6 @@
 import { clearAuthState, getAuthState, setAuthState, type AuthUser } from '../../auth/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export interface ClientAppointment {
   id: number;

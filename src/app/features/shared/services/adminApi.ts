@@ -6,7 +6,7 @@ import { mockUsers } from '../../../data/mockUsers';
 import type { AppointmentSummary, DashboardMetric, ProgramSummary, Role, TicketSummary, UserSummary } from '../../types';
 import { getAuthState } from '../../auth/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 type RoleDistributionItem = {
   role: Role;
