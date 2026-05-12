@@ -7,9 +7,9 @@
     "dev": "vite",
     "build": "vite build",
     "build:cap": "vite build --mode capacitor",
-    "cap:sync": "npm run build:cap && npx cap sync android",
-    "cap:copy": "npm run build:cap && npx cap copy android",
-    "cap:open": "npx cap open android",
+    "cap:sync": "npm run build:cap && npx @capacitor/cli sync android",
+    "cap:copy": "npm run build:cap && npx @capacitor/cli copy android",
+    "cap:open": "npx @capacitor/cli open android",
     "android": "npm run cap:sync && npm run cap:open"
   },
   "dependencies": {
