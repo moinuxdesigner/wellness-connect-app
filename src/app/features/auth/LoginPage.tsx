@@ -55,6 +55,9 @@ export default function LoginPage() {
             required
           />
         </div>
+        <div className="text-right">
+          <Link className="text-sm text-indigo-600 hover:text-indigo-700" to="/forgot-password">Forgot password?</Link>
+        </div>
         {notice ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p> : null}
         <button
           className="w-full rounded-xl bg-indigo-600 px-4 py-2.5 font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-60"

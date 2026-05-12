@@ -3,6 +3,8 @@ import AuthLayout from '../layout/AuthLayout';
 import PublicLayout from '../layout/PublicLayout';
 import LoginPage from '../features/auth/LoginPage';
 import SignupPage from '../features/auth/SignupPage';
+import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import LandingPage from '../features/public/LandingPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
@@ -29,6 +31,7 @@ import ClientDashboardPage from '../features/client/pages/ClientDashboardPage';
 import ClientProfilePage from '../features/client/pages/ClientProfilePage';
 import ClientAppointmentsPage from '../features/client/pages/ClientAppointmentsPage';
 import ClientProgramsPage from '../features/client/pages/ClientProgramsPage';
+import ClientTasksPage from '../features/client/pages/ClientTasksPage';
 import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage';
 import { RoleDashboardLayout } from '../features/roleDashboards/RoleDashboardLayout';
 import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboards/RoleDashboardPage';
@@ -52,6 +55,8 @@ export default function AppRoutes() {
 
       <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
       <Route path="/signup" element={<AuthLayout><SignupPage /></AuthLayout>} />
+      <Route path="/forgot-password" element={<AuthLayout><ForgotPasswordPage /></AuthLayout>} />
+      <Route path="/reset-password" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
 
       <Route element={<RequireAuth />}>
         <Route element={<RequireRole allow={['admin']} />}>
@@ -80,6 +85,7 @@ export default function AppRoutes() {
             <Route path="intake" element={<ClientIntakeFlowPage />} />
             <Route path="appointments" element={<ClientAppointmentsPage />} />
             <Route path="programs" element={<ClientProgramsPage />} />
+            <Route path="tasks" element={<ClientTasksPage />} />
             <Route path="profile" element={<ClientProfilePage />} />
           </Route>
         </Route>

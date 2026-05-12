@@ -17,6 +17,9 @@
   --ds-success: #15803d;
   --ds-warning: #b45309;
   --ds-danger: #dc2626;
+  --app-radius-xl: 0.75rem;
+  --app-radius-lg: 0.625rem;
+  --app-radius-md: 0.5rem;
 }
 
 body {
@@ -37,4 +40,19 @@ body {
   .dashboard-content {
     margin-left: var(--sidebar-offset, 288px);
   }
+}
+
+/* Uniform corner-radius tightening across app */
+.rounded-\[26px\],
+.rounded-3xl,
+.rounded-2xl {
+  border-radius: var(--app-radius-xl);
+}
+
+.rounded-xl {
+  border-radius: var(--app-radius-lg);
+}
+
+.rounded-lg {
+  border-radius: var(--app-radius-md);
 }

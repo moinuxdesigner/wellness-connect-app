@@ -1,6 +1,10 @@
 import { NavLink } from 'react-router';
 import { PanelLeftClose, PanelLeftOpen, X, type LucideIcon } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
+import { LogOut } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router';
+import { logoutRequest } from '../features/auth/apiAuth';
 
 export interface NavItem {
   label: string;
@@ -78,6 +82,9 @@ function SidebarContent({
   onMobileClose?: () => void;
   title: string;
 }) {
+  const navigate = useNavigate();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
+
   return (
     <div className="flex h-full flex-col p-4">
       <div className={`mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-2'}`}>
@@ -115,7 +122,7 @@ function SidebarContent({
           {onMobileClose ? <X size={16} /> : collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       </div>
-      <nav className="space-y-1 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -151,6 +158,46 @@ function SidebarContent({
           );
         })}
       </nav>
+      <div className="mt-3 border-t border-slate-200 pt-3">
+        <button
+          type="button"
+          disabled={isLoggingOut}
+          title={collapsed ? 'Logout' : undefined}
+          onClick={async () => {
+            if (isLoggingOut) return;
+            setIsLoggingOut(true);
+            try {
+              await logoutRequest();
+              navigate('/login');
+              onMobileClose?.();
+            } finally {
+              setIsLoggingOut(false);
+            }
+          }}
+          className={`flex w-full items-center rounded-xl py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 ${
+            collapsed ? 'justify-center px-2' : 'gap-2 px-3'
+          }`}
+        >
+          {isLoggingOut ? (
+            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-300 border-t-rose-700" />
+          ) : (
+            <LogOut size={16} />
+          )}
+          <AnimatePresence initial={false}>
+            {!collapsed ? (
+              <motion.span
+                key="logout-label"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.14 }}
+              >
+                {isLoggingOut ? 'Logging out...' : 'Logout'}
+              </motion.span>
+            ) : null}
+          </AnimatePresence>
+        </button>
+      </div>
     </div>
   );
 }

@@ -45,7 +45,7 @@ export default function ClientAppointmentsPage() {
     <div className="mx-auto max-w-md space-y-4 pb-2">
       <ClientPageTitle title="My Schedule" subtitle="View and manage both training and counselling sessions." />
 
-      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+      <DSCard className="rounded-xl border-slate-200/80 p-4">
         <h2 className="text-base font-semibold text-slate-900">Today's Sessions</h2>
         <div className="mt-3 space-y-3">
           {sortedAppointments.length === 0 ? (
@@ -64,7 +64,7 @@ export default function ClientAppointmentsPage() {
         </div>
       </DSCard>
 
-      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+      <DSCard className="rounded-xl border-slate-200/80 p-4">
         <h2 className="text-base font-semibold text-slate-900">Book New Session</h2>
         <div className="mt-3 grid gap-3">
           <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={serviceType} onChange={(e) => setServiceType(e.target.value as 'psychology' | 'training' | 'combined' | 'package')}>
@@ -106,7 +106,7 @@ export default function ClientAppointmentsPage() {
 
       {notice ? <p className="rounded-xl bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</p> : null}
 
-      <DSCard className="rounded-[26px] border-slate-200/80 p-4">
+      <DSCard className="rounded-xl border-slate-200/80 p-4">
         <h2 className="text-base font-semibold text-slate-900">Upcoming and Past Sessions</h2>
         <div className="mt-3 space-y-2">
           {sortedAppointments.length === 0 ? <p className="text-sm text-slate-600">No appointments yet.</p> : sortedAppointments.map((a) => (

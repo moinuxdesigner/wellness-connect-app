@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getAuthState } from '../../auth/auth';
-import { meRequest, updateProfileRequest } from '../../auth/apiAuth';
+import { changePasswordRequest, meRequest, updateProfileRequest } from '../../auth/apiAuth';
 import { ClientPageTitle } from '../ClientLayout';
 import { DSButton, DSCard } from '../../../../design/components/primitives';
 
@@ -17,7 +17,12 @@ export default function ClientProfilePage() {
   const [primaryGoal, setPrimaryGoal] = useState<(typeof goals)[number]['value']>((authUser?.primary_goal as (typeof goals)[number]['value']) ?? 'fitness');
   const [consent, setConsent] = useState(Boolean(authUser?.consent_to_terms));
   const [notice, setNotice] = useState('');
+  const [passwordNotice, setPasswordNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     meRequest().then((user) => {
@@ -71,6 +76,73 @@ export default function ClientProfilePage() {
 
           {notice ? <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{notice}</p> : null}
           <DSButton disabled={loading}>{loading ? 'Saving profile...' : 'Save profile'}</DSButton>
+        </form>
+      </DSCard>
+      <DSCard>
+        <form
+          className="grid gap-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setPasswordNotice('');
+            if (newPassword !== confirmPassword) {
+              setPasswordNotice('New password and confirm password do not match.');
+              return;
+            }
+            setPasswordLoading(true);
+            try {
+              const message = await changePasswordRequest({
+                current_password: currentPassword,
+                password: newPassword,
+                password_confirmation: confirmPassword,
+              });
+              setPasswordNotice(message);
+              setCurrentPassword('');
+              setNewPassword('');
+              setConfirmPassword('');
+            } catch (error) {
+              setPasswordNotice(error instanceof Error ? error.message : 'Password update failed.');
+            } finally {
+              setPasswordLoading(false);
+            }
+          }}
+        >
+          <h2 className="text-base font-semibold text-slate-900">Change Password</h2>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <label className="grid gap-1 text-sm font-medium text-slate-700">
+              Current password
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2"
+                type="password"
+                value={currentPassword}
+                onChange={(e) => setCurrentPassword(e.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">
+              New password
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2"
+                type="password"
+                minLength={8}
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                required
+              />
+            </label>
+            <label className="grid gap-1 text-sm font-medium text-slate-700">
+              Confirm password
+              <input
+                className="rounded-xl border border-slate-300 px-3 py-2"
+                type="password"
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                required
+              />
+            </label>
+          </div>
+          {passwordNotice ? <p className="rounded-lg bg-indigo-50 px-3 py-2 text-sm text-indigo-700">{passwordNotice}</p> : null}
+          <DSButton disabled={passwordLoading}>{passwordLoading ? 'Updating password...' : 'Update password'}</DSButton>
         </form>
       </DSCard>
     </div>
