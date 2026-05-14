@@ -23,6 +23,7 @@ export const BottomNav = ({ items, onOpenMenu }: BottomNavProps) => {
             <NavLink
               key={item.to}
               to={item.to}
+              end={item.end}
               className={({ isActive }) =>
                 `flex h-14 min-w-0 flex-col items-center justify-center gap-1 rounded-xl px-1 text-xs font-medium ${
                   isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800'

@@ -27,5 +27,5 @@ export function ToneBadge({ tone, children }: { tone: 'success' | 'warning' | 'd
     neutral: 'bg-slate-100 text-slate-700',
   } as const;
 
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${styles[tone]}`}>{children}</span>;
+  return <span className={`inline-flex shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${styles[tone]}`}>{children}</span>;
 }

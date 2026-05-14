@@ -21,19 +21,116 @@ function toneByRoleStatus(status: RoleDistributionItem['status']) {
 
 export function UserManagementPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    getAdminUsers().then(setUsers);
+    let mounted = true;
+    setLoading(true);
+    getAdminUsers()
+      .then((data) => {
+        if (!mounted) return;
+        setUsers(data);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
   }, []);
+
+  const stats = useMemo(() => {
+    const active = users.filter((u) => u.status === 'active').length;
+    const pending = users.filter((u) => u.status === 'pending').length;
+    const admins = users.filter((u) => u.role === 'admin').length;
+    return { total: users.length, active, pending, admins };
+  }, [users]);
 
   return (
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+              <div className="mt-3 h-7 w-10 animate-pulse rounded bg-slate-200" />
+            </article>
+          ))
+        ) : (
+          <>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Users</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Active</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-700">{stats.active}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-700">{stats.pending}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Admins</p>
+              <p className="mt-2 text-2xl font-semibold text-sky-700">{stats.admins}</p>
+            </article>
+          </>
+        )}
+      </section>
       <Panel title="All Users">
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {loading
+            ? Array.from({ length: 5 }).map((_, index) => (
+                <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-44 animate-pulse rounded bg-slate-200" />
+                    </div>
+                    <div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
+                  </div>
+                  <div className="mt-3 h-3 w-20 animate-pulse rounded bg-slate-200" />
+                </article>
+              ))
+            : users.map((u) => (
+                <article key={u.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-slate-900">{u.name}</p>
+                      <p className="mt-1 truncate text-sm text-slate-600">{u.email}</p>
+                    </div>
+                    <div className="shrink-0">
+                      <ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">{u.role}</p>
+                </article>
+              ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-left text-sm">
             <thead className="text-slate-500"><tr><th className="py-2">Name</th><th className="py-2">Email</th><th className="py-2">Role</th><th className="py-2">Status</th></tr></thead>
-            <tbody>{users.map((u) => <tr key={u.id} className="border-t border-slate-200"><td className="py-2 font-medium text-slate-900">{u.name}</td><td className="py-2 text-slate-600">{u.email}</td><td className="py-2 capitalize">{u.role}</td><td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td></tr>)}</tbody>
+            <tbody>
+              {loading
+                ? Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={index} className="border-t border-slate-200">
+                      <td className="py-3"><div className="h-4 w-28 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-4 w-44 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-4 w-16 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" /></td>
+                    </tr>
+                  ))
+                : users.map((u) => (
+                    <tr key={u.id} className="border-t border-slate-200">
+                      <td className="py-2 font-medium text-slate-900">{u.name}</td>
+                      <td className="py-2 text-slate-600">{u.email}</td>
+                      <td className="py-2 capitalize">{u.role}</td>
+                      <td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td>
+                    </tr>
+                  ))}
+            </tbody>
           </table>
         </div>
       </Panel>
