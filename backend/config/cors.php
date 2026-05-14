@@ -16,6 +16,11 @@ return [
             ))),
         ),
     ),
+    'allowed_origins' => [
+        env('FRONTEND_URL', 'http://localhost:6026'),
+        'http://10.100.103.206:6026',
+        'http://172.17.144.1:6026',
+    ],
     'allowed_origins_patterns' => [],
     'allowed_headers' => ['Content-Type', 'Authorization', 'Accept', 'X-Requested-With'],
     'exposed_headers' => [],
