@@ -166,7 +166,7 @@ export default function LandingPage() {
               Sign In
             </Link>
             <Link
-              to="/signup"
+              to="/get-started"
               className="rounded-lg bg-indigo-600 px-4 py-2 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
             >
               Get Started
@@ -218,7 +218,7 @@ export default function LandingPage() {
                 Sign In
               </Link>
               <Link
-                to="/signup"
+                to="/get-started"
                 className="rounded-lg bg-indigo-600 px-4 py-2.5 text-center text-sm font-semibold text-white hover:bg-indigo-700"
               >
                 Get Started
@@ -268,7 +268,7 @@ export default function LandingPage() {
             {/* CTAs */}
             <div className="mt-8 flex flex-wrap gap-3">
               <Link
-                to="/signup"
+                to="/get-started"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
               >
                 Start Your Journey
@@ -395,7 +395,7 @@ export default function LandingPage() {
 
           <div className="mt-12 text-center">
             <Link
-              to="/signup"
+              to="/get-started"
               className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-8 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
             >
               Get Started Today
@@ -460,7 +460,7 @@ export default function LandingPage() {
           </p>
           <div className="mt-8 flex flex-wrap justify-center gap-4">
             <Link
-              to="/signup"
+              to="/get-started"
               className="rounded-xl bg-white px-8 py-3.5 text-sm font-semibold text-indigo-600 shadow-sm transition-colors hover:bg-indigo-50"
             >
               Create Free Account
