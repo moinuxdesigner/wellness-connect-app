@@ -112,7 +112,7 @@ export default function GetStartedWizardPage() {
           <div className="space-y-6">
             <OnboardingAnimation type="name" />
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Hi there! 👋</p>
+              <p className="text-sm font-semibold tracking-wide text-indigo-600">Hi there! 👋</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">What's your name?</h1>
               <p className="mt-2 text-slate-500">We'd love to personalise your wellness journey.</p>
             </div>
@@ -138,16 +138,16 @@ export default function GetStartedWizardPage() {
 
       case 2:
         return (
-          <div className="space-y-6">
-            <OnboardingAnimation type="goal" />
+          <div className="space-y-4">
+            <OnboardingAnimation type="goal" className="onboarding-animation--compact" />
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 2 of {TOTAL_STEPS}</p>
-              <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
+              <p className="text-sm font-semibold tracking-wide text-indigo-600">Step 2 of {TOTAL_STEPS}</p>
+              <h1 className="mt-1.5 text-2xl font-bold text-slate-900 sm:text-3xl">
                 Nice to meet you, {firstName}!
               </h1>
-              <p className="mt-2 text-slate-500">How can we support you today?</p>
+              <p className="mt-1.5 text-sm text-slate-500 sm:text-base">How can we support you today?</p>
             </div>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid gap-2 sm:grid-cols-2">
               {GOALS.map((goal) => {
                 const active = goalId === goal.id;
                 return (
@@ -155,18 +155,18 @@ export default function GetStartedWizardPage() {
                     key={goal.id}
                     type="button"
                     onClick={() => setGoalId(goal.id)}
-                    className={`flex items-start gap-3 rounded-xl border-2 p-4 text-left transition-all ${
+                    className={`flex items-start gap-2.5 rounded-xl border-2 p-3 text-left transition-all ${
                       active
                         ? `${goal.borderClass} ${goal.bgClass}`
                         : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                     }`}
                   >
-                    <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ${goal.bgClass}`}>
-                      <goal.Icon size={18} className={goal.colorClass} />
+                    <span className={`mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg ${goal.bgClass}`}>
+                      <goal.Icon size={16} className={goal.colorClass} />
                     </span>
                     <span className="min-w-0 flex-1">
                       <span className="block text-sm font-semibold text-slate-900">{goal.label}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">{goal.description}</span>
+                      <span className="mt-0.5 block text-[11px] leading-snug text-slate-500 sm:text-xs">{goal.description}</span>
                     </span>
                     {active && <Check size={16} className={`ml-auto mt-1 shrink-0 ${goal.colorClass}`} />}
                   </button>
@@ -176,7 +176,7 @@ export default function GetStartedWizardPage() {
             <button
               onClick={() => setStep(3)}
               disabled={!goalId}
-              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
+              className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50"
             >
               Continue <ArrowRight size={16} />
             </button>
@@ -188,7 +188,7 @@ export default function GetStartedWizardPage() {
           <div className="space-y-6">
             <OnboardingAnimation type="email" />
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 3 of {TOTAL_STEPS}</p>
+              <p className="text-sm font-semibold tracking-wide text-indigo-600">Step 3 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">What's your email?</h1>
               <p className="mt-2 text-slate-500">We'll use this to create your account and send updates.</p>
             </div>
@@ -218,7 +218,7 @@ export default function GetStartedWizardPage() {
           <div className="space-y-6">
             <OnboardingAnimation type="password" />
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 4 of {TOTAL_STEPS}</p>
+              <p className="text-sm font-semibold tracking-wide text-indigo-600">Step 4 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Create a password</h1>
               <p className="mt-2 text-slate-500">Minimum 8 characters. Keep it secure.</p>
             </div>
@@ -252,7 +252,7 @@ export default function GetStartedWizardPage() {
           <div className="space-y-6">
             <OnboardingAnimation type="review" />
             <div>
-              <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 5 of {TOTAL_STEPS}</p>
+              <p className="text-sm font-semibold tracking-wide text-indigo-600">Step 5 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
                 Let's create your personal plan 🎯
               </h1>

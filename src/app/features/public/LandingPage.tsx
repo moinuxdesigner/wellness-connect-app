@@ -230,29 +230,29 @@ export default function LandingPage() {
 
       {/* ══ HERO ════════════════════════════════════════════════════ */}
       <section className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-white">
-        <div className="mx-auto grid max-w-7xl gap-7 px-4 pb-10 pt-8 lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-5 px-4 pb-8 pt-5 lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-24">
 
           {/* Left — copy */}
-          <div className="order-1 flex flex-col lg:order-1">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-600">
+          <div className="order-2 flex flex-col lg:order-1">
+            <span className="hidden items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-600 lg:inline-flex">
               <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
               Integrated Wellness Platform
             </span>
 
-            <h1 className="mt-3 text-[2.35rem] font-bold leading-[1.1] text-slate-900 sm:text-4xl lg:mt-4 lg:text-5xl lg:leading-[1.15]">
+            <h1 className="text-[2rem] font-bold leading-[1.08] text-slate-900 sm:text-4xl lg:mt-4 lg:text-5xl lg:leading-[1.15]">
               Integrated care for{' '}
               <span className="text-indigo-600">mind, body,</span>{' '}
               and lifestyle.
             </h1>
 
-            <p className="landing-hero-support mt-3 text-base leading-relaxed text-slate-600 lg:mt-5 lg:text-lg">
+            <p className="landing-hero-support order-4 mt-3 text-sm leading-relaxed text-slate-600 lg:order-none lg:mt-5 lg:text-lg">
               A role-based wellness workspace connecting clients with licensed
               counsellors, certified trainers, and life coaches — all in one
               platform.
             </p>
 
             {/* Feature bullets */}
-            <ul className="order-5 mt-4 space-y-2 lg:order-none lg:mt-6 lg:space-y-2.5">
+            <ul className="hidden mt-6 space-y-2.5 lg:block">
               {[
                 'Smart intake & triage matching',
                 'Online & in-person sessions',
@@ -266,7 +266,7 @@ export default function LandingPage() {
             </ul>
 
             {/* CTAs */}
-            <div className="order-3 mt-5 flex flex-wrap gap-3 lg:order-none lg:mt-8">
+            <div className="order-3 mt-4 flex flex-wrap gap-3 lg:order-none lg:mt-8">
               <Link
                 to="/get-started"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 lg:px-6"
@@ -282,17 +282,17 @@ export default function LandingPage() {
               </Link>
             </div>
 
-            <p className="order-4 mt-3 text-xs leading-relaxed text-slate-400 lg:order-none lg:mt-5">
+            <p className="order-5 mt-3 text-xs leading-relaxed text-slate-400 lg:order-none lg:mt-5">
               Trusted by 2,400+ clients · HIPAA-compliant · Secure &amp; confidential
             </p>
           </div>
 
           {/* Right — hero image */}
-          <div className="order-2 lg:order-2">
+          <div className="order-1 lg:order-2">
             <img
               src="/exercise-couple.png"
               alt="Couple exercising together — fitness and wellness"
-              className="mx-auto h-auto max-h-[220px] w-full object-contain sm:max-h-[280px] lg:max-h-none lg:object-cover"
+              className="mx-auto h-auto max-h-[180px] w-full object-contain sm:max-h-[230px] lg:max-h-none lg:object-cover"
             />
           </div>
         </div>

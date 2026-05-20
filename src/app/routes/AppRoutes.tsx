@@ -2,7 +2,6 @@ import { Navigate, Route, Routes } from 'react-router';
 import AuthLayout from '../layout/AuthLayout';
 import PublicLayout from '../layout/PublicLayout';
 import LoginPage from '../features/auth/LoginPage';
-import SignupPage from '../features/auth/SignupPage';
 import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
@@ -57,7 +56,7 @@ export default function AppRoutes() {
       <Route path="/get-started" element={<GetStartedWizardPage />} />
 
       <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
-      <Route path="/signup" element={<AuthLayout><SignupPage /></AuthLayout>} />
+      <Route path="/signup" element={<Navigate to="/get-started" replace />} />
       <Route path="/forgot-password" element={<AuthLayout><ForgotPasswordPage /></AuthLayout>} />
       <Route path="/reset-password" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
 

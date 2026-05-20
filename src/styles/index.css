@@ -77,9 +77,17 @@ body {
   font-size: 2.5rem;
 }
 
+.onboarding-animation--compact {
+  height: 104px;
+}
+
 @media (min-width: 640px) {
   .onboarding-animation {
     height: 160px;
+  }
+
+  .onboarding-animation--compact {
+    height: 128px;
   }
 }
 
@@ -93,6 +101,10 @@ body {
     height: 4.75rem;
     width: 4.75rem;
     font-size: 2rem;
+  }
+
+  .onboarding-animation--compact {
+    height: 88px;
   }
 }
 

@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
+import welcomeAnimation from './animations/Welcome Animation.json';
+import mascotAnimation from './animations/mascot.json';
 
-export const onboardingAnimations = {
+const onboardingAnimations = {
   name: {
-    src: '/animations/onboarding/hello.json',
+    data: mascotAnimation,
     fallback: '👋',
     label: 'Welcome animation',
   },
@@ -51,10 +53,12 @@ export default function OnboardingAnimation({ type, className = '' }) {
 
     Promise.all([
       import('lottie-react'),
-      fetch(config.src).then((response) => {
-        if (!response.ok) throw new Error(`Missing animation: ${config.src}`);
-        return response.json();
-      }),
+      config.data
+        ? Promise.resolve(config.data)
+        : fetch(`${config.src}?v=20260520-lottie-fix`, { cache: 'no-store' }).then((response) => {
+            if (!response.ok) throw new Error(`Missing animation: ${config.src}`);
+            return response.json();
+          }),
     ])
       .then(([module, json]) => {
         if (!isMounted) return;
@@ -68,7 +72,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
     return () => {
       isMounted = false;
     };
-  }, [config.src, prefersReducedMotion]);
+  }, [config.data, config.src, prefersReducedMotion]);
 
   const showFallback = prefersReducedMotion || hasError || !animationData || !LottieComponent;
 
@@ -83,6 +87,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
           animationData={animationData}
           autoplay
           loop
+          renderer="svg"
           className="onboarding-animation__lottie"
           rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
         />
