@@ -9,6 +9,29 @@ export type Role =
   | 'legal'
   | 'content';
 
+export type FlowStatus = 'not_started' | 'in_progress' | 'completed' | 'escalated';
+
+export interface FlowStep {
+  id: string;
+  title: string;
+  description: string;
+  status: FlowStatus;
+}
+
+export interface RoleScenario {
+  role: Extract<Role, 'client' | 'counsellor' | 'trainer' | 'helpdesk' | 'admin' | 'content'>;
+  title: string;
+  happyPath: FlowStep[];
+  exceptionPath: FlowStep[];
+}
+
+export interface DemoScenario {
+  role: RoleScenario['role'];
+  entryRoute: string;
+  steps: string[];
+  expectedOutcome: string;
+}
+
 export interface UserSummary {
   id: string;
   name: string;

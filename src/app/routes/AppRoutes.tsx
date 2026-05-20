@@ -2,9 +2,11 @@ import { Navigate, Route, Routes } from 'react-router';
 import AuthLayout from '../layout/AuthLayout';
 import PublicLayout from '../layout/PublicLayout';
 import LoginPage from '../features/auth/LoginPage';
-import SignupPage from '../features/auth/SignupPage';
+import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
+import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import { RequireAuth, RequireRole } from '../features/auth/guards';
 import LandingPage from '../features/public/LandingPage';
+import GetStartedWizardPage from '../features/public/GetStartedWizardPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
 import { AdminLayout } from '../features/admin/AdminLayout';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
@@ -29,10 +31,19 @@ import ClientDashboardPage from '../features/client/pages/ClientDashboardPage';
 import ClientProfilePage from '../features/client/pages/ClientProfilePage';
 import ClientAppointmentsPage from '../features/client/pages/ClientAppointmentsPage';
 import ClientProgramsPage from '../features/client/pages/ClientProgramsPage';
+import ClientTasksPage from '../features/client/pages/ClientTasksPage';
 import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage';
 import { RoleDashboardLayout } from '../features/roleDashboards/RoleDashboardLayout';
 import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboards/RoleDashboardPage';
 import TrainerOnboardingPage from '../features/trainer/TrainerOnboardingPage';
+import CounsellorSessionsPage from '../features/counsellor/CounsellorSessionsPage';
+import CounsellorClientsPage from '../features/counsellor/CounsellorClientsPage';
+import TrainerPlansPage from '../features/trainer/TrainerPlansPage';
+import TrainerCheckinsPage from '../features/trainer/TrainerCheckinsPage';
+import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
+import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
+import ContentProgramsPage from '../features/content/ContentProgramsPage';
+import ContentAssetsPage from '../features/content/ContentAssetsPage';
 
 export default function AppRoutes() {
   return (
@@ -42,8 +53,12 @@ export default function AppRoutes() {
       <Route path="/about" element={<PublicLayout><SimplePublicPage title="About" description="WellnessConnect unifies counselling, training, coaching, and operations in one platform." /></PublicLayout>} />
       <Route path="/contact" element={<PublicLayout><SimplePublicPage title="Contact" description="Support and sales channels placeholder for future integrations." /></PublicLayout>} />
 
+      <Route path="/get-started" element={<GetStartedWizardPage />} />
+
       <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
-      <Route path="/signup" element={<AuthLayout><SignupPage /></AuthLayout>} />
+      <Route path="/signup" element={<Navigate to="/get-started" replace />} />
+      <Route path="/forgot-password" element={<AuthLayout><ForgotPasswordPage /></AuthLayout>} />
+      <Route path="/reset-password" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
 
       <Route element={<RequireAuth />}>
         <Route element={<RequireRole allow={['admin']} />}>
@@ -72,6 +87,7 @@ export default function AppRoutes() {
             <Route path="intake" element={<ClientIntakeFlowPage />} />
             <Route path="appointments" element={<ClientAppointmentsPage />} />
             <Route path="programs" element={<ClientProgramsPage />} />
+            <Route path="tasks" element={<ClientTasksPage />} />
             <Route path="profile" element={<ClientProfilePage />} />
           </Route>
         </Route>
@@ -79,8 +95,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['counsellor']} />}>
           <Route path="/counsellor" element={<RoleDashboardLayout role="counsellor" />}>
             <Route index element={<RoleDashboardPage role="counsellor" />} />
-            <Route path="sessions" element={<RolePlaceholderPage role="counsellor" title="Sessions" />} />
-            <Route path="clients" element={<RolePlaceholderPage role="counsellor" title="Clients" />} />
+            <Route path="sessions" element={<CounsellorSessionsPage />} />
+            <Route path="clients" element={<CounsellorClientsPage />} />
           </Route>
         </Route>
 
@@ -88,8 +104,8 @@ export default function AppRoutes() {
           <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
             <Route index element={<RoleDashboardPage role="trainer" />} />
             <Route path="onboarding" element={<TrainerOnboardingPage />} />
-            <Route path="plans" element={<RolePlaceholderPage role="trainer" title="Plans" />} />
-            <Route path="check-ins" element={<RolePlaceholderPage role="trainer" title="Check-ins" />} />
+            <Route path="plans" element={<TrainerPlansPage />} />
+            <Route path="check-ins" element={<TrainerCheckinsPage />} />
           </Route>
         </Route>
 
@@ -104,8 +120,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['helpdesk']} />}>
           <Route path="/helpdesk" element={<RoleDashboardLayout role="helpdesk" />}>
             <Route index element={<RoleDashboardPage role="helpdesk" />} />
-            <Route path="tickets" element={<RolePlaceholderPage role="helpdesk" title="Tickets" />} />
-            <Route path="knowledge-base" element={<RolePlaceholderPage role="helpdesk" title="Knowledge Base" />} />
+            <Route path="tickets" element={<HelpdeskTicketsPage />} />
+            <Route path="knowledge-base" element={<HelpdeskKnowledgeBasePage />} />
           </Route>
         </Route>
 
@@ -128,8 +144,8 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['content']} />}>
           <Route path="/content" element={<RoleDashboardLayout role="content" />}>
             <Route index element={<RoleDashboardPage role="content" />} />
-            <Route path="programs" element={<RolePlaceholderPage role="content" title="Programs" />} />
-            <Route path="assets" element={<RolePlaceholderPage role="content" title="Assets" />} />
+            <Route path="programs" element={<ContentProgramsPage />} />
+            <Route path="assets" element={<ContentAssetsPage />} />
           </Route>
         </Route>
       </Route>

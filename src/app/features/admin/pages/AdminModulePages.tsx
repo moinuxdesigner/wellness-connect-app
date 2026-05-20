@@ -1,17 +1,136 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import * as echarts from 'echarts';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { getAppointments, getPrograms, getRolesOverview, getTickets, getUsers, getUsageMetrics } from '../../shared/services/mockApi';
+import { getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminUsers } from '../../shared/services/adminApi';
+import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
+
+type RoleDistributionItem = {
+  role: Role;
+  users: number;
+  status: 'healthy' | 'attention' | 'needs-review';
+};
+
+function toneByUserStatus(status: UserSummary['status']) {
+  return status === 'active' ? 'success' : status === 'pending' ? 'warning' : 'danger';
+}
+
+function toneByRoleStatus(status: RoleDistributionItem['status']) {
+  return status === 'healthy' ? 'success' : 'warning';
+}
 
 export function UserManagementPage() {
-  const users = getUsers();
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    getAdminUsers()
+      .then((data) => {
+        if (!mounted) return;
+        setUsers(data);
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  const stats = useMemo(() => {
+    const active = users.filter((u) => u.status === 'active').length;
+    const pending = users.filter((u) => u.status === 'pending').length;
+    const admins = users.filter((u) => u.role === 'admin').length;
+    return { total: users.length, active, pending, admins };
+  }, [users]);
+
   return (
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        {loading ? (
+          Array.from({ length: 4 }).map((_, index) => (
+            <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+              <div className="mt-3 h-7 w-10 animate-pulse rounded bg-slate-200" />
+            </article>
+          ))
+        ) : (
+          <>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Users</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Active</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-700">{stats.active}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-700">{stats.pending}</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+              <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Admins</p>
+              <p className="mt-2 text-2xl font-semibold text-sky-700">{stats.admins}</p>
+            </article>
+          </>
+        )}
+      </section>
       <Panel title="All Users">
-        <div className="overflow-x-auto">
+        <div className="space-y-3 md:hidden">
+          {loading
+            ? Array.from({ length: 5 }).map((_, index) => (
+                <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="space-y-2">
+                      <div className="h-4 w-28 animate-pulse rounded bg-slate-200" />
+                      <div className="h-3 w-44 animate-pulse rounded bg-slate-200" />
+                    </div>
+                    <div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" />
+                  </div>
+                  <div className="mt-3 h-3 w-20 animate-pulse rounded bg-slate-200" />
+                </article>
+              ))
+            : users.map((u) => (
+                <article key={u.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-base font-semibold text-slate-900">{u.name}</p>
+                      <p className="mt-1 truncate text-sm text-slate-600">{u.email}</p>
+                    </div>
+                    <div className="shrink-0">
+                      <ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">{u.role}</p>
+                </article>
+              ))}
+        </div>
+        <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-left text-sm">
             <thead className="text-slate-500"><tr><th className="py-2">Name</th><th className="py-2">Email</th><th className="py-2">Role</th><th className="py-2">Status</th></tr></thead>
-            <tbody>{users.map((u) => <tr key={u.id} className="border-t border-slate-200"><td className="py-2 font-medium text-slate-900">{u.name}</td><td className="py-2 text-slate-600">{u.email}</td><td className="py-2 capitalize">{u.role}</td><td className="py-2"><ToneBadge tone={u.status === 'active' ? 'success' : u.status === 'pending' ? 'warning' : 'danger'}>{u.status}</ToneBadge></td></tr>)}</tbody>
+            <tbody>
+              {loading
+                ? Array.from({ length: 6 }).map((_, index) => (
+                    <tr key={index} className="border-t border-slate-200">
+                      <td className="py-3"><div className="h-4 w-28 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-4 w-44 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-4 w-16 animate-pulse rounded bg-slate-200" /></td>
+                      <td className="py-3"><div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" /></td>
+                    </tr>
+                  ))
+                : users.map((u) => (
+                    <tr key={u.id} className="border-t border-slate-200">
+                      <td className="py-2 font-medium text-slate-900">{u.name}</td>
+                      <td className="py-2 text-slate-600">{u.email}</td>
+                      <td className="py-2 capitalize">{u.role}</td>
+                      <td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td>
+                    </tr>
+                  ))}
+            </tbody>
           </table>
         </div>
       </Panel>
@@ -20,7 +139,12 @@ export function UserManagementPage() {
 }
 
 export function RoleManagementPage() {
-  const roles = getRolesOverview();
+  const [roles, setRoles] = useState<RoleDistributionItem[]>([]);
+
+  useEffect(() => {
+    getAdminOverview().then((data) => setRoles((data.role_distribution ?? []) as RoleDistributionItem[]));
+  }, []);
+
   return <SimpleList title="Role Management" subtitle="Manage role distribution and staffing." items={roles.map((r) => `${r.role}: ${r.users} users (${r.status})`)} />;
 }
 
@@ -29,8 +153,15 @@ export function PermissionMatrixPage() {
 }
 
 export function ProfessionalApprovalsPage() {
-  const users = getUsers().filter((u) => u.status === 'pending');
-  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={users.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
+  const [users, setUsers] = useState<UserSummary[]>([]);
+
+  useEffect(() => {
+    getAdminUsers().then(setUsers);
+  }, []);
+
+  const pending = useMemo(() => users.filter((u) => u.status === 'pending'), [users]);
+
+  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={pending.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
 }
 
 export function TrainerApplicationsPage() {
@@ -86,12 +217,182 @@ export function WorkflowConfigurationPage() {
 }
 
 export function RevenueReportsPage() {
-  return <SimpleList title="Revenue Reports" subtitle="Finance overview placeholders for backend integration." items={['Monthly recurring revenue trend', 'Plan-wise revenue split', 'Refund ratio by plan', 'Outstanding invoices aging']} />;
+  const monthlyRecurringRevenue = [82, 88, 94, 102, 108, 116, 122, 128, 131, 138, 146, 154];
+  const monthlyOrders = [420, 460, 490, 515, 548, 576, 602, 618, 641, 668, 702, 734];
+  const refundRate = [4.1, 3.9, 3.6, 3.4, 3.3, 3.1, 2.9, 2.7, 2.8, 2.6, 2.5, 2.4];
+
+  const trendOption: echarts.EChartsOption = {
+    tooltip: { trigger: 'axis' },
+    grid: { left: 22, right: 20, top: 24, bottom: 24, containLabel: true },
+    legend: { bottom: 0, textStyle: { color: '#475569' } },
+    xAxis: {
+      type: 'category',
+      boundaryGap: false,
+      data: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      axisLabel: { color: '#64748b' },
+    },
+    yAxis: [
+      {
+        type: 'value',
+        axisLine: { show: false },
+        splitLine: { lineStyle: { color: '#e2e8f0' } },
+        axisLabel: { color: '#64748b', formatter: '${value}k' },
+      },
+      {
+        type: 'value',
+        axisLine: { show: false },
+        splitLine: { show: false },
+        axisLabel: { color: '#64748b' },
+      },
+    ],
+    series: [
+      {
+        name: 'MRR',
+        type: 'line',
+        smooth: true,
+        data: monthlyRecurringRevenue,
+        yAxisIndex: 0,
+        symbol: 'circle',
+        symbolSize: 7,
+        itemStyle: { color: '#2563eb' },
+        lineStyle: { width: 3, color: '#2563eb' },
+        areaStyle: {
+          color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+            { offset: 0, color: 'rgba(37,99,235,0.24)' },
+            { offset: 1, color: 'rgba(37,99,235,0.02)' },
+          ]),
+        },
+      },
+      {
+        name: 'Orders',
+        type: 'line',
+        smooth: true,
+        data: monthlyOrders,
+        yAxisIndex: 1,
+        symbol: 'none',
+        itemStyle: { color: '#0ea5e9' },
+        lineStyle: { width: 2, color: '#0ea5e9', type: 'dashed' },
+      },
+      {
+        name: 'Refund %',
+        type: 'line',
+        smooth: true,
+        data: refundRate,
+        yAxisIndex: 1,
+        symbol: 'none',
+        itemStyle: { color: '#f97316' },
+        lineStyle: { width: 2, color: '#f97316' },
+      },
+    ],
+  };
+
+  const planSplitOption: echarts.EChartsOption = {
+    tooltip: { trigger: 'item' },
+    legend: { bottom: 0, textStyle: { color: '#475569' } },
+    series: [
+      {
+        type: 'pie',
+        radius: ['58%', '78%'],
+        center: ['50%', '44%'],
+        avoidLabelOverlap: true,
+        label: { show: false },
+        data: [
+          { value: 42, name: 'Premium Care', itemStyle: { color: '#2563eb' } },
+          { value: 28, name: 'Mind + Body', itemStyle: { color: '#0ea5e9' } },
+          { value: 18, name: 'Corporate', itemStyle: { color: '#14b8a6' } },
+          { value: 12, name: 'Family', itemStyle: { color: '#94a3b8' } },
+        ],
+      },
+    ],
+    graphic: [
+      { type: 'text', left: 'center', top: '37%', style: { text: '154k', fill: '#0f172a', font: '700 24px sans-serif' } },
+      { type: 'text', left: 'center', top: '51%', style: { text: 'Monthly ARR', fill: '#64748b', font: '500 12px sans-serif' } },
+    ],
+  };
+
+  const agingOption: echarts.EChartsOption = {
+    tooltip: { trigger: 'axis', axisPointer: { type: 'shadow' } },
+    grid: { left: 22, right: 20, top: 16, bottom: 24, containLabel: true },
+    xAxis: {
+      type: 'value',
+      axisLine: { lineStyle: { color: '#cbd5e1' } },
+      splitLine: { lineStyle: { color: '#e2e8f0' } },
+      axisLabel: { color: '#64748b', formatter: '${value}k' },
+    },
+    yAxis: {
+      type: 'category',
+      data: ['0-30 days', '31-60 days', '61-90 days', '90+ days'],
+      axisLine: { show: false },
+      axisLabel: { color: '#475569' },
+    },
+    series: [
+      {
+        type: 'bar',
+        data: [44, 26, 14, 8],
+        barWidth: 16,
+        itemStyle: {
+          borderRadius: 8,
+          color: new echarts.graphic.LinearGradient(1, 0, 0, 0, [
+            { offset: 0, color: '#3b82f6' },
+            { offset: 1, color: '#93c5fd' },
+          ]),
+        },
+      },
+    ],
+  };
+
+  return (
+    <div className="space-y-6">
+      <PageTitle title="Revenue Reports" subtitle="Finance overview powered by mock analytics data." />
+
+      <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Monthly Revenue</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">$154K</p>
+          <p className="mt-2 text-xs font-medium text-emerald-700">+12.8% vs previous month</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Total Orders</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">734</p>
+          <p className="mt-2 text-xs font-medium text-emerald-700">+9.2% conversion uplift</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Avg. Ticket Size</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">$209</p>
+          <p className="mt-2 text-xs font-medium text-sky-700">Stable across top plans</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <p className="text-sm text-slate-500">Outstanding Invoices</p>
+          <p className="mt-2 text-4xl font-semibold tracking-tight text-slate-900">$92K</p>
+          <p className="mt-2 text-xs font-medium text-amber-700">Needs collection follow-up</p>
+        </article>
+      </section>
+
+      <Panel title="Monthly recurring revenue trend">
+        <EChart option={trendOption} height={360} />
+      </Panel>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+        <Panel title="Plan-wise revenue split">
+          <EChart option={planSplitOption} height={300} />
+        </Panel>
+        <Panel title="Outstanding invoices aging">
+          <EChart option={agingOption} height={300} />
+        </Panel>
+      </section>
+    </div>
+  );
 }
 
 export function UsageMetricsPage() {
-  const usage = getUsageMetrics();
-  return <SimpleList title="Usage Metrics" subtitle="Engagement and operational KPIs." items={usage.map((u) => `${u.label}: ${u.value} (${u.delta})`)} />;
+  const [items, setItems] = useState<string[]>([]);
+
+  useEffect(() => {
+    getAdminOverview().then((data) => setItems((data.usage_metrics ?? []).map((u) => `${u.label}: ${u.value} (${u.delta})`)));
+  }, []);
+
+  return <SimpleList title="Usage Metrics" subtitle="Engagement and operational KPIs." items={items} />;
 }
 
 export function PerformanceDashboardPage() {
@@ -99,16 +400,26 @@ export function PerformanceDashboardPage() {
 }
 
 export function PlatformHealthPage() {
-  return <SimpleList title="Platform Health" subtitle="System and process health checkpoints." items={['Auth services: healthy', 'Booking service: healthy', 'Messaging queue: degraded (mock)', 'Escalation pipeline: healthy']} />;
+  return <SimpleList title="Platform Health" subtitle="System and process health checkpoints." items={['Auth services: healthy', 'Booking service: healthy', 'Messaging queue: monitored', 'Escalation pipeline: healthy']} />;
 }
 
 export function EscalationsPage() {
-  const tickets = getTickets();
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+
+  useEffect(() => {
+    getAdminEscalations().then(setTickets);
+  }, []);
+
   return <SimpleList title="Escalations" subtitle="High-priority cases requiring admin action." items={tickets.filter((t) => t.priority !== 'low').map((t) => `${t.id}: ${t.title} (${t.status})`)} />;
 }
 
 export function ProgramManagementPage() {
-  const programs = getPrograms();
+  const [programs, setPrograms] = useState<ProgramSummary[]>([]);
+
+  useEffect(() => {
+    getAdminPrograms().then(setPrograms);
+  }, []);
+
   return <SimpleList title="Program Management" subtitle="Manage wellness programs and lifecycle status." items={programs.map((p) => `${p.title} - ${p.category} - ${p.status}`)} />;
 }
 
@@ -117,8 +428,13 @@ export function MembershipPlanManagementPage() {
 }
 
 export function ActivityLogsPage() {
-  const appointments = getAppointments();
-  return <SimpleList title="Activity Logs" subtitle="Audit and activity stream placeholders." items={appointments.map((a) => `${a.id}: ${a.serviceType} ${a.status} for ${a.clientName}`)} />;
+  const [activities, setActivities] = useState<AppointmentSummary[]>([]);
+
+  useEffect(() => {
+    getAdminActivities().then(setActivities);
+  }, []);
+
+  return <SimpleList title="Activity Logs" subtitle="Audit and activity stream." items={activities.map((a) => `${a.id}: ${a.serviceType} ${a.status} for ${a.clientName}`)} />;
 }
 
 function SimpleList({ title, subtitle, items }: { title: string; subtitle: string; items: string[] }) {
@@ -130,8 +446,28 @@ function SimpleList({ title, subtitle, items }: { title: string; subtitle: strin
           {items.map((item) => (
             <li key={item} className="rounded-xl border border-slate-200 px-3 py-2">{item}</li>
           ))}
+          {!items.length ? <li className="rounded-xl border border-slate-200 px-3 py-2 text-slate-500">No records found.</li> : null}
         </ul>
       </Panel>
     </div>
   );
+}
+
+function EChart({ option, height }: { option: echarts.EChartsOption; height: number }) {
+  const chartRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    if (!chartRef.current) return;
+    const instance = echarts.init(chartRef.current);
+    instance.setOption(option);
+    const resizeObserver = new ResizeObserver(() => instance.resize());
+    resizeObserver.observe(chartRef.current);
+
+    return () => {
+      resizeObserver.disconnect();
+      instance.dispose();
+    };
+  }, [option]);
+
+  return <div ref={(node) => { chartRef.current = node; }} style={{ height, width: '100%' }} />;
 }

@@ -4,10 +4,10 @@
   /* ===== WELLNESS CONNECT DESIGN SYSTEM ===== */
 
   /* === Color System === */
-  /* Primary Colors */
-  --primary: #5B4CFF;
-  --primary-dark: #4A3DE8;
-  --primary-light: #E8E6FF;
+  /* Primary Colors - Figma: #4C54E8 (500), #3D3FD4 (600), #F0F4FF (50) */
+  --primary: #4C54E8;
+  --primary-dark: #3D3FD4;
+  --primary-light: #F0F4FF;
   --primary-foreground: #ffffff;
 
   /* Secondary Colors */
@@ -22,7 +22,7 @@
   --teal: #14B8A6;
   --teal-light: #CCFBF1;
 
-  /* Neutrals */
+  /* Neutrals - Figma exact palette */
   --neutral-900: #111827;
   --neutral-800: #1F2937;
   --neutral-700: #374151;
@@ -34,12 +34,12 @@
   --neutral-100: #F3F4F6;
   --neutral-50: #F9FAFB;
 
-  /* Semantic Colors */
-  --success: #10B981;
-  --success-light: #D1FAE5;
-  --warning: #F59E0B;
+  /* Semantic Colors - Figma: success=#15803D, warning=#B45309, danger=#B91C1C */
+  --success: #15803D;
+  --success-light: #DCFCE7;
+  --warning: #B45309;
   --warning-light: #FEF3C7;
-  --error: #EF4444;
+  --error: #B91C1C;
   --error-light: #FEE2E2;
   --info: #3B82F6;
   --info-light: #DBEAFE;
@@ -53,15 +53,15 @@
   --popover-foreground: #111827;
   --muted: #F3F4F6;
   --muted-foreground: #6B7280;
-  --accent: #F3F4F6;
-  --accent-foreground: #111827;
-  --destructive: #EF4444;
+  --accent: #F0F4FF;
+  --accent-foreground: #4C54E8;
+  --destructive: #B91C1C;
   --destructive-foreground: #ffffff;
   --border: #E5E7EB;
   --input: transparent;
   --input-background: #F9FAFB;
   --switch-background: #D1D5DB;
-  --ring: #5B4CFF;
+  --ring: #4C54E8;
 
   /* === Semantic Tokens === */
   --surface-default: var(--background);
@@ -119,67 +119,69 @@
 
   --nav-active: var(--action-primary);
 
-  /* === Typography System === */
+  /* === Typography System - Figma: Segoe UI, H1=32/600, H2=24/600, H3=18/600, Body=14/400, Caption=12/400, Button=14/500 === */
+  --font-family-base: 'Segoe UI', system-ui, -apple-system, sans-serif;
   --font-size: 16px;
-  --text-xs: 0.75rem;    /* 12px */
-  --text-sm: 0.875rem;   /* 14px */
+  --text-xs: 0.75rem;    /* 12px - Caption */
+  --text-sm: 0.875rem;   /* 14px - Body / Button */
   --text-base: 1rem;     /* 16px */
-  --text-lg: 1.125rem;   /* 18px */
+  --text-lg: 1.125rem;   /* 18px - H3 */
   --text-xl: 1.25rem;    /* 20px */
-  --text-2xl: 1.5rem;    /* 24px */
+  --text-2xl: 1.5rem;    /* 24px - H2 */
   --text-3xl: 1.75rem;   /* 28px */
-  --text-4xl: 2rem;      /* 32px */
+  --text-4xl: 2rem;      /* 32px - H1 */
 
   --font-weight-normal: 400;
   --font-weight-medium: 500;
   --font-weight-semibold: 600;
   --font-weight-bold: 700;
 
+  /* Line heights from Figma: H1=40px, H2=32px, H3=28px, Body=20px, Caption=16px */
   --line-height-tight: 1.25;
-  --line-height-normal: 1.5;
+  --line-height-normal: 1.43;  /* 20/14 for body */
   --line-height-relaxed: 1.75;
 
-  /* === Spacing System === */
-  --spacing-1: 0.25rem;   /* 4px */
-  --spacing-2: 0.5rem;    /* 8px */
-  --spacing-3: 0.75rem;   /* 12px */
-  --spacing-4: 1rem;      /* 16px */
-  --spacing-6: 1.5rem;    /* 24px */
-  --spacing-8: 2rem;      /* 32px */
-  --spacing-10: 2.5rem;   /* 40px */
-  --spacing-12: 3rem;     /* 48px */
-  --spacing-16: 4rem;     /* 64px */
+  /* === Spacing System - Figma 8px grid: 4,8,12,16,24,32,40,48,64 === */
+  --spacing-1: 0.25rem;   /* 4px  - --spacing-4 */
+  --spacing-2: 0.5rem;    /* 8px  - --spacing-8 */
+  --spacing-3: 0.75rem;   /* 12px - --spacing-12 */
+  --spacing-4: 1rem;      /* 16px - --spacing-16 */
+  --spacing-6: 1.5rem;    /* 24px - --spacing-24 */
+  --spacing-8: 2rem;      /* 32px - --spacing-32 */
+  --spacing-10: 2.5rem;   /* 40px - --spacing-40 */
+  --spacing-12: 3rem;     /* 48px - --spacing-48 */
+  --spacing-16: 4rem;     /* 64px - --spacing-64 */
 
-  /* === Border Radius === */
+  /* === Border Radius - Figma: Button=8px, Card=12px === */
   --radius-sm: 0.25rem;   /* 4px */
   --radius-md: 0.375rem;  /* 6px */
-  --radius-lg: 0.5rem;    /* 8px */
-  --radius-xl: 0.75rem;   /* 12px */
+  --radius-lg: 0.5rem;    /* 8px  - buttons */
+  --radius-xl: 0.75rem;   /* 12px - cards */
   --radius-full: 9999px;
-  --radius: 0.375rem;     /* default - 6px */
+  --radius: 0.5rem;       /* default - 8px (button radius) */
 
-  /* === Shadows === */
-  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
-  --shadow-modal: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
-  --shadow-floating: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  /* === Shadows - Figma: Shadow SM, MD, LG === */
   --shadow-sm: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+  --shadow-card: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px -1px rgba(0, 0, 0, 0.1);
+  --shadow-modal: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.1);
+  --shadow-floating: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -4px rgba(0, 0, 0, 0.1);
 
-  /* Sidebar (for compatibility) */
-  --sidebar: #F9FAFB;
+  /* Sidebar - Figma: white bg, #E5E7EB border, active=#F0F4FF bg */
+  --sidebar: #FFFFFF;
   --sidebar-foreground: #111827;
-  --sidebar-primary: #5B4CFF;
+  --sidebar-primary: #4C54E8;
   --sidebar-primary-foreground: #ffffff;
-  --sidebar-accent: #F3F4F6;
-  --sidebar-accent-foreground: #111827;
+  --sidebar-accent: #F0F4FF;
+  --sidebar-accent-foreground: #4C54E8;
   --sidebar-border: #E5E7EB;
-  --sidebar-ring: #5B4CFF;
+  --sidebar-ring: #4C54E8;
 
   /* Chart colors */
-  --chart-1: #5B4CFF;
+  --chart-1: #4C54E8;
   --chart-2: #00D9D5;
   --chart-3: #8B5CF6;
   --chart-4: #14B8A6;
-  --chart-5: #10B981;
+  --chart-5: #15803D;
 }
 
 .dark {
@@ -368,47 +370,50 @@
 
   html {
     font-size: var(--font-size);
+    font-family: var(--font-family-base);
   }
 
+  /* Figma typography scale: H1=32px/600, H2=24px/600, H3=18px/600 */
   h1 {
-    font-size: var(--text-2xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: var(--text-4xl);   /* 32px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 2.5rem;          /* 40px */
   }
 
   h2 {
-    font-size: var(--text-xl);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: var(--text-2xl);   /* 24px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 2rem;            /* 32px */
   }
 
   h3 {
-    font-size: var(--text-lg);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: var(--text-lg);    /* 18px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.75rem;         /* 28px */
   }
 
   h4 {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: var(--text-sm);    /* 14px */
+    font-weight: var(--font-weight-semibold);
+    line-height: 1.25rem;         /* 20px */
   }
 
+  /* Figma: label=14px/400, button=14px/500, input=14px/400 */
   label {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);
     font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    line-height: 1.25rem;
   }
 
   button {
-    font-size: var(--text-base);
-    font-weight: var(--font-weight-medium);
-    line-height: 1.5;
+    font-size: var(--text-sm);    /* 14px */
+    font-weight: var(--font-weight-medium); /* 500 */
+    line-height: 1.25rem;
   }
 
   input {
-    font-size: var(--text-base);
+    font-size: var(--text-sm);    /* 14px */
     font-weight: var(--font-weight-normal);
-    line-height: 1.5;
+    line-height: 1.25rem;
   }
 }

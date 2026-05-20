@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AppointmentController;
+use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
@@ -11,10 +12,13 @@ Route::prefix('v1')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register']);
         Route::post('/login', [AuthController::class, 'login']);
+        Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
+        Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
         Route::middleware('auth:sanctum')->group(function (): void {
             Route::get('/me', [AuthController::class, 'me']);
             Route::post('/logout', [AuthController::class, 'logout']);
+            Route::post('/change-password', [AuthController::class, 'changePassword']);
         });
     });
 
@@ -35,5 +39,13 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/appointments', [AppointmentController::class, 'store']);
         Route::put('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+
+        Route::prefix('admin')->group(function (): void {
+            Route::get('/overview', [AdminController::class, 'overview']);
+            Route::get('/users', [AdminController::class, 'users']);
+            Route::get('/programs', [AdminController::class, 'programs']);
+            Route::get('/escalations', [AdminController::class, 'escalations']);
+            Route::get('/activities', [AdminController::class, 'activities']);
+        });
     });
 });

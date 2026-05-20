@@ -29,8 +29,6 @@ export default function DashboardLayout({ navItems, title, children }: { navItem
         className="dashboard-content min-w-0"
       >
         <Topbar
-          collapsed={collapsed}
-          onToggleSidebar={() => setCollapsed((prev) => !prev)}
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
         />
         <main className="mx-auto max-w-7xl p-4 pb-24 lg:p-6">{children ?? <Outlet />}</main>

@@ -8,6 +8,8 @@ use Illuminate\Support\Facades\Schema;
 return new class extends Migration {
     public function up(): void
     {
+        $driver = DB::getDriverName();
+
         if (!Schema::hasTable('appointments')) {
             return;
         }
@@ -47,6 +49,7 @@ return new class extends Migration {
         }
 
         if (
+            $driver === 'mysql' &&
             Schema::hasColumn('appointments', 'appointment_date') &&
             Schema::hasColumn('appointments', 'appointment_time') &&
             Schema::hasColumn('appointments', 'starts_at')
@@ -65,14 +68,20 @@ return new class extends Migration {
         }
 
         if (Schema::hasColumn('appointments', 'ends_at')) {
-            DB::statement('UPDATE appointments SET ends_at = DATE_ADD(starts_at, INTERVAL 60 MINUTE) WHERE ends_at IS NULL AND starts_at IS NOT NULL');
+            if ($driver === 'sqlite') {
+                DB::statement("UPDATE appointments SET ends_at = datetime(starts_at, '+60 minutes') WHERE ends_at IS NULL AND starts_at IS NOT NULL");
+            } else {
+                DB::statement('UPDATE appointments SET ends_at = DATE_ADD(starts_at, INTERVAL 60 MINUTE) WHERE ends_at IS NULL AND starts_at IS NOT NULL');
+            }
         }
 
-        DB::statement("ALTER TABLE appointments MODIFY service_type ENUM('counselling','training','coaching','psychology','combined','package') NOT NULL");
-        DB::statement("UPDATE appointments SET service_type = 'psychology' WHERE service_type = 'counselling'");
-        DB::statement("UPDATE appointments SET service_type = 'combined' WHERE service_type = 'coaching'");
-        DB::statement("ALTER TABLE appointments MODIFY service_type ENUM('psychology','training','combined','package') NOT NULL");
-        DB::statement("ALTER TABLE appointments MODIFY status ENUM('scheduled','rescheduled','cancelled','completed','no_show') NOT NULL DEFAULT 'scheduled'");
+        if ($driver === 'mysql') {
+            DB::statement("ALTER TABLE appointments MODIFY service_type ENUM('counselling','training','coaching','psychology','combined','package') NOT NULL");
+            DB::statement("UPDATE appointments SET service_type = 'psychology' WHERE service_type = 'counselling'");
+            DB::statement("UPDATE appointments SET service_type = 'combined' WHERE service_type = 'coaching'");
+            DB::statement("ALTER TABLE appointments MODIFY service_type ENUM('psychology','training','combined','package') NOT NULL");
+            DB::statement("ALTER TABLE appointments MODIFY status ENUM('scheduled','rescheduled','cancelled','completed','no_show') NOT NULL DEFAULT 'scheduled'");
+        }
     }
 
     public function down(): void

@@ -1,12 +1,48 @@
+import { useEffect, useState } from 'react';
 import { PageTitle } from '../AdminLayout';
 import { Panel, StatCard, ToneBadge } from '../../shared/components/Ui';
-import { getAnalytics, getRolesOverview, getTickets, getUsageMetrics } from '../../shared/services/mockApi';
+import { getAdminOverview } from '../../shared/services/adminApi';
+import type { DashboardMetric, Role, TicketSummary } from '../../../types';
+
+type RoleDistributionItem = {
+  role: Role;
+  users: number;
+  status: 'healthy' | 'attention' | 'needs-review';
+};
+
+function roleTone(status: RoleDistributionItem['status']) {
+  return status === 'healthy' ? 'success' : 'warning';
+}
+
+function priorityTone(priority: TicketSummary['priority']) {
+  return priority === 'high' ? 'danger' : priority === 'medium' ? 'warning' : 'neutral';
+}
 
 export default function AdminDashboardPage() {
-  const metrics = getAnalytics();
-  const usage = getUsageMetrics();
-  const roles = getRolesOverview();
-  const tickets = getTickets();
+  const [metrics, setMetrics] = useState<DashboardMetric[]>([]);
+  const [usage, setUsage] = useState<DashboardMetric[]>([]);
+  const [roles, setRoles] = useState<RoleDistributionItem[]>([]);
+  const [tickets, setTickets] = useState<TicketSummary[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let active = true;
+    getAdminOverview()
+      .then((data) => {
+        if (!active) return;
+        setMetrics(data.analytics ?? []);
+        setUsage(data.usage_metrics ?? []);
+        setRoles((data.role_distribution ?? []) as RoleDistributionItem[]);
+        setTickets(data.recent_escalations ?? []);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, []);
 
   return (
     <div className="space-y-6">
@@ -39,7 +75,7 @@ export default function AdminDashboardPage() {
                   <p className="text-sm font-medium capitalize text-slate-900">{item.role}</p>
                   <p className="text-xs text-slate-500">{item.users} users</p>
                 </div>
-                <ToneBadge tone={item.status === 'healthy' ? 'success' : 'warning'}>{item.status}</ToneBadge>
+                <ToneBadge tone={roleTone(item.status)}>{item.status}</ToneBadge>
               </div>
             ))}
           </div>
@@ -47,6 +83,7 @@ export default function AdminDashboardPage() {
       </section>
 
       <Panel title="Recent Escalations">
+        {loading ? <p className="text-sm text-slate-500">Loading...</p> : null}
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="text-slate-500">
@@ -62,7 +99,7 @@ export default function AdminDashboardPage() {
                 <tr key={ticket.id} className="border-t border-slate-200">
                   <td className="py-2 font-medium text-slate-800">{ticket.id}</td>
                   <td className="py-2 text-slate-600">{ticket.title}</td>
-                  <td className="py-2"><ToneBadge tone={ticket.priority === 'high' ? 'danger' : ticket.priority === 'medium' ? 'warning' : 'neutral'}>{ticket.priority}</ToneBadge></td>
+                  <td className="py-2"><ToneBadge tone={priorityTone(ticket.priority)}>{ticket.priority}</ToneBadge></td>
                   <td className="py-2 capitalize text-slate-700">{ticket.status}</td>
                 </tr>
               ))}

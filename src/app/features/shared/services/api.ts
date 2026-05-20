@@ -1,6 +1,6 @@
 import { clearAuthState, getAuthState, setAuthState, type AuthUser } from '../../auth/auth';
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:8080/api/v1';
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
 export interface ClientAppointment {
   id: number;
@@ -101,6 +101,46 @@ export async function loginRequest(email: string, password: string) {
   const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
   setAuthState(data.token as string, mergedUser);
   return mergedUser;
+}
+
+export async function forgotPasswordRequest(email: string) {
+  const response = await fetch(`${API_BASE}/auth/forgot-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify({ email }),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to send password reset link'));
+  return String(data?.message ?? 'Password reset link sent to your email.');
+}
+
+export async function resetPasswordRequest(payload: { email: string; token: string; password: string; password_confirmation: string }) {
+  const response = await fetch(`${API_BASE}/auth/reset-password`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to reset password'));
+  return String(data?.message ?? 'Password reset successful.');
+}
+
+export async function changePasswordRequest(payload: { current_password: string; password: string; password_confirmation: string }) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/auth/change-password`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to change password'));
+
+  if (typeof data?.token === 'string' && data.user) {
+    const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
+    setAuthState(data.token, mergedUser);
+  }
+
+  return String(data?.message ?? 'Password updated successfully.');
 }
 
 export async function meRequest() {
