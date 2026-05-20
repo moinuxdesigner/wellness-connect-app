@@ -36,6 +36,20 @@ body {
   margin-left: 0;
 }
 
+.landing-hero-support {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+}
+
+@media (min-width: 1024px) {
+  .landing-hero-support {
+    display: block;
+    overflow: visible;
+  }
+}
+
 .onboarding-animation {
   pointer-events: none;
   display: flex;

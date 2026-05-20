@@ -230,29 +230,29 @@ export default function LandingPage() {
 
       {/* ══ HERO ════════════════════════════════════════════════════ */}
       <section className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-white">
-        <div className="mx-auto grid max-w-7xl gap-12 px-4 py-16 lg:grid-cols-2 lg:items-center lg:px-8 lg:py-24">
+        <div className="mx-auto grid max-w-7xl gap-7 px-4 pb-10 pt-8 lg:grid-cols-2 lg:items-center lg:gap-12 lg:px-8 lg:py-24">
 
           {/* Left — copy */}
-          <div className="order-2 lg:order-1">
+          <div className="order-1 flex flex-col lg:order-1">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold uppercase tracking-widest text-indigo-600">
               <span className="h-1.5 w-1.5 rounded-full bg-indigo-500" />
               Integrated Wellness Platform
             </span>
 
-            <h1 className="mt-4 text-4xl font-bold leading-[1.15] text-slate-900 lg:text-5xl">
+            <h1 className="mt-3 text-[2.35rem] font-bold leading-[1.1] text-slate-900 sm:text-4xl lg:mt-4 lg:text-5xl lg:leading-[1.15]">
               Integrated care for{' '}
               <span className="text-indigo-600">mind, body,</span>{' '}
               and lifestyle.
             </h1>
 
-            <p className="mt-5 text-lg leading-relaxed text-slate-600">
+            <p className="landing-hero-support mt-3 text-base leading-relaxed text-slate-600 lg:mt-5 lg:text-lg">
               A role-based wellness workspace connecting clients with licensed
               counsellors, certified trainers, and life coaches — all in one
               platform.
             </p>
 
             {/* Feature bullets */}
-            <ul className="mt-6 space-y-2.5">
+            <ul className="order-5 mt-4 space-y-2 lg:order-none lg:mt-6 lg:space-y-2.5">
               {[
                 'Smart intake & triage matching',
                 'Online & in-person sessions',
@@ -266,33 +266,33 @@ export default function LandingPage() {
             </ul>
 
             {/* CTAs */}
-            <div className="mt-8 flex flex-wrap gap-3">
+            <div className="order-3 mt-5 flex flex-wrap gap-3 lg:order-none lg:mt-8">
               <Link
                 to="/get-started"
-                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-6 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700"
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 lg:px-6"
               >
                 Start Your Journey
                 <ArrowRight size={15} />
               </Link>
               <Link
                 to="/login"
-                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-6 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50"
+                className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 shadow-sm transition-colors hover:bg-slate-50 lg:px-6"
               >
                 Sign In
               </Link>
             </div>
 
-            <p className="mt-5 text-xs text-slate-400">
+            <p className="order-4 mt-3 text-xs leading-relaxed text-slate-400 lg:order-none lg:mt-5">
               Trusted by 2,400+ clients · HIPAA-compliant · Secure &amp; confidential
             </p>
           </div>
 
           {/* Right — hero image */}
-          <div className="order-1 lg:order-2">
+          <div className="order-2 lg:order-2">
             <img
               src="/exercise-couple.png"
               alt="Couple exercising together — fitness and wellness"
-              className="h-auto w-full object-cover"
+              className="mx-auto h-auto max-h-[220px] w-full object-contain sm:max-h-[280px] lg:max-h-none lg:object-cover"
             />
           </div>
         </div>
