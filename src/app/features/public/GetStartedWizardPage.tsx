@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowLeft, ArrowRight, Brain, Check, CheckCircle2, Dumbbell, HeartHandshake, Zap } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Brain, Check, Dumbbell, HeartHandshake, Zap } from 'lucide-react';
+import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import OnboardingAnimation from '../../../components/onboarding/OnboardingAnimation';
 import { registerRequest } from '../shared/services/api';
 import { getPostAuthRedirectPath } from '../auth/roleRedirects';
 
@@ -63,6 +65,7 @@ const TOTAL_STEPS = 5;
 
 export default function GetStartedWizardPage() {
   const navigate = useNavigate();
+  const prefersReducedMotion = useReducedMotion();
   const [step, setStep] = useState<Step>(1);
   const [name, setName] = useState('');
   const [goalId, setGoalId] = useState('');
@@ -107,6 +110,7 @@ export default function GetStartedWizardPage() {
       case 1:
         return (
           <div className="space-y-6">
+            <OnboardingAnimation type="name" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Hi there! 👋</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">What's your name?</h1>
@@ -135,6 +139,7 @@ export default function GetStartedWizardPage() {
       case 2:
         return (
           <div className="space-y-6">
+            <OnboardingAnimation type="goal" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 2 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -181,6 +186,7 @@ export default function GetStartedWizardPage() {
       case 3:
         return (
           <div className="space-y-6">
+            <OnboardingAnimation type="email" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 3 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">What's your email?</h1>
@@ -210,6 +216,7 @@ export default function GetStartedWizardPage() {
       case 4:
         return (
           <div className="space-y-6">
+            <OnboardingAnimation type="password" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 4 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Create a password</h1>
@@ -243,6 +250,7 @@ export default function GetStartedWizardPage() {
       case 5:
         return (
           <div className="space-y-6">
+            <OnboardingAnimation type="review" />
             <div>
               <p className="text-sm font-semibold uppercase tracking-widest text-indigo-600">Step 5 of {TOTAL_STEPS}</p>
               <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">
@@ -293,9 +301,7 @@ export default function GetStartedWizardPage() {
       case 6:
         return (
           <div className="space-y-6 text-center">
-            <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-full bg-emerald-100">
-              <CheckCircle2 size={40} className="text-emerald-600" />
-            </div>
+            <OnboardingAnimation type="success" />
             <div>
               <h1 className="text-3xl font-bold text-slate-900 sm:text-4xl">
                 Welcome to your transformation journey! 🌟
@@ -372,7 +378,17 @@ export default function GetStartedWizardPage() {
         </div>
 
         {/* Step content */}
-        {renderStep()}
+        <AnimatePresence mode="wait">
+          <motion.div
+            key={step}
+            initial={prefersReducedMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, y: -6 }}
+            transition={{ duration: 0.22, ease: 'easeOut' }}
+          >
+            {renderStep()}
+          </motion.div>
+        </AnimatePresence>
       </div>
     </div>
   );
