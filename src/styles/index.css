@@ -93,30 +93,30 @@ body {
 
 @media (max-height: 720px) {
   .onboarding-animation {
-    height: 112px;
+    height: 146px;
     margin-bottom: 0;
   }
 
   .onboarding-animation__fallback {
-    height: 4.75rem;
-    width: 4.75rem;
-    font-size: 2rem;
+    height: 6.175rem;
+    width: 6.175rem;
+    font-size: 2.6rem;
   }
 
   .onboarding-animation--compact {
-    height: 88px;
+    height: 114px;
   }
 }
 
 @media (max-height: 620px) {
   .onboarding-animation {
-    height: 76px;
+    height: 99px;
   }
 
   .onboarding-animation__fallback {
-    height: 3.5rem;
-    width: 3.5rem;
-    font-size: 1.5rem;
+    height: 4.55rem;
+    width: 4.55rem;
+    font-size: 1.95rem;
   }
 }
 

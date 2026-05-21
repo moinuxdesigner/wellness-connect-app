@@ -55,7 +55,7 @@ export default function AppRoutes() {
 
       <Route path="/get-started" element={<GetStartedWizardPage />} />
 
-      <Route path="/login" element={<AuthLayout><LoginPage /></AuthLayout>} />
+      <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<Navigate to="/get-started" replace />} />
       <Route path="/forgot-password" element={<AuthLayout><ForgotPasswordPage /></AuthLayout>} />
       <Route path="/reset-password" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
