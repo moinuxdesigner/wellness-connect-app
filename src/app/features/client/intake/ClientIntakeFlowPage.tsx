@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { Check, UserRound } from 'lucide-react';
+import { ArrowLeft, ArrowRight, Check, UserRound } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import {
   bookAppointmentRequest,
@@ -13,7 +13,7 @@ import {
   type SlotItem,
 } from '../../shared/services/api';
 import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
-import { IntakeStepper, MobileSectionTitle } from '../../../../design/patterns/intake';
+import { MobileSectionTitle } from '../../../../design/patterns/intake';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
 
 type ServiceType = 'psychology' | 'training' | 'combined' | 'package';
@@ -71,9 +71,6 @@ const concernOptions: Record<ServiceType, ConcernOption[]> = {
     { value: 'lifestyle_package', label: 'Lifestyle package' },
   ],
 };
-
-const defaultSteps = ['Service', 'Intake', 'Schedule', 'Confirm'];
-const combinedSteps = ['Service', 'Intake', 'Psychologist', 'Trainer', 'Review', 'Confirm'];
 
 function getConcernOptions(serviceType: ServiceType) {
   return concernOptions[serviceType];
@@ -151,8 +148,8 @@ export default function ClientIntakeFlowPage() {
   const selectedTrainerSlot = useMemo(() => trainerSlots.find((slot) => slot.id === state.selectedTrainerSlotId), [trainerSlots, state.selectedTrainerSlotId]);
   const concernChoices = getConcernOptions(state.serviceType);
   const isCombined = state.serviceType === 'combined';
-  const stepperSteps = isCombined ? combinedSteps : defaultSteps;
-  const stepperCurrent = isCombined ? state.step : Math.min(state.step, 4);
+  const totalSteps = isCombined ? 5 : 3;
+  const currentStep = Math.min(state.step, totalSteps);
 
   const singlePractitioners = useMemo(() => {
     if (state.serviceType === 'training') return practitioners.filter((p) => ['trainer', 'coach'].includes(p.type));
@@ -373,38 +370,87 @@ export default function ClientIntakeFlowPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl space-y-4 pb-20">
-      <DSCard className="space-y-4">
-        <IntakeStepper current={stepperCurrent} steps={stepperSteps} />
+    <div className="mx-auto w-full max-w-lg pb-20">
+      <div className="mb-7 flex items-center justify-between">
+        {state.step > 1 ? (
+          <button
+            type="button"
+            onClick={() => dispatch({ type: 'SET_STEP', payload: (state.step - 1) as Step })}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <ArrowLeft size={15} /> Back
+          </button>
+        ) : (
+          <button
+            type="button"
+            onClick={() => navigate('/client')}
+            className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+          >
+            <ArrowLeft size={15} /> Dashboard
+          </button>
+        )}
 
+        <div className="flex items-center gap-1.5" aria-label={`Step ${currentStep} of ${totalSteps}`}>
+          {Array.from({ length: totalSteps }, (_, index) => {
+            const item = index + 1;
+            return (
+              <span
+                key={item}
+                className={`h-2 rounded-full transition-all duration-300 ${
+                  item === currentStep ? 'w-6 bg-indigo-600' : item < currentStep ? 'w-2 bg-indigo-300' : 'w-2 bg-slate-200'
+                }`}
+              />
+            );
+          })}
+        </div>
+
+        <button
+          type="button"
+          onClick={() => navigate('/client')}
+          className="rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
+        >
+          Close
+        </button>
+      </div>
+
+      <div className="space-y-6">
         {state.step === 1 ? (
           <>
             <MobileSectionTitle title="Select the support you need" subtitle="Choose your main service type to continue." />
-            <div className="grid gap-2 sm:grid-cols-2">
+            <div className="grid gap-3 sm:grid-cols-2">
               {(['psychology', 'training', 'combined', 'package'] as ServiceType[]).map((service) => (
                 <button
                   key={service}
                   type="button"
                   onClick={() => dispatch({ type: 'SET_SERVICE', payload: service })}
-                  className={`rounded-xl border px-3 py-3 text-left text-sm capitalize ${state.serviceType === service ? 'border-[var(--ds-brand)] bg-indigo-50 text-[var(--ds-brand)]' : 'border-[var(--ds-border)] bg-white text-slate-700'}`}
+                  className={`rounded-xl border-2 px-4 py-4 text-left text-sm capitalize transition ${
+                    state.serviceType === service
+                      ? 'border-[var(--ds-brand)] bg-indigo-50 text-[var(--ds-brand)]'
+                      : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
+                  }`}
                 >
-                  {service}
+                  <span className="block font-semibold">{service}</span>
+                  <span className="mt-1 block text-xs normal-case text-slate-500">
+                    {service === 'combined' ? 'Counselling and fitness together' : service === 'package' ? 'A guided wellness package' : service === 'psychology' ? 'Mental wellness support' : 'Fitness and habit support'}
+                  </span>
                 </button>
               ))}
             </div>
-            <div className="flex justify-end"><DSButton onClick={onContinueFromService} disabled={loading}>{loading ? 'Starting...' : 'Continue'}</DSButton></div>
+            <DSButton className="w-full gap-2" onClick={onContinueFromService} disabled={loading}>
+              {loading ? 'Starting...' : <>Continue <ArrowRight size={16} /></>}
+            </DSButton>
           </>
         ) : null}
 
         {state.step === 2 ? (
           <>
             <MobileSectionTitle title="Intake questions" subtitle="Answer briefly so we can match the right support." />
-            <label className="grid gap-1 text-sm font-medium text-slate-700">What brings you here today?
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">What brings you here today?
               <select className="rounded-xl border border-slate-300 px-3 py-2" value={state.concern} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { concern: e.target.value } })}>
                 {concernChoices.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">How long?
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">How long?
               <select className="rounded-xl border border-slate-300 px-3 py-2" value={state.duration} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { duration: e.target.value } })}>
                 <option value="lt_2_weeks">Less than 2 weeks</option>
                 <option value="2_8_weeks">2-8 weeks</option>
@@ -412,7 +458,7 @@ export default function ClientIntakeFlowPage() {
                 <option value="gt_6_months">More than 6 months</option>
               </select>
             </label>
-            <label className="grid gap-1 text-sm font-medium text-slate-700">What would success look like?
+            <label className="grid gap-1.5 text-sm font-medium text-slate-700">What would success look like?
               <textarea
                 className="min-h-24 rounded-xl border border-slate-300 px-3 py-2"
                 value={state.outcome}
@@ -420,7 +466,10 @@ export default function ClientIntakeFlowPage() {
                 placeholder="Example: I want to feel calmer, sleep better, build a consistent fitness routine, and know which first steps to follow each week."
               />
             </label>
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 1 })}>Back</DSSecondaryButton><DSButton onClick={onContinueFromIntake} disabled={loading}>{loading ? 'Submitting...' : 'Continue'}</DSButton></div>
+            <div className="flex gap-2">
+              <DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 1 })}>Back</DSSecondaryButton>
+              <DSButton className="flex-1 gap-2" onClick={onContinueFromIntake} disabled={loading}>{loading ? 'Submitting...' : <>Continue <ArrowRight size={16} /></>}</DSButton>
+            </div>
           </>
         ) : null}
 
@@ -430,7 +479,7 @@ export default function ClientIntakeFlowPage() {
             {renderPractitionerButton('psychologist', selectedPsychologist, 'Select Psychologist', 'Open psychologist list')}
             {selectedPsychologist ? <p className="text-xs text-slate-600">Specialties: {selectedPsychologist.specialties.join(', ')}</p> : null}
             {renderSlotSelect(psychologistSlots, state.selectedPsychologistSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })} disabled={!state.selectedPsychologistId || !state.selectedPsychologistSlotId}>Continue</DSButton></div>
+            <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton className="flex-1 gap-2" onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })} disabled={!state.selectedPsychologistId || !state.selectedPsychologistSlotId}>Continue <ArrowRight size={16} /></DSButton></div>
           </>
         ) : null}
 
@@ -440,7 +489,7 @@ export default function ClientIntakeFlowPage() {
             {renderPractitionerButton('trainer', selectedTrainer, 'Select Fitness Trainer', 'Open trainer list')}
             {selectedTrainer ? <p className="text-xs text-slate-600">Specialties: {selectedTrainer.specialties.join(', ')}</p> : null}
             {renderSlotSelect(trainerSlots, state.selectedTrainerSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>Back</DSSecondaryButton><DSButton onClick={() => dispatch({ type: 'SET_STEP', payload: 5 })} disabled={!state.selectedTrainerId || !state.selectedTrainerSlotId}>Review</DSButton></div>
+            <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>Back</DSSecondaryButton><DSButton className="flex-1 gap-2" onClick={() => dispatch({ type: 'SET_STEP', payload: 5 })} disabled={!state.selectedTrainerId || !state.selectedTrainerSlotId}>Review <ArrowRight size={16} /></DSButton></div>
           </>
         ) : null}
 
@@ -451,7 +500,7 @@ export default function ClientIntakeFlowPage() {
               {renderAppointmentSummary('Psychologist appointment', selectedPsychologist, selectedPsychologistSlot)}
               {renderAppointmentSummary('Fitness trainer appointment', selectedTrainer, selectedTrainerSlot)}
             </div>
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })}>Back</DSSecondaryButton><DSButton onClick={onReserveCombinedSlots} disabled={loading}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
+            <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })}>Back</DSSecondaryButton><DSButton className="flex-1" onClick={onReserveCombinedSlots} disabled={loading}>{loading ? 'Reserving...' : 'Reserve Slots'}</DSButton></div>
           </>
         ) : null}
 
@@ -461,7 +510,7 @@ export default function ClientIntakeFlowPage() {
             {renderPractitionerButton('single', selectedPractitioner, 'Select practitioner', 'Choose from recommended matches')}
             {selectedPractitioner ? <p className="text-xs text-slate-600">Specialties: {selectedPractitioner.specialties.join(', ')}</p> : null}
             {renderSlotSelect(slots, state.selectedSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }))}
-            <div className="flex justify-between gap-2"><DSSecondaryButton onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton onClick={onReserveSingleSlot} disabled={loading || !state.selectedSlotId || !state.selectedPractitionerId}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
+            <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton className="flex-1" onClick={onReserveSingleSlot} disabled={loading || !state.selectedSlotId || !state.selectedPractitionerId}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
           </>
         ) : null}
 
@@ -500,7 +549,7 @@ export default function ClientIntakeFlowPage() {
         </Dialog>
 
         {notice ? <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-700">{notice}</p> : null}
-      </DSCard>
+      </div>
     </div>
   );
 }

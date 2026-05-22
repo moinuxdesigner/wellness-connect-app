@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { ArrowLeft, ArrowRight, Brain, Check, Dumbbell, HeartHandshake, Zap } from 'lucide-react';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
 import OnboardingAnimation from '../../../components/onboarding/OnboardingAnimation';
@@ -62,21 +62,57 @@ const GOALS: Array<{
 ];
 
 const TOTAL_STEPS = 5;
+const wizardDraftKey = 'wc_get_started_draft';
+
+type WizardDraft = {
+  step?: Step;
+  name?: string;
+  goalId?: string;
+  email?: string;
+  password?: string;
+};
+
+function readWizardDraft(): WizardDraft {
+  try {
+    const raw = sessionStorage.getItem(wizardDraftKey);
+    return raw ? JSON.parse(raw) : {};
+  } catch {
+    return {};
+  }
+}
+
+function getRestorableStep(draft: WizardDraft): Step {
+  if (draft.password && draft.password.length >= 8) return 5;
+  if (draft.email && draft.email.includes('@')) return 4;
+  if (draft.goalId) return 3;
+  if (draft.name?.trim()) return 2;
+  return 1;
+}
 
 export default function GetStartedWizardPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const prefersReducedMotion = useReducedMotion();
-  const [step, setStep] = useState<Step>(1);
-  const [name, setName] = useState('');
-  const [goalId, setGoalId] = useState('');
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
+  const [draft] = useState(readWizardDraft);
+  const requestedStep = Number(searchParams.get('step'));
+  const restorableStep = getRestorableStep(draft);
+  const requestedDraftStep = requestedStep >= 1 && requestedStep <= 5 ? (requestedStep as Step) : draft.step ?? 1;
+  const initialStep = Math.min(requestedDraftStep, restorableStep) as Step;
+  const [step, setStep] = useState<Step>(initialStep);
+  const [name, setName] = useState(draft.name ?? '');
+  const [goalId, setGoalId] = useState(draft.goalId ?? '');
+  const [email, setEmail] = useState(draft.email ?? '');
+  const [password, setPassword] = useState(draft.password ?? '');
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
   const [postAuthPath, setPostAuthPath] = useState('/client/intake');
 
   const selectedGoal = GOALS.find((g) => g.id === goalId);
   const firstName = name.split(' ')[0];
+
+  useEffect(() => {
+    sessionStorage.setItem(wizardDraftKey, JSON.stringify({ step, name, goalId, email, password }));
+  }, [email, goalId, name, password, step]);
 
   function goBack() {
     setNotice('');
@@ -97,6 +133,7 @@ export default function GetStartedWizardPage() {
         consent_to_terms: true,
       });
       setPostAuthPath(getPostAuthRedirectPath(user));
+      sessionStorage.removeItem(wizardDraftKey);
       setStep(6);
     } catch (error) {
       setNotice(error instanceof Error ? error.message : 'Unable to create your account. Please try again.');
@@ -274,9 +311,9 @@ export default function GetStartedWizardPage() {
             </div>
             <p className="text-center text-xs text-slate-400">
               By creating your account you agree to our{' '}
-              <a href="#" className="underline hover:text-slate-600">Terms of Service</a>
+              <Link to="/terms-of-service" className="underline hover:text-slate-600">Terms of Service</Link>
               {' '}and{' '}
-              <a href="#" className="underline hover:text-slate-600">Privacy Policy</a>.
+              <Link to="/privacy-policy" className="underline hover:text-slate-600">Privacy Policy</Link>.
             </p>
             {notice && (
               <p className="rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{notice}</p>
@@ -332,10 +369,10 @@ export default function GetStartedWizardPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-indigo-50/30 to-white">
-      <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5 sm:px-6 sm:py-10">
 
         {/* Top bar */}
-        <div className="mb-10 flex items-center justify-between">
+        <div className="mb-7 flex items-center justify-between sm:mb-10">
           {showBack ? (
             <button
               type="button"

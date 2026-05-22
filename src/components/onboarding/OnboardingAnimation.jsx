@@ -2,9 +2,6 @@ import { useEffect, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import welcomeAnimation from './animations/Welcome Animation.json';
 import mascotAnimation from './animations/mascot.json';
-import contactUsAnimation from './animations/contact us.json';
-import emailCheckAnimation from './animations/Email check.json';
-import changePasswordsAnimation from './animations/Change Passwords.json';
 
 const onboardingAnimations = {
   name: {
@@ -18,27 +15,27 @@ const onboardingAnimations = {
     label: 'Goal selection animation',
   },
   contact: {
-    data: contactUsAnimation,
+    load: () => import('./animations/contact us.json').then((module) => module.default),
     fallback: 'ðŸ‘‹',
     label: 'Nice to meet you animation',
   },
   email: {
-    data: emailCheckAnimation,
+    load: () => import('./animations/Email check.json').then((module) => module.default),
     fallback: '✉️',
     label: 'Email animation',
   },
   password: {
-    data: changePasswordsAnimation,
+    load: () => import('./animations/Change Passwords.json').then((module) => module.default),
     fallback: '🔒',
     label: 'Security animation',
   },
   review: {
-    src: '/animations/onboarding/personal-plan.json',
+    load: () => import('./animations/final-plan.json').then((module) => module.default),
     fallback: '📋',
     label: 'Plan review animation',
   },
   success: {
-    src: '/animations/onboarding/success.json',
+    load: () => import('./animations/Welcome title animation.json').then((module) => module.default),
     fallback: '🌟',
     label: 'Success animation',
   },
@@ -63,7 +60,9 @@ export default function OnboardingAnimation({ type, className = '' }) {
       import('lottie-react'),
       config.data
         ? Promise.resolve(config.data)
-        : fetch(`${config.src}?v=20260520-lottie-fix`, { cache: 'no-store' }).then((response) => {
+        : config.load
+          ? config.load()
+          : fetch(`${config.src}?v=20260520-lottie-fix`, { cache: 'no-store' }).then((response) => {
             if (!response.ok) throw new Error(`Missing animation: ${config.src}`);
             return response.json();
           }),
@@ -80,7 +79,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
     return () => {
       isMounted = false;
     };
-  }, [config.data, config.src, prefersReducedMotion]);
+  }, [config.data, config.load, config.src, prefersReducedMotion]);
 
   const showFallback = prefersReducedMotion || hasError || !animationData || !LottieComponent;
 
