@@ -11,6 +11,7 @@ build/
 .env.*
 !.env.example
 !.env.capacitor
+!.env.production.example
 
 # Logs
 logs/
