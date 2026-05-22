@@ -139,7 +139,7 @@ export default function GetStartedWizardPage() {
       case 2:
         return (
           <div className="space-y-4">
-            <OnboardingAnimation type="goal" className="onboarding-animation--compact" />
+            <OnboardingAnimation type="contact" className="onboarding-animation--compact" />
             <div>
               <p className="text-sm font-semibold tracking-wide text-indigo-600">Step 2 of {TOTAL_STEPS}</p>
               <h1 className="mt-1.5 text-2xl font-bold text-slate-900 sm:text-3xl">

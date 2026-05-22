@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { useReducedMotion } from 'motion/react';
 import welcomeAnimation from './animations/Welcome Animation.json';
 import mascotAnimation from './animations/mascot.json';
+import contactUsAnimation from './animations/contact us.json';
+import emailCheckAnimation from './animations/Email check.json';
+import changePasswordsAnimation from './animations/Change Passwords.json';
 
 const onboardingAnimations = {
   name: {
@@ -14,13 +17,18 @@ const onboardingAnimations = {
     fallback: '🎯',
     label: 'Goal selection animation',
   },
+  contact: {
+    data: contactUsAnimation,
+    fallback: 'ðŸ‘‹',
+    label: 'Nice to meet you animation',
+  },
   email: {
-    src: '/animations/onboarding/email.json',
+    data: emailCheckAnimation,
     fallback: '✉️',
     label: 'Email animation',
   },
   password: {
-    src: '/animations/onboarding/secure-lock.json',
+    data: changePasswordsAnimation,
     fallback: '🔒',
     label: 'Security animation',
   },
