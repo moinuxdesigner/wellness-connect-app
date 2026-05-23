@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router';
-import { ArrowLeft, ArrowRight } from 'lucide-react';
+import { Home, ArrowLeft, ArrowRight } from 'lucide-react';
 import OnboardingAnimation from '../../../components/onboarding/OnboardingAnimation';
 import { loginRequest } from './apiAuth';
 import { getPostAuthRedirectPath } from './roleRedirects';
@@ -14,31 +14,31 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-indigo-50/30 to-white">
-      <div className="mx-auto w-full max-w-lg flex-1 px-4 py-10 sm:px-6">
+      <div className="mx-auto w-full max-w-lg flex-1 px-4 py-2 sm:px-6">
         <div className="mb-10 flex items-center justify-between">
           <Link
             to="/"
             className="flex items-center gap-1.5 rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
-            <ArrowLeft size={15} /> Home
+            <Home size={15} /> 
           </Link>
 
-          <p className="rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500">Sign in</p>
+          {/* <p className="rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500">Sign in</p> */}
 
-          <Link
+          {/* <Link
             to="/get-started"
             className="rounded-lg px-2 py-1.5 text-sm font-medium text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-700"
           >
             Create account
-          </Link>
+          </Link> */}
         </div>
 
         <div className="space-y-6">
-          <OnboardingAnimation type="password" />
+          {/* <OnboardingAnimation type="password" /> */}
           <div>
             <p className="text-sm font-semibold tracking-wide text-indigo-600">Welcome back</p>
             <h1 className="mt-2 text-3xl font-bold text-slate-900 sm:text-4xl">Sign in to WellnessConnect</h1>
-            <p className="mt-2 text-slate-500">Use your Laravel account credentials to continue.</p>
+            {/* <p className="mt-2 text-slate-500">Use your Laravel account credentials to continue.</p> */}
           </div>
 
           <form
