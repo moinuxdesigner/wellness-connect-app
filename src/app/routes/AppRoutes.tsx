@@ -9,6 +9,8 @@ import LandingPage from '../features/public/LandingPage';
 import GetStartedWizardPage from '../features/public/GetStartedWizardPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
 import LegalPage from '../features/public/LegalPage';
+import CareersPage from '../features/public/CareersPage';
+import ProfessionalOnboardingPage from '../features/public/ProfessionalOnboardingPage';
 import { AdminLayout } from '../features/admin/AdminLayout';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
 import {
@@ -50,6 +52,7 @@ export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<PublicLayout><LandingPage /></PublicLayout>} />
+      <Route path="/careers" element={<PublicLayout><CareersPage /></PublicLayout>} />
       <Route path="/pricing" element={<PublicLayout><SimplePublicPage title="Pricing" description="Membership plans and billing rules will be connected to backend APIs in the next phase." /></PublicLayout>} />
       <Route path="/about" element={<PublicLayout><SimplePublicPage title="About" description="WellnessConnect unifies counselling, training, coaching, and operations in one platform." /></PublicLayout>} />
       <Route path="/contact" element={<PublicLayout><SimplePublicPage title="Contact" description="Support and sales channels placeholder for future integrations." /></PublicLayout>} />
@@ -57,6 +60,7 @@ export default function AppRoutes() {
       <Route path="/privacy-policy" element={<PublicLayout><LegalPage type="privacy" /></PublicLayout>} />
 
       <Route path="/get-started" element={<GetStartedWizardPage />} />
+      <Route path="/professional-onboarding" element={<PublicLayout><ProfessionalOnboardingPage /></PublicLayout>} />
       <Route path="/trainer/onboarding" element={<TrainerOnboardingPage />} />
 
       <Route path="/login" element={<LoginPage />} />

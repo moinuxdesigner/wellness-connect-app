@@ -130,7 +130,7 @@ export default function LandingPage() {
               <HeartHandshake size={16} className="text-white" />
             </div>
             <span className="text-[17px] font-semibold text-slate-900">
-              Wellness<span className="text-indigo-600">Connect</span>
+              Aura <span className="text-indigo-600">Wellness Connect</span>
             </span>
           </Link>
 
@@ -503,11 +503,11 @@ export default function LandingPage() {
                 <HeartHandshake size={13} className="text-white" />
               </div>
               <span className="text-sm font-semibold text-slate-900">
-                Wellness<span className="text-indigo-600">Connect</span>
+                Aura <span className="text-indigo-600">Wellness Connect</span>
               </span>
             </div>
             <p className="text-xs text-slate-400">
-              © {new Date().getFullYear()} WellnessConnect. All rights reserved.
+              © {new Date().getFullYear()} Aura Wellness Connect. All rights reserved.
             </p>
             <div className="flex gap-5 text-xs text-slate-400">
               <a href="#" className="hover:text-slate-600">Privacy</a>
