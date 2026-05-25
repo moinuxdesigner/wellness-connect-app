@@ -1,25 +1,16 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CalendarClock, Video } from 'lucide-react';
-import type { ClientAppointment, PractitionerItem, SlotItem } from '../../shared/services/api';
+import type { ClientAppointment } from '../../shared/services/api';
 import {
-  bookAppointmentAdapter,
   cancelAppointmentAdapter,
   listAppointmentsAdapter,
-  listPractitionersAdapter,
-  listSlotsAdapter,
 } from '../../shared/services/demoAdapter';
 import { ClientPageTitle } from '../ClientLayout';
-import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
+import { DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
 
 export default function ClientAppointmentsPage() {
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
-  const [practitioners, setPractitioners] = useState<PractitionerItem[]>([]);
-  const [selectedPractitioner, setSelectedPractitioner] = useState<number | null>(null);
-  const [slots, setSlots] = useState<SlotItem[]>([]);
-  const [selectedSlot, setSelectedSlot] = useState<number | null>(null);
-  const [serviceType, setServiceType] = useState<'psychology' | 'training' | 'combined' | 'package'>('combined');
   const [notice, setNotice] = useState('');
-  const [loading, setLoading] = useState(false);
 
   const sortedAppointments = useMemo(() => [...appointments].sort((a, b) => (b.starts_at ?? '').localeCompare(a.starts_at ?? '')), [appointments]);
 
@@ -29,21 +20,11 @@ export default function ClientAppointmentsPage() {
 
   useEffect(() => {
     refresh().catch((error) => setNotice(error instanceof Error ? error.message : 'Unable to load appointments'));
-    listPractitionersAdapter().then(setPractitioners).catch(() => {
-      // quiet fallback
-    });
   }, []);
-
-  useEffect(() => {
-    if (!selectedPractitioner) return;
-    listSlotsAdapter(selectedPractitioner).then(setSlots).catch(() => {
-      setSlots([]);
-    });
-  }, [selectedPractitioner]);
 
   return (
     <div className="mx-auto max-w-md space-y-4 pb-2">
-      <ClientPageTitle title="My Schedule" subtitle="View and manage both training and counselling sessions." />
+      <ClientPageTitle title="My Schedule" subtitle="View and manage both training and counselling sessions already on your calendar." />
 
       <DSCard className="rounded-xl border-slate-200/80 p-4">
         <h2 className="text-base font-semibold text-slate-900">Today's Sessions</h2>
@@ -61,46 +42,6 @@ export default function ClientAppointmentsPage() {
               </article>
             ))
           )}
-        </div>
-      </DSCard>
-
-      <DSCard className="rounded-xl border-slate-200/80 p-4">
-        <h2 className="text-base font-semibold text-slate-900">Book New Session</h2>
-        <div className="mt-3 grid gap-3">
-          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={serviceType} onChange={(e) => setServiceType(e.target.value as 'psychology' | 'training' | 'combined' | 'package')}>
-            <option value="psychology">Psychology</option>
-            <option value="training">Training</option>
-            <option value="combined">Combined</option>
-            <option value="package">Package</option>
-          </select>
-          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={selectedPractitioner ?? ''} onChange={(e) => setSelectedPractitioner(Number(e.target.value) || null)}>
-            <option value="">Select practitioner</option>
-            {practitioners.map((p) => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
-          </select>
-          <select className="rounded-xl border border-slate-300 bg-slate-50 px-3 py-2" value={selectedSlot ?? ''} onChange={(e) => setSelectedSlot(Number(e.target.value) || null)}>
-            <option value="">Select slot</option>
-            {slots.map((s) => <option key={s.id} value={s.id}>{new Date(s.starts_at).toLocaleString()}</option>)}
-          </select>
-          <DSButton
-            disabled={loading || !selectedPractitioner || !selectedSlot}
-            onClick={async () => {
-              if (!selectedPractitioner || !selectedSlot) return;
-              setLoading(true);
-              setNotice('');
-              try {
-                await bookAppointmentAdapter({ practitioner_id: selectedPractitioner, slot_id: selectedSlot, service_type: serviceType, mode: 'online' });
-                await refresh();
-                setNotice('Appointment booked successfully.');
-              } catch (error) {
-                setNotice(error instanceof Error ? error.message : 'Booking failed');
-              } finally {
-                setLoading(false);
-              }
-            }}
-            type="button"
-          >
-            {loading ? 'Booking...' : 'Book new session'}
-          </DSButton>
         </div>
       </DSCard>
 
