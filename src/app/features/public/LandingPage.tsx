@@ -90,8 +90,7 @@ const TESTIMONIALS = [
     quote:
       'WellnessConnect made it incredibly easy to find a therapist who truly understood my needs. The intake process was seamless.',
     rating: 5,
-    initials: 'PS',
-    avatarBg: 'bg-indigo-100 text-indigo-700',
+    avatarSrc: '/images/uifaces-human-avatar.jpg',
   },
   {
     name: 'Rahul Menon',
@@ -99,8 +98,7 @@ const TESTIMONIALS = [
     quote:
       'My trainer built a plan that actually fits my schedule. The progress tracking keeps me accountable every week.',
     rating: 5,
-    initials: 'RM',
-    avatarBg: 'bg-emerald-100 text-emerald-700',
+    avatarSrc: '/images/uifaces-popular-avatar.jpg',
   },
   {
     name: 'Ananya Iyer',
@@ -108,8 +106,7 @@ const TESTIMONIALS = [
     quote:
       'The combined psychology and coaching package transformed how I handle stress. I feel more in control than ever.',
     rating: 5,
-    initials: 'AI',
-    avatarBg: 'bg-rose-100 text-rose-700',
+    avatarSrc: '/images/uifaces-human-avatar (1).jpg',
   },
 ];
 
@@ -159,12 +156,6 @@ export default function LandingPage() {
 
           {/* Desktop CTAs */}
           <div className="hidden items-center gap-3 lg:flex">
-            <Link
-              to="/trainer/onboarding"
-              className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
-            >
-              PT Onboarding
-            </Link>
             <Link
               to="/login"
               className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
@@ -217,13 +208,6 @@ export default function LandingPage() {
               ))}
             </nav>
             <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-4">
-              <Link
-                to="/trainer/onboarding"
-                onClick={() => setMobileOpen(false)}
-                className="rounded-lg border border-indigo-200 px-4 py-2.5 text-center text-sm font-medium text-indigo-600 hover:bg-indigo-50"
-              >
-                PT Onboarding
-              </Link>
               <Link
                 to="/login"
                 className="rounded-lg border border-slate-200 px-4 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -280,12 +264,6 @@ export default function LandingPage() {
 
             {/* CTAs */}
             <div className="order-3 mt-4 flex flex-wrap gap-3 lg:order-none lg:mt-8">
-              <Link
-                to="/trainer/onboarding"
-                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-sm font-semibold text-indigo-600 shadow-sm transition-colors hover:bg-indigo-50 lg:px-6"
-              >
-                PT Onboarding
-              </Link>
               <Link
                 to="/get-started"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 lg:px-6"
@@ -451,11 +429,12 @@ export default function LandingPage() {
                   "{t.quote}"
                 </blockquote>
                 <div className="mt-5 flex items-center gap-3 border-t border-slate-50 pt-4">
-                  <div
-                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold ${t.avatarBg}`}
-                  >
-                    {t.initials}
-                  </div>
+                  <img
+                    src={encodeURI(t.avatarSrc)}
+                    alt={`${t.name} avatar`}
+                    className="h-10 w-10 shrink-0 rounded-full object-cover ring-1 ring-slate-200"
+                    loading="lazy"
+                  />
                   <div>
                     <p className="text-sm font-semibold text-slate-900">{t.name}</p>
                     <p className="text-xs text-slate-400">{t.role}</p>
