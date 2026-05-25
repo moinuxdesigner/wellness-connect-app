@@ -5,6 +5,9 @@ import { mockRoles, mockTickets } from '../../../data/mockTickets';
 import { mockUsers } from '../../../data/mockUsers';
 import type { AppointmentSummary, DashboardMetric, ProgramSummary, Role, TicketSummary, UserSummary } from '../../types';
 import { getAuthState } from '../../auth/auth';
+import { resetDemoUserPassword } from '../../auth/demoAuthDirectory';
+import { fetchAdminTrainerApplicationsFromApi } from '../../trainer/trainerApplicationsApi';
+import type { TrainerApplicationRecord } from '../../trainer/trainerOnboarding';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
@@ -21,10 +24,10 @@ type AdminOverview = {
   recent_escalations: TicketSummary[];
 };
 
-function authHeaders(): HeadersInit {
-  const token = getAuthState().token;
+function authHeaders(token = getAuthState().token, withJson = false): HeadersInit {
   return {
     Accept: 'application/json',
+    ...(withJson ? { 'Content-Type': 'application/json' } : {}),
     ...(token ? { Authorization: `Bearer ${token}` } : {}),
   };
 }
@@ -60,6 +63,47 @@ const fallbackOverview: AdminOverview = {
   recent_escalations: mockTickets,
 };
 
+function trainerUserStatus(status: TrainerApplicationRecord['status']): UserSummary['status'] {
+  if (status === 'approved') return 'active';
+  if (status === 'rejected') return 'suspended';
+  return 'pending';
+}
+
+function mergeTrainerApplicationUsers(users: UserSummary[], trainerApplications: TrainerApplicationRecord[]) {
+  if (!trainerApplications.length) return users;
+
+  const applicationsByEmail = new Map(
+    trainerApplications.map((application) => [application.applicantEmail.trim().toLowerCase(), application]),
+  );
+
+  const mergedUsers = users.map((user) => {
+    const matchingApplication = applicationsByEmail.get(user.email.trim().toLowerCase());
+    if (!matchingApplication || user.role !== 'trainer') return user;
+
+    applicationsByEmail.delete(user.email.trim().toLowerCase());
+
+    return {
+      ...user,
+      name: matchingApplication.applicantName,
+      email: matchingApplication.applicantEmail,
+      role: 'trainer' as const,
+      status: trainerUserStatus(matchingApplication.status),
+      joinedAt: matchingApplication.submittedAt.slice(0, 10),
+    } satisfies UserSummary;
+  });
+
+  const derivedUsers = Array.from(applicationsByEmail.values()).map((application) => ({
+    id: application.applicationId,
+    name: application.applicantName,
+    email: application.applicantEmail,
+    role: 'trainer' as const,
+    status: trainerUserStatus(application.status),
+    joinedAt: application.submittedAt.slice(0, 10),
+  }) satisfies UserSummary);
+
+  return [...derivedUsers, ...mergedUsers];
+}
+
 export async function getAdminOverview() {
   try {
     return await fetchAdmin<AdminOverview>('overview');
@@ -70,11 +114,41 @@ export async function getAdminOverview() {
 
 export async function getAdminUsers() {
   try {
-    const data = await fetchAdmin<{ users: UserSummary[] }>('users');
-    return data.users;
+    const [data, trainerApplications] = await Promise.all([
+      fetchAdmin<{ users: UserSummary[] }>('users'),
+      fetchAdminTrainerApplicationsFromApi(),
+    ]);
+    return mergeTrainerApplicationUsers(data.users, trainerApplications);
   } catch {
-    return mockUsers;
+    const trainerApplications = await fetchAdminTrainerApplicationsFromApi();
+    return mergeTrainerApplicationUsers(mockUsers, trainerApplications);
   }
+}
+
+export async function adminResetUserPassword(user: UserSummary) {
+  const isDatabaseUser = /^\d+$/.test(String(user.id));
+
+  if (isDatabaseUser) {
+    const token = getAuthState().token;
+    if (!token) throw new Error('Missing admin session token.');
+
+    const response = await fetch(`${API_BASE}/admin/users/${user.id}/reset-password`, {
+      method: 'POST',
+      headers: authHeaders(token, true),
+      body: JSON.stringify({}),
+    });
+
+    const data = await readJson(response);
+    if (!response.ok) {
+      throw new Error(String(data?.message ?? 'Unable to reset password in database.'));
+    }
+
+    resetDemoUserPassword(user, 'password123');
+    return String(data?.message ?? `Password reset for ${user.email}. New password: password123`);
+  }
+
+  resetDemoUserPassword(user, 'password123');
+  return `Password reset locally for ${user.email}. This record is not in the database yet, so no server-side password was changed.`;
 }
 
 export async function getAdminPrograms() {

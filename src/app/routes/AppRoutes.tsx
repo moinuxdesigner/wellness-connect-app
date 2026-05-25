@@ -57,6 +57,7 @@ export default function AppRoutes() {
       <Route path="/privacy-policy" element={<PublicLayout><LegalPage type="privacy" /></PublicLayout>} />
 
       <Route path="/get-started" element={<GetStartedWizardPage />} />
+      <Route path="/trainer/onboarding" element={<TrainerOnboardingPage />} />
 
       <Route path="/login" element={<LoginPage />} />
       <Route path="/signup" element={<Navigate to="/get-started" replace />} />
@@ -106,7 +107,6 @@ export default function AppRoutes() {
         <Route element={<RequireRole allow={['trainer']} />}>
           <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
             <Route index element={<RoleDashboardPage role="trainer" />} />
-            <Route path="onboarding" element={<TrainerOnboardingPage />} />
             <Route path="plans" element={<TrainerPlansPage />} />
             <Route path="check-ins" element={<TrainerCheckinsPage />} />
           </Route>

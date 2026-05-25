@@ -2,8 +2,15 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminUsers } from '../../shared/services/adminApi';
+import { adminResetUserPassword, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminUsers } from '../../shared/services/adminApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
+import {
+  nextActionLabel,
+  statusLabel,
+  type TrainerApplicationRecord,
+  type TrainerApplicationStatus,
+} from '../../trainer/trainerOnboarding';
+import { fetchAdminTrainerApplicationsFromApi, updateTrainerApplicationReviewInApi } from '../../trainer/trainerApplicationsApi';
 
 type RoleDistributionItem = {
   role: Role;
@@ -19,9 +26,18 @@ function toneByRoleStatus(status: RoleDistributionItem['status']) {
   return status === 'healthy' ? 'success' : 'warning';
 }
 
+function trainerApplicationTone(status: TrainerApplicationStatus) {
+  if (status === 'approved') return 'success';
+  if (status === 'needs_resubmission' || status === 'submitted') return 'warning';
+  if (status === 'rejected') return 'danger';
+  return 'neutral';
+}
+
 export function UserManagementPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -47,9 +63,24 @@ export function UserManagementPage() {
     return { total: users.length, active, pending, admins };
   }, [users]);
 
+  async function handlePasswordReset(user: UserSummary) {
+    setResettingUserId(user.id);
+    setNotice('');
+
+    try {
+      const message = await adminResetUserPassword(user);
+      setNotice(message);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to reset password.');
+    } finally {
+      setResettingUserId(null);
+    }
+  }
+
   return (
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
+      {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, index) => (
@@ -106,12 +137,20 @@ export function UserManagementPage() {
                     </div>
                   </div>
                   <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">{u.role}</p>
+                  <button
+                    type="button"
+                    onClick={() => handlePasswordReset(u)}
+                    disabled={resettingUserId === u.id}
+                    className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
+                  </button>
                 </article>
               ))}
         </div>
         <div className="hidden overflow-x-auto md:block">
           <table className="min-w-full text-left text-sm">
-            <thead className="text-slate-500"><tr><th className="py-2">Name</th><th className="py-2">Email</th><th className="py-2">Role</th><th className="py-2">Status</th></tr></thead>
+            <thead className="text-slate-500"><tr><th className="py-2">Name</th><th className="py-2">Email</th><th className="py-2">Role</th><th className="py-2">Status</th><th className="py-2 text-right">Actions</th></tr></thead>
             <tbody>
               {loading
                 ? Array.from({ length: 6 }).map((_, index) => (
@@ -120,6 +159,7 @@ export function UserManagementPage() {
                       <td className="py-3"><div className="h-4 w-44 animate-pulse rounded bg-slate-200" /></td>
                       <td className="py-3"><div className="h-4 w-16 animate-pulse rounded bg-slate-200" /></td>
                       <td className="py-3"><div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" /></td>
+                      <td className="py-3"><div className="ml-auto h-9 w-28 animate-pulse rounded-xl bg-slate-200" /></td>
                     </tr>
                   ))
                 : users.map((u) => (
@@ -128,6 +168,16 @@ export function UserManagementPage() {
                       <td className="py-2 text-slate-600">{u.email}</td>
                       <td className="py-2 capitalize">{u.role}</td>
                       <td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td>
+                      <td className="py-2 text-right">
+                        <button
+                          type="button"
+                          onClick={() => handlePasswordReset(u)}
+                          disabled={resettingUserId === u.id}
+                          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                        >
+                          {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
+                        </button>
+                      </td>
                     </tr>
                   ))}
             </tbody>
@@ -165,49 +215,273 @@ export function ProfessionalApprovalsPage() {
 }
 
 export function TrainerApplicationsPage() {
+  const [applications, setApplications] = useState<TrainerApplicationRecord[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [remarks, setRemarks] = useState('');
+  const [feedbackError, setFeedbackError] = useState('');
+  const [isSavingDecision, setIsSavingDecision] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function syncApplications() {
+      const nextApplications = (await fetchAdminTrainerApplicationsFromApi()).sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
+      if (cancelled) return;
+      setApplications(nextApplications);
+      setSelectedId((current) => current ?? nextApplications[0]?.applicationId ?? null);
+    }
+
+    void syncApplications();
+    const handleSync = () => {
+      void syncApplications();
+    };
+
+    window.addEventListener('focus', handleSync);
+    window.addEventListener('storage', handleSync);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('focus', handleSync);
+      window.removeEventListener('storage', handleSync);
+    };
+  }, []);
+
+  const selectedApplication = useMemo(
+    () => applications.find((item) => item.applicationId === selectedId) ?? applications[0] ?? null,
+    [applications, selectedId],
+  );
+
+  useEffect(() => {
+    setRemarks(selectedApplication?.adminRemarks ?? '');
+    setFeedbackError('');
+  }, [selectedApplication]);
+
+  const stats = useMemo(() => ({
+    total: applications.length,
+    submitted: applications.filter((item) => item.status === 'submitted').length,
+    resubmission: applications.filter((item) => item.status === 'needs_resubmission').length,
+    approved: applications.filter((item) => item.status === 'approved').length,
+  }), [applications]);
+
+  async function applyAdminDecision(status: TrainerApplicationStatus) {
+    if (!selectedApplication) return;
+
+    const trimmedRemarks = remarks.trim();
+    if ((status === 'needs_resubmission' || status === 'rejected') && !trimmedRemarks) {
+      setFeedbackError(status === 'needs_resubmission' ? 'Add remarks so the trainer knows what to fix.' : 'Add a rejection reason before closing the application.');
+      return;
+    }
+
+    setIsSavingDecision(true);
+    try {
+      const nextApplication = await updateTrainerApplicationReviewInApi({
+        applicationId: selectedApplication.applicationId,
+        status,
+        adminRemarks: trimmedRemarks,
+      });
+
+      setApplications((current) =>
+        current
+          .map((item) => (item.applicationId === nextApplication.applicationId ? nextApplication : item))
+          .sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()),
+      );
+      setSelectedId(nextApplication.applicationId);
+      setRemarks(nextApplication.adminRemarks);
+      setFeedbackError('');
+    } finally {
+      setIsSavingDecision(false);
+    }
+  }
+
+  const reviewSections = selectedApplication
+    ? [
+        {
+          title: 'Applicant',
+          rows: [
+            ['Name', selectedApplication.applicantName],
+            ['Email', selectedApplication.applicantEmail],
+            ['Mobile', selectedApplication.applicantMobile],
+            ['Location', `${selectedApplication.city}, ${selectedApplication.state}`],
+            ['Application ID', selectedApplication.applicationId],
+          ],
+        },
+        {
+          title: 'Credentials',
+          rows: [
+            ['Certification institute', selectedApplication.values.certification.institute || 'Not provided'],
+            ['Certification type', selectedApplication.values.certification.type || 'Not provided'],
+            ['Expertise', selectedApplication.expertise.length ? selectedApplication.expertise.join(', ') : 'Not provided'],
+            ['Years experience', selectedApplication.values.experience.yearsExperience || 'Not provided'],
+            ['Clients trained', selectedApplication.values.experience.clientsTrained || 'Not provided'],
+          ],
+        },
+        {
+          title: 'Documents and media',
+          rows: [
+            ['Profile photo', selectedApplication.values.photo.file?.name || 'Missing'],
+            ['Certificate file', selectedApplication.values.certification.certificate?.name || 'Missing'],
+            ['PAN', selectedApplication.values.identity.pan?.name || 'Missing'],
+            ['Primary ID', selectedApplication.values.identity.aadhaar?.name || selectedApplication.values.identity.passport?.name || selectedApplication.values.identity.drivingLicense?.name || 'Missing'],
+            ['Transformation photos', selectedApplication.values.showcase.transformationPhotos.length ? selectedApplication.values.showcase.transformationPhotos.map((item) => item.name).join(', ') : 'Missing'],
+            ['Videos', selectedApplication.values.showcase.videos.length ? selectedApplication.values.showcase.videos.map((item) => item.name).join(', ') : 'Missing'],
+            ['Intro video', selectedApplication.values.training.introductionVideo?.name || 'Missing'],
+          ],
+        },
+        {
+          title: 'Delivery and payout',
+          rows: [
+            ['Training modes', selectedApplication.values.availability.modes.length ? selectedApplication.values.availability.modes.join(', ') : 'Not provided'],
+            ['Available days', selectedApplication.values.availability.days.length ? selectedApplication.values.availability.days.join(', ') : 'Not provided'],
+            ['Pricing plans', selectedApplication.values.availability.pricingPlans || 'Not provided'],
+            ['Bank name', selectedApplication.values.payout.bankName || 'Not provided'],
+            ['Account number', selectedApplication.values.payout.accountNumber ? `•••• ${selectedApplication.values.payout.accountNumber.slice(-4)}` : 'Not provided'],
+            ['IFSC', selectedApplication.values.payout.ifsc || 'Not provided'],
+          ],
+        },
+      ]
+    : [];
+
   return (
     <div className="space-y-6">
       <PageTitle title="Trainer Applications" subtitle="Review trainer onboarding submissions, documents, demo videos, interviews, and approval decisions." />
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Applications</p>
+          <p className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">New Submissions</p>
+          <p className="mt-2 text-2xl font-semibold text-sky-700">{stats.submitted}</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Need Resubmission</p>
+          <p className="mt-2 text-2xl font-semibold text-amber-700">{stats.resubmission}</p>
+        </article>
+        <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+          <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Approved</p>
+          <p className="mt-2 text-2xl font-semibold text-emerald-700">{stats.approved}</p>
+        </article>
+      </section>
+
       <Panel title="Application Queue">
+        {!applications.length ? (
+          <p className="text-sm text-slate-500">No trainer onboarding submissions have been sent yet.</p>
+        ) : (
         <div className="overflow-x-auto">
           <table className="min-w-full text-left text-sm">
             <thead className="text-slate-500">
               <tr>
                 <th className="py-2">Trainer</th>
                 <th className="py-2">Status</th>
-                <th className="py-2">Safety Score</th>
+                <th className="py-2">Submitted</th>
                 <th className="py-2">Next Action</th>
               </tr>
             </thead>
             <tbody>
-              {[
-                ['Aarav Mehta', 'Under Review', '82%', 'Verify documents'],
-                ['Sneha Rao', 'Skill Test Pending', '64%', 'Assign safety training'],
-                ['Imran Khan', 'Interview Scheduled', '91%', 'Lead coach demo review'],
-              ].map(([name, status, score, action]) => (
-                <tr key={name} className="border-t border-slate-200">
-                  <td className="py-2 font-medium text-slate-900">{name}</td>
-                  <td className="py-2"><ToneBadge tone={status === 'Skill Test Pending' ? 'warning' : 'neutral'}>{status}</ToneBadge></td>
-                  <td className="py-2 text-slate-700">{score}</td>
-                  <td className="py-2 text-slate-600">{action}</td>
+              {applications.map((application) => (
+                <tr
+                  key={application.applicationId}
+                  className={`border-t border-slate-200 transition ${selectedApplication?.applicationId === application.applicationId ? 'bg-slate-50' : 'hover:bg-slate-50/70'}`}
+                >
+                  <td className="py-2">
+                    <button type="button" onClick={() => setSelectedId(application.applicationId)} className="text-left">
+                      <span className="block font-medium text-slate-900">{application.applicantName}</span>
+                      <span className="text-xs text-slate-500">{application.applicantEmail}</span>
+                    </button>
+                  </td>
+                  <td className="py-2"><ToneBadge tone={trainerApplicationTone(application.status)}>{statusLabel(application.status)}</ToneBadge></td>
+                  <td className="py-2 text-slate-700">{new Date(application.submittedAt).toLocaleDateString()}</td>
+                  <td className="py-2 text-slate-600">{nextActionLabel(application.status)}</td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+        )}
       </Panel>
-      <SimpleList
-        title="Review Actions"
-        subtitle="Admin, lead coach, legal, and owner checkpoints."
-        items={[
-          'Verify ID and certificates',
-          'Review demo videos',
-          'Request corrections for missing or incorrect data',
-          'Schedule interview or practical demo',
-          'Approve, reject, suspend, or blacklist trainer',
-          'Activate trainer dashboard only after admin and lead coach approval',
-        ]}
-      />
+
+      <Panel title="Application Review">
+        {!selectedApplication ? (
+          <p className="text-sm text-slate-500">Choose a trainer application from the queue to review it.</p>
+        ) : (
+          <div className="space-y-6">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h3 className="text-xl font-semibold text-slate-950">{selectedApplication.applicantName}</h3>
+                <p className="mt-1 text-sm text-slate-600">{selectedApplication.applicantEmail} • {selectedApplication.applicantMobile}</p>
+                <p className="mt-1 text-sm text-slate-500">Submitted {new Date(selectedApplication.submittedAt).toLocaleString()}</p>
+              </div>
+              <ToneBadge tone={trainerApplicationTone(selectedApplication.status)}>{statusLabel(selectedApplication.status)}</ToneBadge>
+            </div>
+
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1.15fr)_minmax(320px,0.85fr)]">
+              <div className="space-y-5">
+                {reviewSections.map((section) => (
+                  <section key={section.title} className="rounded-2xl border border-slate-200 bg-slate-50/50 p-4">
+                    <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">{section.title}</h4>
+                    <dl className="mt-3 grid gap-3">
+                      {section.rows.map(([label, value]) => (
+                        <div key={label} className="border-b border-slate-200 pb-3 last:border-b-0">
+                          <dt className="text-xs font-semibold uppercase tracking-wide text-slate-400">{label}</dt>
+                          <dd className="mt-1 text-sm leading-6 text-slate-700">{value}</dd>
+                        </div>
+                      ))}
+                    </dl>
+                  </section>
+                ))}
+              </div>
+
+              <div className="space-y-5">
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Admin remarks</h4>
+                  <textarea
+                    value={remarks}
+                    onChange={(event) => setRemarks(event.target.value)}
+                    placeholder="Add review notes, missing items, approval notes, or rejection reasons."
+                    className="mt-3 min-h-36 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm outline-none focus:border-slate-400"
+                  />
+                  {feedbackError ? <p className="mt-2 text-sm text-rose-600">{feedbackError}</p> : null}
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Decision Actions</h4>
+                  <div className="mt-3 grid gap-3">
+                    <button type="button" onClick={() => void applyAdminDecision('under_review')} disabled={isSavingDecision} className="rounded-xl border border-slate-300 px-4 py-3 text-left text-sm font-semibold text-slate-800 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">
+                      Mark Under Review
+                    </button>
+                    <button type="button" onClick={() => void applyAdminDecision('needs_resubmission')} disabled={isSavingDecision} className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-left text-sm font-semibold text-amber-900 hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60">
+                      Send Back for Resubmission
+                    </button>
+                    <button type="button" onClick={() => void applyAdminDecision('approved')} disabled={isSavingDecision} className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-left text-sm font-semibold text-emerald-900 hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60">
+                      Approve Application
+                    </button>
+                    <button type="button" onClick={() => void applyAdminDecision('rejected')} disabled={isSavingDecision} className="rounded-xl border border-rose-300 bg-rose-50 px-4 py-3 text-left text-sm font-semibold text-rose-900 hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60">
+                      Reject Application
+                    </button>
+                  </div>
+                </section>
+
+                <section className="rounded-2xl border border-slate-200 bg-white p-4">
+                  <h4 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Review history</h4>
+                  <div className="mt-3 space-y-3">
+                    {selectedApplication.reviewHistory.length ? (
+                      [...selectedApplication.reviewHistory].slice().reverse().map((item) => (
+                        <div key={item.id} className="border-l-2 border-slate-200 pl-4">
+                          <p className="text-sm font-semibold text-slate-900">{statusLabel(item.action)}</p>
+                          <p className="mt-1 text-sm text-slate-600">{item.note}</p>
+                          <p className="mt-1 text-xs text-slate-400">{item.actor} • {new Date(item.at).toLocaleString()}</p>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-sm text-slate-500">No review actions recorded yet.</p>
+                    )}
+                  </div>
+                </section>
+              </div>
+            </div>
+          </div>
+        )}
+      </Panel>
     </div>
   );
 }

@@ -160,6 +160,12 @@ export default function LandingPage() {
           {/* Desktop CTAs */}
           <div className="hidden items-center gap-3 lg:flex">
             <Link
+              to="/trainer/onboarding"
+              className="rounded-lg border border-indigo-200 px-4 py-2 text-sm font-medium text-indigo-600 transition-colors hover:bg-indigo-50"
+            >
+              PT Onboarding
+            </Link>
+            <Link
               to="/login"
               className="rounded-lg px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
             >
@@ -211,6 +217,13 @@ export default function LandingPage() {
               ))}
             </nav>
             <div className="mt-3 flex flex-col gap-2 border-t border-slate-100 pt-4">
+              <Link
+                to="/trainer/onboarding"
+                onClick={() => setMobileOpen(false)}
+                className="rounded-lg border border-indigo-200 px-4 py-2.5 text-center text-sm font-medium text-indigo-600 hover:bg-indigo-50"
+              >
+                PT Onboarding
+              </Link>
               <Link
                 to="/login"
                 className="rounded-lg border border-slate-200 px-4 py-2.5 text-center text-sm font-medium text-slate-700 hover:bg-slate-50"
@@ -267,6 +280,12 @@ export default function LandingPage() {
 
             {/* CTAs */}
             <div className="order-3 mt-4 flex flex-wrap gap-3 lg:order-none lg:mt-8">
+              <Link
+                to="/trainer/onboarding"
+                className="inline-flex items-center gap-2 rounded-xl border border-indigo-200 bg-white px-5 py-3 text-sm font-semibold text-indigo-600 shadow-sm transition-colors hover:bg-indigo-50 lg:px-6"
+              >
+                PT Onboarding
+              </Link>
               <Link
                 to="/get-started"
                 className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 lg:px-6"

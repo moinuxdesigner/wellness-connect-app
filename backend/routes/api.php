@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
+use App\Http\Controllers\Api\TrainerApplicationController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -43,9 +44,15 @@ Route::prefix('v1')->group(function (): void {
         Route::prefix('admin')->group(function (): void {
             Route::get('/overview', [AdminController::class, 'overview']);
             Route::get('/users', [AdminController::class, 'users']);
+            Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
+            Route::get('/trainer-applications', [TrainerApplicationController::class, 'index']);
+            Route::patch('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'updateStatus']);
             Route::get('/programs', [AdminController::class, 'programs']);
             Route::get('/escalations', [AdminController::class, 'escalations']);
             Route::get('/activities', [AdminController::class, 'activities']);
         });
     });
+
+    Route::post('/trainer-applications', [TrainerApplicationController::class, 'submit']);
+    Route::get('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'show']);
 });

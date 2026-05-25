@@ -10,6 +10,7 @@ use App\Models\WellnessPackage;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
@@ -129,6 +130,26 @@ class AdminController extends Controller
         ]);
     }
 
+    public function resetUserPassword(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $user->forceFill([
+            'password' => 'password123',
+            'remember_token' => Str::random(60),
+        ])->save();
+
+        $user->tokens()->delete();
+
+        return response()->json([
+            'message' => "Password reset for {$user->email}. New password: password123",
+            'user' => [
+                'id' => (string) $user->id,
+                'email' => (string) $user->email,
+            ],
+        ]);
+    }
+
     public function programs(Request $request): JsonResponse
     {
         $this->authorizeAdmin($request);
@@ -206,4 +227,3 @@ class AdminController extends Controller
         abort_unless($request->user()?->role === 'admin', 403, 'Admin access required.');
     }
 }
-

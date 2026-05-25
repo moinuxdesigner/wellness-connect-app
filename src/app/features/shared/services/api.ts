@@ -1,4 +1,5 @@
 import { clearAuthState, getAuthState, setAuthState, type AuthUser } from '../../auth/auth';
+import { findDemoAuthUser, upsertDemoAuthUser } from '../../auth/demoAuthDirectory';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
@@ -78,29 +79,77 @@ export async function registerRequest(payload: {
   primary_goal?: 'fitness' | 'mental_health' | 'both';
   consent_to_terms?: boolean;
 }) {
-  const response = await fetch(`${API_BASE}/auth/register`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(payload),
-  });
-  const data = await readJson(response);
-  if (!response.ok) throw new Error(String(data?.message ?? 'Registration failed'));
-  const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
-  setAuthState(data.token as string, mergedUser);
-  return mergedUser;
+  try {
+    const response = await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(String(data?.message ?? 'Registration failed'));
+    const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
+    upsertDemoAuthUser({
+      id: mergedUser.id,
+      name: mergedUser.name,
+      email: mergedUser.email,
+      role: mergedUser.role,
+      status: mergedUser.status ?? 'active',
+    }, payload.password);
+    setAuthState(data.token as string, mergedUser);
+    return mergedUser;
+  } catch (error) {
+    const demoUser: AuthUser = {
+      id: Date.now(),
+      name: payload.name,
+      email: payload.email,
+      role: (payload.role as AuthUser['role']) ?? 'client',
+      status: 'active',
+      primary_goal: payload.primary_goal ?? null,
+      wellness_goal: payload.primary_goal ?? null,
+      consent_to_terms: payload.consent_to_terms,
+      phone: payload.phone ?? null,
+    };
+
+    upsertDemoAuthUser({
+      id: demoUser.id,
+      name: demoUser.name,
+      email: demoUser.email,
+      role: demoUser.role,
+      status: 'active',
+    }, payload.password);
+    setAuthState(`demo-token-${demoUser.id}`, demoUser);
+    return demoUser;
+  }
 }
 
 export async function loginRequest(email: string, password: string) {
-  const response = await fetch(`${API_BASE}/auth/login`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ email, password }),
-  });
-  const data = await readJson(response);
-  if (!response.ok) throw new Error(String(data?.message ?? 'Login failed'));
-  const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
-  setAuthState(data.token as string, mergedUser);
-  return mergedUser;
+  try {
+    const response = await fetch(`${API_BASE}/auth/login`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    const data = await readJson(response);
+    if (!response.ok) throw new Error(String(data?.message ?? 'Login failed'));
+    const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
+    upsertDemoAuthUser({
+      id: mergedUser.id,
+      name: mergedUser.name,
+      email: mergedUser.email,
+      role: mergedUser.role,
+      status: mergedUser.status ?? 'active',
+    }, password);
+    setAuthState(data.token as string, mergedUser);
+    return mergedUser;
+  } catch (error) {
+    const demoUser = findDemoAuthUser(email, password);
+    if (demoUser) {
+      setAuthState(`demo-token-${demoUser.id}`, demoUser);
+      return demoUser;
+    }
+
+    throw error instanceof Error ? error : new Error('Login failed');
+  }
 }
 
 export async function forgotPasswordRequest(email: string) {
