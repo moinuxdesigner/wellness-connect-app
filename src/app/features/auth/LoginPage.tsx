@@ -4,6 +4,7 @@ import { Home, ArrowLeft, ArrowRight } from 'lucide-react';
 import OnboardingAnimation from '../../../components/onboarding/OnboardingAnimation';
 import { loginRequest } from './apiAuth';
 import { getPostAuthRedirectPath } from './roleRedirects';
+import AuthActionLoader from './AuthActionLoader';
 
 export default function LoginPage() {
   const navigate = useNavigate();
@@ -14,6 +15,7 @@ export default function LoginPage() {
 
   return (
     <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-indigo-50/30 to-white">
+      {loading ? <AuthActionLoader action="login" /> : null}
       <div className="mx-auto w-full max-w-lg flex-1 px-4 py-2 sm:px-6">
         <div className="mb-10 flex items-center justify-between">
           <Link
@@ -90,14 +92,7 @@ export default function LoginPage() {
               type="submit"
               disabled={loading}
             >
-              {loading ? (
-                <>
-                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-indigo-200 border-t-white" />
-                  Signing in...
-                </>
-              ) : (
-                <>Sign In <ArrowRight size={16} /></>
-              )}
+              <>Sign In <ArrowRight size={16} /></>
             </button>
           </form>
           <p className="text-sm text-slate-600">

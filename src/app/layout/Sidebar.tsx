@@ -5,6 +5,7 @@ import { LogOut } from 'lucide-react';
 import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { logoutRequest } from '../features/auth/apiAuth';
+import AuthActionLoader from '../features/auth/AuthActionLoader';
 
 export interface NavItem {
   label: string;
@@ -87,6 +88,7 @@ function SidebarContent({
 
   return (
     <div className="flex h-full flex-col p-4">
+      {isLoggingOut ? <AuthActionLoader action="logout" /> : null}
       <div className={`mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-2'}`}>
         <AnimatePresence mode="wait" initial={false}>
           {collapsed ? (
@@ -178,11 +180,7 @@ function SidebarContent({
             collapsed ? 'justify-center px-2' : 'gap-2 px-3'
           }`}
         >
-          {isLoggingOut ? (
-            <span className="h-3.5 w-3.5 animate-spin rounded-full border-2 border-rose-300 border-t-rose-700" />
-          ) : (
-            <LogOut size={16} />
-          )}
+          <LogOut size={16} />
           <AnimatePresence initial={false}>
             {!collapsed ? (
               <motion.span
@@ -192,7 +190,7 @@ function SidebarContent({
                 exit={{ opacity: 0, x: -8 }}
                 transition={{ duration: 0.14 }}
               >
-                {isLoggingOut ? 'Logging out...' : 'Logout'}
+                Logout
               </motion.span>
             ) : null}
           </AnimatePresence>
