@@ -11,6 +11,7 @@ import SimplePublicPage from '../features/public/SimplePublicPage';
 import LegalPage from '../features/public/LegalPage';
 import CareersPage from '../features/public/CareersPage';
 import ProfessionalOnboardingPage from '../features/public/ProfessionalOnboardingPage';
+import ContactSupportPage from '../features/public/ContactSupportPage';
 import { AdminLayout } from '../features/admin/AdminLayout';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
 import {
@@ -43,6 +44,7 @@ import CounsellorSessionsPage from '../features/counsellor/CounsellorSessionsPag
 import CounsellorClientsPage from '../features/counsellor/CounsellorClientsPage';
 import TrainerPlansPage from '../features/trainer/TrainerPlansPage';
 import TrainerCheckinsPage from '../features/trainer/TrainerCheckinsPage';
+import TrainerProtectedRoute from '../features/trainer/TrainerProtectedRoute';
 import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
 import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
 import ContentProgramsPage from '../features/content/ContentProgramsPage';
@@ -55,7 +57,7 @@ export default function AppRoutes() {
       <Route path="/careers" element={<PublicLayout><CareersPage /></PublicLayout>} />
       <Route path="/pricing" element={<PublicLayout><SimplePublicPage title="Pricing" description="Membership plans and billing rules will be connected to backend APIs in the next phase." /></PublicLayout>} />
       <Route path="/about" element={<PublicLayout><SimplePublicPage title="About" description="WellnessConnect unifies counselling, training, coaching, and operations in one platform." /></PublicLayout>} />
-      <Route path="/contact" element={<PublicLayout><SimplePublicPage title="Contact" description="Support and sales channels placeholder for future integrations." /></PublicLayout>} />
+      <Route path="/contact" element={<PublicLayout><ContactSupportPage /></PublicLayout>} />
       <Route path="/terms-of-service" element={<PublicLayout><LegalPage type="terms" /></PublicLayout>} />
       <Route path="/privacy-policy" element={<PublicLayout><LegalPage type="privacy" /></PublicLayout>} />
 
@@ -109,10 +111,13 @@ export default function AppRoutes() {
         </Route>
 
         <Route element={<RequireRole allow={['trainer']} />}>
-          <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
-            <Route index element={<RoleDashboardPage role="trainer" />} />
-            <Route path="plans" element={<TrainerPlansPage />} />
-            <Route path="check-ins" element={<TrainerCheckinsPage />} />
+          <Route element={<TrainerProtectedRoute />}>
+            <Route path="/trainer/submitted-profile" element={<Navigate to="/trainer" replace />} />
+            <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
+              <Route index element={<RoleDashboardPage role="trainer" />} />
+              <Route path="plans" element={<TrainerPlansPage />} />
+              <Route path="check-ins" element={<TrainerCheckinsPage />} />
+            </Route>
           </Route>
         </Route>
 

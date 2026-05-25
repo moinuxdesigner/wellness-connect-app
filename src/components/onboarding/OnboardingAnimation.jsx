@@ -47,6 +47,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
   const [animationData, setAnimationData] = useState(null);
   const [LottieComponent, setLottieComponent] = useState(null);
   const [hasError, setHasError] = useState(false);
+  const [loadedType, setLoadedType] = useState(null);
 
   useEffect(() => {
     if (prefersReducedMotion) return undefined;
@@ -55,6 +56,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
     setAnimationData(null);
     setLottieComponent(null);
     setHasError(false);
+    setLoadedType(null);
 
     Promise.all([
       import('lottie-react'),
@@ -71,6 +73,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
         if (!isMounted) return;
         setLottieComponent(() => module.default);
         setAnimationData(json);
+        setLoadedType(type);
       })
       .catch(() => {
         if (isMounted) setHasError(true);
@@ -79,9 +82,10 @@ export default function OnboardingAnimation({ type, className = '' }) {
     return () => {
       isMounted = false;
     };
-  }, [config.data, config.load, config.src, prefersReducedMotion]);
+  }, [config.data, config.load, config.src, prefersReducedMotion, type]);
 
-  const showFallback = prefersReducedMotion || hasError || !animationData || !LottieComponent;
+  const showFallback = prefersReducedMotion || hasError;
+  const showAnimation = loadedType === type && animationData && LottieComponent;
 
   return (
     <div className={`onboarding-animation ${className}`} aria-label={config.label} role="img">
@@ -89,7 +93,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
         <span className="onboarding-animation__fallback" aria-hidden="true">
           {config.fallback}
         </span>
-      ) : (
+      ) : showAnimation ? (
         <LottieComponent
           animationData={animationData}
           autoplay
@@ -98,7 +102,7 @@ export default function OnboardingAnimation({ type, className = '' }) {
           className="onboarding-animation__lottie"
           rendererSettings={{ preserveAspectRatio: 'xMidYMid meet' }}
         />
-      )}
+      ) : null}
     </div>
   );
 }

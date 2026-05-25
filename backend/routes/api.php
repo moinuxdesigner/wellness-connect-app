@@ -7,6 +7,8 @@ use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
 use App\Http\Controllers\Api\TrainerApplicationController;
+use App\Http\Controllers\Api\TrainerWorkspaceController;
+use App\Http\Controllers\Api\SupportRequestController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -41,6 +43,11 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
         Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
 
+        Route::get('/trainer/access-status', [TrainerWorkspaceController::class, 'accessStatus']);
+        Route::middleware('trainer.approved')->prefix('trainer')->group(function (): void {
+            Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard']);
+        });
+
         Route::prefix('admin')->group(function (): void {
             Route::get('/overview', [AdminController::class, 'overview']);
             Route::get('/users', [AdminController::class, 'users']);
@@ -55,4 +62,5 @@ Route::prefix('v1')->group(function (): void {
 
     Route::post('/trainer-applications', [TrainerApplicationController::class, 'submit']);
     Route::get('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'show']);
+    Route::post('/support-requests', [SupportRequestController::class, 'store']);
 });

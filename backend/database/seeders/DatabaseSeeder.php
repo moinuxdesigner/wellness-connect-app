@@ -7,6 +7,7 @@ use App\Models\ClientProfile;
 use App\Models\Practitioner;
 use App\Models\PractitionerSpecialty;
 use App\Models\ServiceCatalog;
+use App\Models\TrainerApplication;
 use App\Models\User;
 use App\Models\WellnessPackage;
 use Illuminate\Database\Console\Seeds\WithoutModelEvents;
@@ -53,6 +54,24 @@ class DatabaseSeeder extends Seeder
         $trainerUser = User::updateOrCreate(
             ['email' => 'trainer@wellnessconnect.local'],
             ['name' => 'Arjun Mehta', 'password' => 'Trainer@12345', 'role' => 'trainer', 'status' => 'active', 'phone' => '+91 9000000004', 'consent_to_terms' => true]
+        );
+
+        TrainerApplication::updateOrCreate(
+            ['application_id' => 'TRN-SEED-APPROVED'],
+            [
+                'reviewed_by_user_id' => $admin->id,
+                'applicant_name' => $trainerUser->name,
+                'applicant_email' => $trainerUser->email,
+                'applicant_mobile' => (string) $trainerUser->phone,
+                'city' => 'Hyderabad',
+                'state' => 'Telangana',
+                'expertise_json' => ['Mobility', 'Consistency'],
+                'values_json' => [],
+                'status' => 'approved',
+                'admin_remarks' => 'Pre-approved seeded trainer account.',
+                'review_history_json' => [],
+                'submitted_at' => now(),
+            ]
         );
 
         ClientProfile::updateOrCreate(
