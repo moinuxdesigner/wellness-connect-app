@@ -20,7 +20,7 @@ class AuthController extends Controller
             'name' => ['required', 'string', 'max:120'],
             'email' => ['required', 'email', 'max:255', 'unique:users,email'],
             'password' => ['required', 'string', 'min:8', 'max:120'],
-            'role' => ['nullable', 'string', 'in:client,counsellor,trainer,coach,helpdesk,admin,finance,legal,content'],
+            'role' => ['nullable', 'string', 'in:client'],
             'phone' => ['nullable', 'string', 'max:30'],
             'consent_to_terms' => ['nullable', 'boolean'],
             'primary_goal' => ['nullable', 'in:fitness,mental_health,both'],
@@ -63,6 +63,14 @@ class AuthController extends Controller
             throw ValidationException::withMessages([
                 'email' => ['Invalid credentials.'],
             ]);
+        }
+
+        if ($user->status !== 'active') {
+            return response()->json([
+                'message' => $user->status === 'suspended'
+                    ? 'Your account has been suspended. Please contact support.'
+                    : 'Your account is pending activation. Please contact support.',
+            ], 403);
         }
 
         $user->tokens()->delete();

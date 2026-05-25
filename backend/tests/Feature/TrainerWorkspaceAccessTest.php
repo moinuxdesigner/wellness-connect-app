@@ -60,8 +60,7 @@ class TrainerWorkspaceAccessTest extends TestCase
         Sanctum::actingAs($trainer);
 
         $this->getJson('/api/v1/trainer/access-status')
-            ->assertOk()
-            ->assertJsonPath('status', 'suspended');
+            ->assertForbidden();
 
         $this->getJson('/api/v1/trainer/dashboard')
             ->assertForbidden();

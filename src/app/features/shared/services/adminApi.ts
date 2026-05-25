@@ -20,6 +20,19 @@ type AdminOverview = {
   recent_escalations: TicketSummary[];
 };
 
+export type RoleChangeAudit = {
+  id: string;
+  actorName: string;
+  actorEmail: string;
+  targetUserId: string;
+  targetName: string;
+  targetEmail: string;
+  previousRole: Role;
+  newRole: Role;
+  reason: string;
+  changedAt: string | null;
+};
+
 function authHeaders(token = getAuthState().token, withJson = false): HeadersInit {
   return {
     Accept: 'application/json',
@@ -92,6 +105,29 @@ export async function adminResetUserPassword(user: UserSummary) {
   }
 
   return String(data?.message ?? `Password reset for ${user.email}. New password: password123`);
+}
+
+export async function getAdminRoleChanges() {
+  const data = await fetchAdmin<{ roleChanges: RoleChangeAudit[] }>('role-changes');
+  return data.roleChanges;
+}
+
+export async function adminUpdateUserRole(userId: string, role: Role, reason: string) {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing admin session token.');
+
+  const response = await fetch(`${API_BASE}/admin/users/${userId}/role`, {
+    method: 'PATCH',
+    headers: authHeaders(token, true),
+    body: JSON.stringify({ role, reason }),
+  });
+
+  const data = await readJson(response);
+  if (!response.ok) {
+    throw new Error(String(data?.message ?? 'Unable to update user role.'));
+  }
+
+  return data as { message: string; user: UserSummary; roleChange: RoleChangeAudit };
 }
 
 export async function getAdminPrograms() {

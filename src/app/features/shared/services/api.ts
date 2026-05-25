@@ -79,30 +79,20 @@ export async function registerRequest(payload: {
   primary_goal?: 'fitness' | 'mental_health' | 'both';
   consent_to_terms?: boolean;
 }) {
+  let response: Response;
+
   try {
-    const response = await fetch(`${API_BASE}/auth/register`, {
+    response = await fetch(`${API_BASE}/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify(payload),
     });
-    const data = await readJson(response);
-    if (!response.ok) throw new Error(String(data?.message ?? 'Registration failed'));
-    const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
-    upsertDemoAuthUser({
-      id: mergedUser.id,
-      name: mergedUser.name,
-      email: mergedUser.email,
-      role: mergedUser.role,
-      status: mergedUser.status ?? 'active',
-    }, payload.password);
-    setAuthState(data.token as string, mergedUser);
-    return mergedUser;
-  } catch (error) {
+  } catch {
     const demoUser: AuthUser = {
       id: Date.now(),
       name: payload.name,
       email: payload.email,
-      role: (payload.role as AuthUser['role']) ?? 'client',
+      role: 'client',
       status: 'active',
       primary_goal: payload.primary_goal ?? null,
       wellness_goal: payload.primary_goal ?? null,
@@ -120,6 +110,19 @@ export async function registerRequest(payload: {
     setAuthState(`demo-token-${demoUser.id}`, demoUser);
     return demoUser;
   }
+
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Registration failed'));
+  const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
+  upsertDemoAuthUser({
+    id: mergedUser.id,
+    name: mergedUser.name,
+    email: mergedUser.email,
+    role: mergedUser.role,
+    status: mergedUser.status ?? 'active',
+  }, payload.password);
+  setAuthState(data.token as string, mergedUser);
+  return mergedUser;
 }
 
 export async function loginRequest(email: string, password: string) {

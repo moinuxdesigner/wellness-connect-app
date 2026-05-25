@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts';
+import { useNavigate } from 'react-router';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { adminResetUserPassword, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminUsers } from '../../shared/services/adminApi';
+import { adminResetUserPassword, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type RoleChangeAudit } from '../../shared/services/adminApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
+import { clearAuthState, getAuthState } from '../../auth/auth';
 import {
   nextActionLabel,
   statusLabel,
@@ -12,18 +14,11 @@ import {
 } from '../../trainer/trainerOnboarding';
 import { fetchAdminTrainerApplicationsFromApi, updateTrainerApplicationReviewInApi } from '../../trainer/trainerApplicationsApi';
 
-type RoleDistributionItem = {
-  role: Role;
-  users: number;
-  status: 'healthy' | 'attention' | 'needs-review';
-};
+const roleOptions: Role[] = ['admin', 'client', 'counsellor', 'trainer', 'coach', 'helpdesk', 'finance', 'legal', 'content'];
+const assignableRoles: Role[] = ['client', 'trainer', 'helpdesk', 'admin', 'finance', 'legal', 'content'];
 
 function toneByUserStatus(status: UserSummary['status']) {
   return status === 'active' ? 'success' : status === 'pending' ? 'warning' : 'danger';
-}
-
-function toneByRoleStatus(status: RoleDistributionItem['status']) {
-  return status === 'healthy' ? 'success' : 'warning';
 }
 
 function trainerApplicationTone(status: TrainerApplicationStatus) {
@@ -228,13 +223,223 @@ export function UserManagementPage() {
 }
 
 export function RoleManagementPage() {
-  const [roles, setRoles] = useState<RoleDistributionItem[]>([]);
+  const navigate = useNavigate();
+  const [users, setUsers] = useState<UserSummary[]>([]);
+  const [audits, setAudits] = useState<RoleChangeAudit[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [editingUser, setEditingUser] = useState<UserSummary | null>(null);
+  const [nextRole, setNextRole] = useState<Role>('client');
+  const [reason, setReason] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
 
   useEffect(() => {
-    getAdminOverview().then((data) => setRoles((data.role_distribution ?? []) as RoleDistributionItem[]));
-  }, []);
+    let mounted = true;
+    setLoading(true);
+    setLoadError('');
 
-  return <SimpleList title="Role Management" subtitle="Manage role distribution and staffing." items={roles.map((r) => `${r.role}: ${r.users} users (${r.status})`)} />;
+    Promise.all([getAdminUsers(), getAdminRoleChanges()])
+      .then(([nextUsers, nextAudits]) => {
+        if (!mounted) return;
+        setUsers(nextUsers);
+        setAudits(nextAudits);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setUsers([]);
+        setAudits([]);
+        setLoadError(error instanceof Error ? error.message : 'Unable to load role management data.');
+      })
+      .finally(() => {
+        if (!mounted) return;
+        setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [reloadCount]);
+
+  const roleCounts = useMemo(() => roleOptions.map((role) => ({
+    role,
+    users: users.filter((user) => user.role === role).length,
+  })), [users]);
+  const lastChangeByUser = useMemo(() => {
+    const latestByUser = new Map<string, RoleChangeAudit>();
+    audits.forEach((audit) => {
+      if (!latestByUser.has(audit.targetUserId)) latestByUser.set(audit.targetUserId, audit);
+    });
+    return latestByUser;
+  }, [audits]);
+  const query = search.trim().toLowerCase();
+  const visibleUsers = users.filter((user) => (
+    (roleFilter === 'all' || user.role === roleFilter)
+    && (!query || user.name.toLowerCase().includes(query) || user.email.toLowerCase().includes(query))
+  ));
+
+  function openRoleChange(user: UserSummary) {
+    setEditingUser(user);
+    setNextRole(user.role === 'client' ? 'helpdesk' : 'client');
+    setReason('');
+    setNotice('');
+  }
+
+  async function saveRoleChange() {
+    if (!editingUser || saving) return;
+    setSaving(true);
+    setNotice('');
+
+    try {
+      const result = await adminUpdateUserRole(editingUser.id, nextRole, reason.trim());
+      if (String(getAuthState().user?.id) === editingUser.id) {
+        clearAuthState();
+        navigate('/login', { replace: true, state: { authNotice: 'Your role was updated. Please sign in again to continue.' } });
+        return;
+      }
+      setNotice(result.message);
+      setEditingUser(null);
+      setReloadCount((count) => count + 1);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to update user role.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle title="Role Management" subtitle="Assign workspace access with approval and audit controls." />
+      {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
+      {loadError ? (
+        <section role="alert" className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-900 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">Role data unavailable</p>
+            <p className="mt-1 text-sm text-rose-700">{loadError}</p>
+          </div>
+          <button type="button" onClick={() => setReloadCount((count) => count + 1)} className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 hover:bg-rose-100">Retry</button>
+        </section>
+      ) : null}
+
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
+        {loading
+          ? Array.from({ length: 9 }).map((_, index) => (
+              <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="h-3 w-20 animate-pulse rounded bg-slate-200" />
+                <div className="mt-3 h-7 w-10 animate-pulse rounded bg-slate-200" />
+              </article>
+            ))
+          : roleCounts.map(({ role, users: count }) => (
+              <button
+                key={role}
+                type="button"
+                onClick={() => setRoleFilter(roleFilter === role ? 'all' : role)}
+                className={`rounded-2xl border bg-white p-4 text-left shadow-sm transition ${roleFilter === role ? 'border-indigo-500 ring-2 ring-indigo-100' : 'border-slate-200 hover:border-indigo-200'}`}
+              >
+                <p className="text-xs font-medium uppercase tracking-wide text-slate-500">{role}</p>
+                <p className="mt-2 text-2xl font-semibold text-slate-900">{count}</p>
+              </button>
+            ))}
+      </section>
+
+      <Panel title="User Role Assignments">
+        <div className="mb-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <input
+            type="search"
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search name or email"
+            className="w-full rounded-xl border border-slate-300 px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100 md:max-w-sm"
+          />
+          <p className="text-xs text-slate-500">Counsellor and coach assignment requires a future approval workflow.</p>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-slate-500"><tr><th className="py-2">User</th><th className="py-2">Current Role</th><th className="py-2">Status</th><th className="py-2">Last Change</th><th className="py-2 text-right">Action</th></tr></thead>
+            <tbody>
+              {loading ? Array.from({ length: 5 }).map((_, index) => (
+                <tr key={index} className="border-t border-slate-200">
+                  <td className="py-4"><div className="h-4 w-40 animate-pulse rounded bg-slate-200" /><div className="mt-2 h-3 w-48 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="py-4"><div className="h-5 w-20 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="py-4"><div className="h-6 w-20 animate-pulse rounded-full bg-slate-200" /></td>
+                  <td className="py-4"><div className="h-4 w-32 animate-pulse rounded bg-slate-200" /></td>
+                  <td className="py-4"><div className="ml-auto h-9 w-28 animate-pulse rounded-xl bg-slate-200" /></td>
+                </tr>
+              )) : visibleUsers.length ? visibleUsers.map((user) => {
+                const change = lastChangeByUser.get(user.id);
+                const disabledReason = user.status !== 'active' ? 'Only active accounts can be assigned roles.' : '';
+                return (
+                  <tr key={user.id} className="border-t border-slate-200">
+                    <td className="py-3">
+                      <p className="font-medium text-slate-900">{user.name}</p>
+                      <p className="text-xs text-slate-500">{user.email}</p>
+                    </td>
+                    <td className="py-3 capitalize">{user.role}</td>
+                    <td className="py-3"><ToneBadge tone={toneByUserStatus(user.status)}>{user.status}</ToneBadge></td>
+                    <td className="py-3 text-xs text-slate-500">{change ? `${change.previousRole} to ${change.newRole}` : 'No recorded changes'}</td>
+                    <td className="py-3 text-right">
+                      <button
+                        type="button"
+                        onClick={() => openRoleChange(user)}
+                        disabled={Boolean(disabledReason)}
+                        title={disabledReason}
+                        className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Change Role
+                      </button>
+                    </td>
+                  </tr>
+                );
+              }) : (
+                <tr className="border-t border-slate-200">
+                  <td colSpan={5} className="py-10 text-center text-sm text-slate-500">{loadError ? 'Unable to display users until role data can be loaded.' : 'No users match this filter.'}</td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
+
+      <Panel title="Recent Role Changes">
+        {loading ? (
+          <div className="space-y-3">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>
+        ) : audits.length ? (
+          <div className="space-y-3">
+            {audits.slice(0, 10).map((audit) => (
+              <article key={audit.id} className="rounded-xl border border-slate-200 px-4 py-3 text-sm">
+                <p className="font-medium text-slate-900">{audit.targetName} <span className="font-normal text-slate-500">changed from</span> <span className="capitalize">{audit.previousRole}</span> <span className="font-normal text-slate-500">to</span> <span className="capitalize">{audit.newRole}</span></p>
+                <p className="mt-1 text-xs text-slate-500">By {audit.actorName} | {audit.changedAt ? new Date(audit.changedAt).toLocaleString() : 'Unknown time'} | {audit.reason}</p>
+              </article>
+            ))}
+          </div>
+        ) : <p className="text-sm text-slate-500">No role changes recorded.</p>}
+      </Panel>
+
+      {editingUser ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="role-change-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="role-change-title" className="text-xl font-semibold text-slate-900">Change user role</h2>
+            <p className="mt-2 text-sm text-slate-600">{editingUser.name} ({editingUser.email}) currently has the <span className="font-semibold capitalize">{editingUser.role}</span> role.</p>
+            <label className="mt-5 block text-sm font-medium text-slate-700">New role</label>
+            <select value={nextRole} onChange={(event) => setNextRole(event.target.value as Role)} className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm">
+              {assignableRoles.map((role) => <option key={role} value={role} disabled={role === editingUser.role}>{role}</option>)}
+            </select>
+            <p className="mt-2 text-xs text-slate-500">Trainer assignment is allowed only after approved trainer onboarding. User sessions will be signed out after a change.</p>
+            <label className="mt-5 block text-sm font-medium text-slate-700">Reason for change</label>
+            <textarea value={reason} onChange={(event) => setReason(event.target.value)} rows={3} maxLength={500} required placeholder="Describe why access is being changed" className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100" />
+            {notice ? <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{notice}</p> : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={saving} onClick={() => setEditingUser(null)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700 hover:bg-slate-50">Cancel</button>
+              <button type="button" disabled={saving || !reason.trim() || nextRole === editingUser.role} onClick={() => void saveRoleChange()} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Confirm Role Change'}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function PermissionMatrixPage() {
@@ -766,16 +971,22 @@ export function ActivityLogsPage() {
   return <SimpleList title="Activity Logs" subtitle="Audit and activity stream." items={activities.map((a) => `${a.id}: ${a.serviceType} ${a.status} for ${a.clientName}`)} />;
 }
 
-function SimpleList({ title, subtitle, items }: { title: string; subtitle: string; items: string[] }) {
+function SimpleList({ title, subtitle, items, loading = false }: { title: string; subtitle: string; items: string[]; loading?: boolean }) {
   return (
     <div className="space-y-6">
       <PageTitle title={title} subtitle={subtitle} />
       <Panel title="Overview">
         <ul className="space-y-2 text-sm text-slate-700">
-          {items.map((item) => (
-            <li key={item} className="rounded-xl border border-slate-200 px-3 py-2">{item}</li>
-          ))}
-          {!items.length ? <li className="rounded-xl border border-slate-200 px-3 py-2 text-slate-500">No records found.</li> : null}
+          {loading
+            ? Array.from({ length: 4 }).map((_, index) => (
+                <li key={index} aria-hidden="true" className="rounded-xl border border-slate-200 px-3 py-3">
+                  <div className="h-4 w-full max-w-xs animate-pulse rounded bg-slate-200" />
+                </li>
+              ))
+            : items.map((item) => (
+                <li key={item} className="rounded-xl border border-slate-200 px-3 py-2">{item}</li>
+              ))}
+          {!loading && !items.length ? <li className="rounded-xl border border-slate-200 px-3 py-2 text-slate-500">No records found.</li> : null}
         </ul>
       </Panel>
     </div>

@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\Notification;
+use App\Models\RoleChangeAudit;
+use App\Models\TrainerApplication;
 use App\Models\User;
 use App\Models\WellnessPackage;
 use Illuminate\Http\JsonResponse;
@@ -150,6 +152,91 @@ class AdminController extends Controller
         ]);
     }
 
+    public function roleChanges(Request $request): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $audits = RoleChangeAudit::query()
+            ->with(['actor:id,name,email', 'target:id,name,email'])
+            ->latest()
+            ->limit(50)
+            ->get()
+            ->map(fn (RoleChangeAudit $audit) => $this->roleChangePayload($audit))
+            ->values();
+
+        return response()->json([
+            'roleChanges' => $audits,
+        ]);
+    }
+
+    public function updateUserRole(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $validated = $request->validate([
+            'role' => ['required', 'string', 'in:client,trainer,helpdesk,admin,finance,legal,content'],
+            'reason' => ['required', 'string', 'max:500'],
+        ]);
+        $newRole = (string) $validated['role'];
+        $reason = trim((string) $validated['reason']);
+
+        abort_if($reason === '', 422, 'A role change reason is required.');
+
+        $audit = DB::transaction(function () use ($request, $user, $newRole, $reason): RoleChangeAudit {
+            $target = User::query()->lockForUpdate()->findOrFail($user->id);
+            $actor = $request->user();
+            $previousRole = (string) $target->role;
+
+            abort_unless($target->status === 'active', 422, 'Only active users can be assigned a role.');
+            abort_if($previousRole === $newRole, 422, 'Select a different role before saving.');
+
+            if ($newRole === 'trainer') {
+                $approvedApplicationExists = TrainerApplication::query()
+                    ->whereRaw('LOWER(applicant_email) = ?', [strtolower((string) $target->email)])
+                    ->where('status', 'approved')
+                    ->exists();
+
+                abort_unless($approvedApplicationExists, 422, 'Trainer role requires an approved trainer application.');
+            }
+
+            if ($previousRole === 'admin' && $newRole !== 'admin') {
+                $activeAdminCount = User::query()
+                    ->where('role', 'admin')
+                    ->where('status', 'active')
+                    ->count();
+
+                abort_if($activeAdminCount <= 1, 422, 'The last active administrator cannot be reassigned.');
+            }
+
+            $target->forceFill(['role' => $newRole])->save();
+            $target->tokens()->delete();
+
+            return RoleChangeAudit::query()->create([
+                'actor_user_id' => $actor->id,
+                'target_user_id' => $target->id,
+                'previous_role' => $previousRole,
+                'new_role' => $newRole,
+                'reason' => $reason,
+            ]);
+        });
+
+        $audit->load(['actor:id,name,email', 'target:id,name,email']);
+        $updatedUser = User::query()->findOrFail($user->id);
+
+        return response()->json([
+            'message' => "Role updated for {$updatedUser->email}. Existing sessions have been signed out.",
+            'user' => [
+                'id' => (string) $updatedUser->id,
+                'name' => (string) $updatedUser->name,
+                'email' => (string) $updatedUser->email,
+                'role' => (string) $updatedUser->role,
+                'status' => (string) $updatedUser->status,
+                'joinedAt' => optional($updatedUser->created_at)->format('Y-m-d') ?? '',
+            ],
+            'roleChange' => $this->roleChangePayload($audit),
+        ]);
+    }
+
     public function programs(Request $request): JsonResponse
     {
         $this->authorizeAdmin($request);
@@ -225,5 +312,21 @@ class AdminController extends Controller
     private function authorizeAdmin(Request $request): void
     {
         abort_unless($request->user()?->role === 'admin', 403, 'Admin access required.');
+    }
+
+    private function roleChangePayload(RoleChangeAudit $audit): array
+    {
+        return [
+            'id' => (string) $audit->id,
+            'actorName' => (string) optional($audit->actor)->name,
+            'actorEmail' => (string) optional($audit->actor)->email,
+            'targetUserId' => (string) $audit->target_user_id,
+            'targetName' => (string) optional($audit->target)->name,
+            'targetEmail' => (string) optional($audit->target)->email,
+            'previousRole' => (string) $audit->previous_role,
+            'newRole' => (string) $audit->new_role,
+            'reason' => (string) $audit->reason,
+            'changedAt' => optional($audit->created_at)->toIso8601String(),
+        ];
     }
 }

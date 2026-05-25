@@ -19,13 +19,15 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
 
         Route::middleware('auth:sanctum')->group(function (): void {
-            Route::get('/me', [AuthController::class, 'me']);
             Route::post('/logout', [AuthController::class, 'logout']);
-            Route::post('/change-password', [AuthController::class, 'changePassword']);
+            Route::middleware('account.active')->group(function (): void {
+                Route::get('/me', [AuthController::class, 'me']);
+                Route::post('/change-password', [AuthController::class, 'changePassword']);
+            });
         });
     });
 
-    Route::middleware('auth:sanctum')->group(function (): void {
+    Route::middleware(['auth:sanctum', 'account.active'])->group(function (): void {
         Route::put('/client/profile', [ClientProfileController::class, 'update']);
 
         Route::post('/intake-flows', [IntakeFlowController::class, 'store']);
@@ -52,6 +54,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/overview', [AdminController::class, 'overview']);
             Route::get('/users', [AdminController::class, 'users']);
             Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
+            Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole']);
+            Route::get('/role-changes', [AdminController::class, 'roleChanges']);
             Route::get('/trainer-applications', [TrainerApplicationController::class, 'index']);
             Route::patch('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'updateStatus']);
             Route::get('/programs', [AdminController::class, 'programs']);
