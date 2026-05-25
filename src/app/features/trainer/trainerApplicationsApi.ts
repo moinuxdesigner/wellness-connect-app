@@ -29,6 +29,17 @@ type TrainerApplicationResponse = {
     adminRemarks: string;
     reviewHistory: TrainerApplicationRecord['reviewHistory'];
   };
+  account?: {
+    userId: string;
+    email: string;
+    created: boolean;
+    temporaryPassword: string | null;
+  } | null;
+};
+
+export type TrainerApplicationReviewResult = {
+  application: TrainerApplicationRecord;
+  account?: NonNullable<TrainerApplicationResponse['account']>;
 };
 
 function readJson(response: Response) {
@@ -138,7 +149,7 @@ export async function fetchTrainerApplicationFromApi(applicationId: string | nul
   }
 }
 
-export async function fetchAdminTrainerApplicationsFromApi() {
+export async function fetchAdminTrainerApplicationsFromApi(options: { allowLocalFallback?: boolean } = {}) {
   try {
     const response = await fetch(`${API_BASE}/admin/trainer-applications`, {
       method: 'GET',
@@ -153,7 +164,11 @@ export async function fetchAdminTrainerApplicationsFromApi() {
     const applications = (data?.applications ?? []).map(normalizeTrainerApplicationRecord);
     applications.forEach((application) => upsertTrainerApplication(application));
     return applications;
-  } catch {
+  } catch (error) {
+    if (options.allowLocalFallback === false) {
+      throw error instanceof Error ? error : new Error('Unable to load trainer applications.');
+    }
+
     return readTrainerApplications();
   }
 }
@@ -180,7 +195,10 @@ export async function updateTrainerApplicationReviewInApi(input: {
 
     const application = normalizeTrainerApplicationRecord(data.application);
     upsertTrainerApplication(application);
-    return application;
+    return {
+      application,
+      account: 'account' in data && data.account ? data.account : undefined,
+    } satisfies TrainerApplicationReviewResult;
   } catch (error) {
     const localApplication = findTrainerApplication(input.applicationId);
     if (!localApplication) {
@@ -205,6 +223,6 @@ export async function updateTrainerApplicationReviewInApi(input: {
     };
 
     upsertTrainerApplication(fallback);
-    return fallback;
+    return { application: fallback } satisfies TrainerApplicationReviewResult;
   }
 }

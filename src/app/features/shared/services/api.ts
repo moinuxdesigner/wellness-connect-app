@@ -123,24 +123,14 @@ export async function registerRequest(payload: {
 }
 
 export async function loginRequest(email: string, password: string) {
+  let response: Response;
+
   try {
-    const response = await fetch(`${API_BASE}/auth/login`, {
+    response = await fetch(`${API_BASE}/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ email, password }),
     });
-    const data = await readJson(response);
-    if (!response.ok) throw new Error(String(data?.message ?? 'Login failed'));
-    const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
-    upsertDemoAuthUser({
-      id: mergedUser.id,
-      name: mergedUser.name,
-      email: mergedUser.email,
-      role: mergedUser.role,
-      status: mergedUser.status ?? 'active',
-    }, password);
-    setAuthState(data.token as string, mergedUser);
-    return mergedUser;
   } catch (error) {
     const demoUser = findDemoAuthUser(email, password);
     if (demoUser) {
@@ -150,6 +140,20 @@ export async function loginRequest(email: string, password: string) {
 
     throw error instanceof Error ? error : new Error('Login failed');
   }
+
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Login failed'));
+
+  const mergedUser = mergeUserProfile(data.user as AuthUser, data.profile);
+  upsertDemoAuthUser({
+    id: mergedUser.id,
+    name: mergedUser.name,
+    email: mergedUser.email,
+    role: mergedUser.role,
+    status: mergedUser.status ?? 'active',
+  }, password);
+  setAuthState(data.token as string, mergedUser);
+  return mergedUser;
 }
 
 export async function forgotPasswordRequest(email: string) {

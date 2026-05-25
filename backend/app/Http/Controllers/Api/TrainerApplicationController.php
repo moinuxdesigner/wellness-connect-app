@@ -4,10 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TrainerApplication;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Support\Str;
 
@@ -113,26 +115,76 @@ class TrainerApplicationController extends Controller
         $timestamp = now();
         $status = (string) $validated['status'];
         $remarks = trim((string) ($validated['adminRemarks'] ?? ''));
-        $history = is_array($application->review_history_json) ? $application->review_history_json : [];
-        $history[] = $this->historyItem(
-            action: $status,
-            actor: 'admin',
-            note: $remarks !== '' ? $remarks : $this->defaultAdminNote($status),
-            at: $timestamp,
-        );
+        $account = null;
 
-        $application->fill([
-            'status' => $status,
-            'admin_remarks' => $remarks,
-            'review_history_json' => $history,
-            'reviewed_by_user_id' => $request->user()?->id,
-            'updated_at' => $timestamp,
-        ]);
-        $application->save();
+        DB::transaction(function () use ($application, $request, $timestamp, $status, $remarks, &$account): void {
+            $history = is_array($application->review_history_json) ? $application->review_history_json : [];
+            $history[] = $this->historyItem(
+                action: $status,
+                actor: 'admin',
+                note: $remarks !== '' ? $remarks : $this->defaultAdminNote($status),
+                at: $timestamp,
+            );
+
+            $application->fill([
+                'status' => $status,
+                'admin_remarks' => $remarks,
+                'review_history_json' => $history,
+                'reviewed_by_user_id' => $request->user()?->id,
+                'updated_at' => $timestamp,
+            ]);
+            $application->save();
+
+            if ($status === 'approved') {
+                $account = $this->provisionApprovedTrainerAccount($application);
+            }
+        });
 
         return response()->json([
             'application' => $this->applicationPayload($application->fresh()),
+            'account' => $account,
         ]);
+    }
+
+    private function provisionApprovedTrainerAccount(TrainerApplication $application): array
+    {
+        $user = User::query()
+            ->whereRaw('LOWER(email) = ?', [strtolower((string) $application->applicant_email)])
+            ->first();
+        $temporaryPassword = null;
+        $created = false;
+
+        if ($user && $user->role === 'admin') {
+            abort(422, 'An administrator account cannot be converted to a trainer.');
+        }
+
+        if (!$user) {
+            $temporaryPassword = 'Trainer@' . Str::password(10, symbols: false);
+            $user = User::query()->create([
+                'name' => $application->applicant_name,
+                'email' => $application->applicant_email,
+                'password' => $temporaryPassword,
+                'role' => 'trainer',
+                'status' => 'active',
+                'phone' => $application->applicant_mobile,
+                'consent_to_terms' => true,
+            ]);
+            $created = true;
+        } else {
+            $user->forceFill([
+                'name' => $application->applicant_name,
+                'role' => 'trainer',
+                'status' => 'active',
+                'phone' => $application->applicant_mobile ?: $user->phone,
+            ])->save();
+        }
+
+        return [
+            'userId' => (string) $user->id,
+            'email' => (string) $user->email,
+            'created' => $created,
+            'temporaryPassword' => $temporaryPassword,
+        ];
     }
 
     private function applicationPayload(TrainerApplication $application): array

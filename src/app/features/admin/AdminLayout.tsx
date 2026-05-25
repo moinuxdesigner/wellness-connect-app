@@ -1,4 +1,5 @@
-import { Link, Outlet } from 'react-router';
+import { useEffect, useState } from 'react';
+import { Link, Navigate, Outlet } from 'react-router';
 import {
   Activity,
   BadgeIndianRupee,
@@ -17,6 +18,8 @@ import {
   Users,
 } from 'lucide-react';
 import DashboardLayout from '../../layout/DashboardLayout';
+import { clearAuthState, getAuthState } from '../auth/auth';
+import { meRequest } from '../auth/apiAuth';
 
 export const adminNavItems = [
   { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop, end: true },
@@ -37,6 +40,46 @@ export const adminNavItems = [
 ];
 
 export function AdminLayout() {
+  const [sessionState, setSessionState] = useState<'checking' | 'authenticated' | 'invalid'>('checking');
+
+  useEffect(() => {
+    let mounted = true;
+    const auth = getAuthState();
+
+    if (!auth.token || auth.token.startsWith('demo-token-')) {
+      clearAuthState();
+      setSessionState('invalid');
+      return () => {
+        mounted = false;
+      };
+    }
+
+    void meRequest()
+      .then((user) => {
+        if (!mounted) return;
+        setSessionState(user.role === 'admin' ? 'authenticated' : 'invalid');
+      })
+      .catch(() => {
+        if (mounted) setSessionState('invalid');
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  if (sessionState === 'checking') {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-slate-50">
+        <p className="text-sm font-medium text-slate-500">Verifying admin session...</p>
+      </main>
+    );
+  }
+
+  if (sessionState === 'invalid') {
+    return <Navigate to="/login" replace state={{ authNotice: 'Your admin session is not valid for database access. Please sign in again.' }} />;
+  }
+
   return <DashboardLayout navItems={adminNavItems} title="Admin Console"><Outlet /></DashboardLayout>;
 }
 

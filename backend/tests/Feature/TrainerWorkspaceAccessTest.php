@@ -93,6 +93,51 @@ class TrainerWorkspaceAccessTest extends TestCase
         $this->getJson('/api/v1/trainer/dashboard')->assertOk();
     }
 
+    public function test_admin_approval_provisions_account_for_application_without_user(): void
+    {
+        $application = TrainerApplication::query()->create([
+            'application_id' => 'TRN-NEW-APPLICANT',
+            'applicant_name' => 'New Trainer',
+            'applicant_email' => 'new.trainer@example.com',
+            'applicant_mobile' => '+91 9000000022',
+            'city' => 'Hyderabad',
+            'state' => 'Telangana',
+            'values_json' => [],
+            'status' => 'submitted',
+            'submitted_at' => now(),
+        ]);
+        $admin = User::factory()->create([
+            'role' => 'admin',
+            'status' => 'active',
+        ]);
+
+        Sanctum::actingAs($admin);
+        $response = $this->patchJson("/api/v1/admin/trainer-applications/{$application->application_id}", [
+            'status' => 'approved',
+            'adminRemarks' => 'Approved for activation.',
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'approved')
+            ->assertJsonPath('account.email', 'new.trainer@example.com')
+            ->assertJsonPath('account.created', true);
+
+        $temporaryPassword = (string) $response->json('account.temporaryPassword');
+        $this->assertNotSame('', $temporaryPassword);
+
+        $trainer = User::query()->where('email', 'new.trainer@example.com')->firstOrFail();
+        $this->assertSame('trainer', $trainer->role);
+        $this->assertSame('active', $trainer->status);
+
+        $this->postJson('/api/v1/auth/login', [
+            'email' => 'new.trainer@example.com',
+            'password' => $temporaryPassword,
+        ])->assertOk()->assertJsonPath('user.role', 'trainer');
+
+        Sanctum::actingAs($admin);
+        $this->getJson('/api/v1/admin/users')
+            ->assertOk()
+            ->assertJsonFragment(['email' => 'new.trainer@example.com']);
+    }
+
     private function createTrainerApplication(User $trainer, string $status): TrainerApplication
     {
         return TrainerApplication::query()->create([

@@ -34,7 +34,7 @@ export default defineConfig(({ mode }) => {
         disable: !enablePwa,
         registerType: 'autoUpdate',
         injectRegister: 'auto',
-        includeAssets: ['icons/icon-192.png', 'icons/icon-512.png'],
+        includeAssets: ['favicon.svg', 'icons/icon-192.png', 'icons/icon-512.png'],
         manifest: {
           name: 'WellnessConnect',
           short_name: 'Wellness',

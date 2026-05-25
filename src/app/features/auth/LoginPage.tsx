@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useLocation, useNavigate } from 'react-router';
 import { Home, ArrowLeft, ArrowRight } from 'lucide-react';
 import OnboardingAnimation from '../../../components/onboarding/OnboardingAnimation';
 import { loginRequest } from './apiAuth';
@@ -8,9 +8,13 @@ import AuthActionLoader from './AuthActionLoader';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation();
   const [email, setEmail] = useState('admin@wellnessconnect.local');
   const [password, setPassword] = useState('Admin@12345');
-  const [notice, setNotice] = useState('');
+  const [notice, setNotice] = useState(() => {
+    const state = location.state as { authNotice?: string } | null;
+    return state?.authNotice ?? '';
+  });
   const [loading, setLoading] = useState(false);
 
   return (

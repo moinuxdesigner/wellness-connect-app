@@ -37,15 +37,23 @@ export function UserManagementPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
+  const [loadError, setLoadError] = useState('');
+  const [reloadCount, setReloadCount] = useState(0);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     setLoading(true);
+    setLoadError('');
     getAdminUsers()
       .then((data) => {
         if (!mounted) return;
         setUsers(data);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setUsers([]);
+        setLoadError(error instanceof Error ? error.message : 'Unable to fetch database users.');
       })
       .finally(() => {
         if (!mounted) return;
@@ -54,7 +62,7 @@ export function UserManagementPage() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [reloadCount]);
 
   const stats = useMemo(() => {
     const active = users.filter((u) => u.status === 'active').length;
@@ -81,6 +89,21 @@ export function UserManagementPage() {
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
       {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
+      {loadError ? (
+        <section role="alert" className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-900 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold">Database user data unavailable</p>
+            <p className="mt-1 text-sm text-rose-700">No user records are displayed because the database request failed. {loadError}</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setReloadCount((count) => count + 1)}
+            className="shrink-0 rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700 transition hover:bg-rose-100"
+          >
+            Retry
+          </button>
+        </section>
+      ) : null}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         {loading ? (
           Array.from({ length: 4 }).map((_, index) => (
@@ -93,19 +116,19 @@ export function UserManagementPage() {
           <>
             <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Users</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">{stats.total}</p>
+              <p className="mt-2 text-2xl font-semibold text-slate-900">{loadError ? '--' : stats.total}</p>
             </article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Active</p>
-              <p className="mt-2 text-2xl font-semibold text-emerald-700">{stats.active}</p>
+              <p className="mt-2 text-2xl font-semibold text-emerald-700">{loadError ? '--' : stats.active}</p>
             </article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Pending</p>
-              <p className="mt-2 text-2xl font-semibold text-amber-700">{stats.pending}</p>
+              <p className="mt-2 text-2xl font-semibold text-amber-700">{loadError ? '--' : stats.pending}</p>
             </article>
             <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
               <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Admins</p>
-              <p className="mt-2 text-2xl font-semibold text-sky-700">{stats.admins}</p>
+              <p className="mt-2 text-2xl font-semibold text-sky-700">{loadError ? '--' : stats.admins}</p>
             </article>
           </>
         )}
@@ -125,6 +148,10 @@ export function UserManagementPage() {
                   <div className="mt-3 h-3 w-20 animate-pulse rounded bg-slate-200" />
                 </article>
               ))
+            : loadError
+              ? <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">Unable to display users until database data can be loaded.</p>
+              : users.length === 0
+                ? <p className="rounded-xl bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">No users found in the database.</p>
             : users.map((u) => (
                 <article key={u.id} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
                   <div className="flex items-start justify-between gap-3">
@@ -162,6 +189,18 @@ export function UserManagementPage() {
                       <td className="py-3"><div className="ml-auto h-9 w-28 animate-pulse rounded-xl bg-slate-200" /></td>
                     </tr>
                   ))
+                : loadError
+                  ? (
+                    <tr className="border-t border-slate-200">
+                      <td colSpan={5} className="py-10 text-center text-sm text-slate-500">Unable to display users until database data can be loaded.</td>
+                    </tr>
+                  )
+                  : users.length === 0
+                    ? (
+                      <tr className="border-t border-slate-200">
+                        <td colSpan={5} className="py-10 text-center text-sm text-slate-500">No users found in the database.</td>
+                      </tr>
+                    )
                 : users.map((u) => (
                     <tr key={u.id} className="border-t border-slate-200">
                       <td className="py-2 font-medium text-slate-900">{u.name}</td>
@@ -204,14 +243,17 @@ export function PermissionMatrixPage() {
 
 export function ProfessionalApprovalsPage() {
   const [users, setUsers] = useState<UserSummary[]>([]);
+  const [loadError, setLoadError] = useState('');
 
   useEffect(() => {
-    getAdminUsers().then(setUsers);
+    getAdminUsers()
+      .then(setUsers)
+      .catch(() => setLoadError('Unable to load professional approvals from the database.'));
   }, []);
 
   const pending = useMemo(() => users.filter((u) => u.status === 'pending'), [users]);
 
-  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={pending.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
+  return <SimpleList title="Professional Approvals" subtitle="Review and approve counsellor, trainer, and coach applications." items={loadError ? [loadError] : pending.map((u) => `${u.name} (${u.role}) - submitted ${u.joinedAt}`)} />;
 }
 
 export function TrainerApplicationsPage() {
@@ -219,6 +261,7 @@ export function TrainerApplicationsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [remarks, setRemarks] = useState('');
   const [feedbackError, setFeedbackError] = useState('');
+  const [decisionNotice, setDecisionNotice] = useState('');
   const [isSavingDecision, setIsSavingDecision] = useState(false);
 
   useEffect(() => {
@@ -254,6 +297,7 @@ export function TrainerApplicationsPage() {
   useEffect(() => {
     setRemarks(selectedApplication?.adminRemarks ?? '');
     setFeedbackError('');
+    setDecisionNotice('');
   }, [selectedApplication]);
 
   const stats = useMemo(() => ({
@@ -274,11 +318,12 @@ export function TrainerApplicationsPage() {
 
     setIsSavingDecision(true);
     try {
-      const nextApplication = await updateTrainerApplicationReviewInApi({
+      const result = await updateTrainerApplicationReviewInApi({
         applicationId: selectedApplication.applicationId,
         status,
         adminRemarks: trimmedRemarks,
       });
+      const nextApplication = result.application;
 
       setApplications((current) =>
         current
@@ -288,6 +333,15 @@ export function TrainerApplicationsPage() {
       setSelectedId(nextApplication.applicationId);
       setRemarks(nextApplication.adminRemarks);
       setFeedbackError('');
+      if (status === 'approved' && result.account?.created && result.account.temporaryPassword) {
+        setDecisionNotice(`Trainer account created for ${result.account.email}. Temporary password: ${result.account.temporaryPassword}. Share it securely and ask the trainer to change it after signing in.`);
+      } else if (status === 'approved' && result.account) {
+        setDecisionNotice(`Trainer account activated for ${result.account.email}. The trainer can now access the workspace with their existing password.`);
+      } else {
+        setDecisionNotice('Application status updated.');
+      }
+    } catch (error) {
+      setFeedbackError(error instanceof Error ? error.message : 'Unable to update the trainer application.');
     } finally {
       setIsSavingDecision(false);
     }
@@ -344,6 +398,7 @@ export function TrainerApplicationsPage() {
   return (
     <div className="space-y-6">
       <PageTitle title="Trainer Applications" subtitle="Review trainer onboarding submissions, documents, demo videos, interviews, and approval decisions." />
+      {decisionNotice ? <p className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">{decisionNotice}</p> : null}
       <section className="grid grid-cols-2 gap-3 md:grid-cols-4">
         <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
           <p className="text-xs font-medium uppercase tracking-wide text-slate-500">Total Applications</p>
