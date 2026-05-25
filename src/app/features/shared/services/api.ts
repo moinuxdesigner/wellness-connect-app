@@ -292,7 +292,7 @@ export async function getPractitionerSlots(practitionerId: number, from?: string
   return (data.slots ?? []) as SlotItem[];
 }
 
-export async function bookAppointmentRequest(payload: { intake_flow_id?: number; practitioner_id: number; slot_id: number; service_type: 'psychology' | 'training' | 'combined' | 'package'; mode: 'online' | 'in_person' | 'hybrid' }) {
+export async function bookAppointmentRequest(payload: { intake_flow_id?: number; practitioner_id: number; slot_id: number; service_type: 'psychology' | 'training' | 'combined' | 'package'; mode: 'online' | 'in_person' | 'hybrid'; use_membership_credits?: boolean; membership_subscription_id?: number }) {
   const token = getToken();
   const response = await fetch(`${API_BASE}/appointments`, {
     method: 'POST',

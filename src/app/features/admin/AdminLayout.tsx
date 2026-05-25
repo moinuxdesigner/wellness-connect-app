@@ -36,7 +36,7 @@ export const adminNavItems = [
   { label: 'Platform Health', to: '/admin/health', icon: ShieldCheck },
   { label: 'Escalations', to: '/admin/escalations', icon: ShieldAlert, permission: 'admin.escalations.view' },
   { label: 'Program Management', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
-  { label: 'Membership Plans', to: '/admin/memberships', icon: ClipboardList },
+  { label: 'Membership Plans', to: '/admin/memberships', icon: ClipboardList, permission: 'admin.memberships.manage' },
   { label: 'Activity Logs', to: '/admin/logs', icon: Activity },
 ];
 

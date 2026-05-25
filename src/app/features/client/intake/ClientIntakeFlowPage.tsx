@@ -15,6 +15,7 @@ import {
 import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
 import { MobileSectionTitle } from '../../../../design/patterns/intake';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { getClientMemberships, type ClientMembership } from '../../shared/services/membershipApi';
 
 type ServiceType = 'psychology' | 'training' | 'combined' | 'package';
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
@@ -139,6 +140,9 @@ export default function ClientIntakeFlowPage() {
   const [psychologistSlots, setPsychologistSlots] = useState<SlotItem[]>([]);
   const [trainerSlots, setTrainerSlots] = useState<SlotItem[]>([]);
   const [confirmation, setConfirmation] = useState<{ state: string; message?: string } | null>(null);
+  const [memberships, setMemberships] = useState<ClientMembership[]>([]);
+  const [useCredits, setUseCredits] = useState(false);
+  const [selectedMembershipId, setSelectedMembershipId] = useState<number | null>(null);
 
   const selectedPractitioner = useMemo(() => practitioners.find((p) => p.id === state.selectedPractitionerId), [practitioners, state.selectedPractitionerId]);
   const selectedPsychologist = useMemo(() => practitioners.find((p) => p.id === state.selectedPsychologistId), [practitioners, state.selectedPsychologistId]);
@@ -150,6 +154,17 @@ export default function ClientIntakeFlowPage() {
   const isCombined = state.serviceType === 'combined';
   const totalSteps = isCombined ? 5 : 3;
   const currentStep = Math.min(state.step, totalSteps);
+  const activeMemberships = memberships.filter((membership) => membership.status === 'active');
+
+  useEffect(() => {
+    getClientMemberships()
+      .then((data) => {
+        const active = data.filter((membership) => membership.status === 'active');
+        setMemberships(data);
+        setSelectedMembershipId(active[0]?.id ?? null);
+      })
+      .catch(() => setMemberships([]));
+  }, []);
 
   const singlePractitioners = useMemo(() => {
     if (state.serviceType === 'training') return practitioners.filter((p) => ['trainer', 'coach'].includes(p.type));
@@ -247,6 +262,8 @@ export default function ClientIntakeFlowPage() {
         slot_id: state.selectedSlotId,
         service_type: state.serviceType,
         mode: 'online',
+        use_membership_credits: useCredits,
+        membership_subscription_id: useCredits ? selectedMembershipId ?? undefined : undefined,
       });
       dispatch({ type: 'SET_FIELD', payload: { status: 'booked' } });
       dispatch({ type: 'SET_STEP', payload: 6 });
@@ -510,6 +527,19 @@ export default function ClientIntakeFlowPage() {
             {renderPractitionerButton('single', selectedPractitioner, 'Select practitioner', 'Choose from recommended matches')}
             {selectedPractitioner ? <p className="text-xs text-slate-600">Specialties: {selectedPractitioner.specialties.join(', ')}</p> : null}
             {renderSlotSelect(slots, state.selectedSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }))}
+            {state.serviceType !== 'package' && activeMemberships.length ? (
+              <label className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-slate-700">
+                <span className="flex items-center gap-2 font-medium">
+                  <input type="checkbox" checked={useCredits} onChange={(event) => setUseCredits(event.target.checked)} className="h-4 w-4 accent-indigo-600" />
+                  Use membership credits
+                </span>
+                {useCredits ? (
+                  <select value={selectedMembershipId ?? ''} onChange={(event) => setSelectedMembershipId(Number(event.target.value))} className="mt-3 w-full rounded-lg border border-indigo-200 bg-white p-2">
+                    {activeMemberships.map((membership) => <option key={membership.id} value={membership.id}>{membership.planName} - counselling {membership.credits.counselling}, training {membership.credits.training}</option>)}
+                  </select>
+                ) : null}
+              </label>
+            ) : null}
             <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton className="flex-1" onClick={onReserveSingleSlot} disabled={loading || !state.selectedSlotId || !state.selectedPractitionerId}>{loading ? 'Reserving...' : 'Reserve Slot'}</DSButton></div>
           </>
         ) : null}

@@ -72,7 +72,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
     navItems: [
       { label: 'Dashboard', to: '/finance', icon: LayoutPanelTop },
       { label: 'Revenue', to: '/finance/revenue', icon: Store },
-      { label: 'Invoices', to: '/finance/invoices', icon: FileText },
+      { label: 'Invoices', to: '/finance/invoices', icon: FileText, permission: 'finance.invoices.view' },
     ],
   },
   legal: {
@@ -101,7 +101,7 @@ export function RoleDashboardLayout({ role }: { role: Role }) {
     { label: 'Programs', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
     { label: 'Escalations', to: '/admin/escalations', icon: Activity, permission: 'admin.escalations.view' },
   ];
-  const navItems = [...shell.navItems, ...delegatedItems.filter((item) => hasPermission(user, item.permission))];
+  const navItems = [...shell.navItems.filter((item) => !item.permission || hasPermission(user, item.permission)), ...delegatedItems.filter((item) => hasPermission(user, item.permission))];
 
   return (
     <DashboardLayout navItems={navItems} title={shell.title}>

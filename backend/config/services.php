@@ -35,4 +35,13 @@ return [
         ],
     ],
 
+    'razorpay' => [
+        'key_id' => env('RAZORPAY_KEY_ID'),
+        'key_secret' => env('RAZORPAY_KEY_SECRET'),
+        'webhook_secret' => env('RAZORPAY_WEBHOOK_SECRET'),
+        'receipt_prefix' => env('MEMBERSHIP_RECEIPT_PREFIX', 'AWC-R'),
+        'refund_approval_threshold_minor' => (int) env('REFUND_APPROVAL_THRESHOLD_MINOR', 1000000),
+        'free_cancellation_before_hours' => (int) env('FREE_CANCELLATION_BEFORE_HOURS', 24),
+    ],
+
 ];

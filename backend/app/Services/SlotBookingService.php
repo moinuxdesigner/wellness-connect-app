@@ -10,9 +10,13 @@ use RuntimeException;
 
 class SlotBookingService
 {
-    public function book(int $clientUserId, int $practitionerId, int $slotId, string $serviceType, string $mode, ?int $intakeFlowId = null): Appointment
+    public function __construct(private readonly MembershipEntitlementService $entitlements)
     {
-        return DB::transaction(function () use ($clientUserId, $practitionerId, $slotId, $serviceType, $mode, $intakeFlowId) {
+    }
+
+    public function book(int $clientUserId, int $practitionerId, int $slotId, string $serviceType, string $mode, ?int $intakeFlowId = null, ?\App\Models\MembershipSubscription $subscription = null): Appointment
+    {
+        return DB::transaction(function () use ($clientUserId, $practitionerId, $slotId, $serviceType, $mode, $intakeFlowId, $subscription) {
             $slot = AvailabilitySlot::query()->lockForUpdate()->findOrFail($slotId);
 
             if ($slot->slot_status !== 'open') {
@@ -39,6 +43,10 @@ class SlotBookingService
                 'meta_json' => ['slot_id' => $slot->id],
                 'created_at' => now(),
             ]);
+
+            if ($subscription) {
+                $this->entitlements->reserve($subscription, $appointment, $clientUserId, $serviceType);
+            }
 
             return $appointment;
         });

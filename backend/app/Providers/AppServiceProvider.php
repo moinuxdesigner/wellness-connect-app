@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\PaymentGateway;
 use App\Models\User;
+use App\Services\RazorpayPaymentGateway;
 use Illuminate\Auth\Notifications\ResetPassword;
 use Illuminate\Support\ServiceProvider;
 
@@ -13,7 +15,7 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(PaymentGateway::class, RazorpayPaymentGateway::class);
     }
 
     /**

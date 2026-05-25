@@ -80,7 +80,7 @@ class PermissionMatrixTest extends TestCase
 
         Sanctum::actingAs($admin);
         $this->putJson('/api/v1/admin/permissions/client', [
-            'permissions' => ['client.dashboard.view', 'client.intake.manage', 'client.appointments.view', 'client.appointments.manage'],
+            'permissions' => ['client.dashboard.view', 'client.intake.manage', 'client.appointments.view', 'client.appointments.manage', 'client.memberships.manage'],
             'reason' => 'Disable profile changes during verification.',
         ])->assertOk();
 

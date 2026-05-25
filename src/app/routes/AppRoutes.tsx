@@ -8,6 +8,7 @@ import { PermissionBoundary, RequireAuth, RequirePermission, RequireRole } from 
 import LandingPage from '../features/public/LandingPage';
 import GetStartedWizardPage from '../features/public/GetStartedWizardPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
+import PricingPage from '../features/public/PricingPage';
 import LegalPage from '../features/public/LegalPage';
 import CareersPage from '../features/public/CareersPage';
 import ProfessionalOnboardingPage from '../features/public/ProfessionalOnboardingPage';
@@ -36,6 +37,8 @@ import ClientProfilePage from '../features/client/pages/ClientProfilePage';
 import ClientAppointmentsPage from '../features/client/pages/ClientAppointmentsPage';
 import ClientProgramsPage from '../features/client/pages/ClientProgramsPage';
 import ClientTasksPage from '../features/client/pages/ClientTasksPage';
+import ClientMembershipPage from '../features/client/pages/ClientMembershipPage';
+import ClientReceiptPage from '../features/client/pages/ClientReceiptPage';
 import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage';
 import { RoleDashboardLayout } from '../features/roleDashboards/RoleDashboardLayout';
 import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboards/RoleDashboardPage';
@@ -49,13 +52,14 @@ import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
 import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
 import ContentProgramsPage from '../features/content/ContentProgramsPage';
 import ContentAssetsPage from '../features/content/ContentAssetsPage';
+import FinanceBillingPage from '../features/finance/FinanceBillingPage';
 
 export default function AppRoutes() {
   return (
     <Routes>
       <Route path="/" element={<PublicLayout><LandingPage /></PublicLayout>} />
       <Route path="/careers" element={<PublicLayout><CareersPage /></PublicLayout>} />
-      <Route path="/pricing" element={<PublicLayout><SimplePublicPage title="Pricing" description="Membership plans and billing rules will be connected to backend APIs in the next phase." /></PublicLayout>} />
+      <Route path="/pricing" element={<PublicLayout><PricingPage /></PublicLayout>} />
       <Route path="/about" element={<PublicLayout><SimplePublicPage title="About" description="WellnessConnect unifies counselling, training, coaching, and operations in one platform." /></PublicLayout>} />
       <Route path="/contact" element={<PublicLayout><ContactSupportPage /></PublicLayout>} />
       <Route path="/terms-of-service" element={<PublicLayout><LegalPage type="terms" /></PublicLayout>} />
@@ -85,7 +89,7 @@ export default function AppRoutes() {
           <Route path="health" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PlatformHealthPage /></PermissionBoundary>} />
           <Route path="escalations" element={<PermissionBoundary anyOf={['admin.escalations.view']}><EscalationsPage /></PermissionBoundary>} />
           <Route path="programs" element={<PermissionBoundary anyOf={['admin.programs.view']}><ProgramManagementPage /></PermissionBoundary>} />
-          <Route path="memberships" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><MembershipPlanManagementPage /></PermissionBoundary>} />
+          <Route path="memberships" element={<PermissionBoundary anyOf={['admin.memberships.manage']}><MembershipPlanManagementPage /></PermissionBoundary>} />
           <Route path="logs" element={<PermissionBoundary anyOf={['admin.activity_logs.view']}><ActivityLogsPage /></PermissionBoundary>} />
         </Route>
 
@@ -98,6 +102,8 @@ export default function AppRoutes() {
             <Route path="programs" element={<ClientProgramsPage />} />
             <Route path="tasks" element={<ClientTasksPage />} />
             <Route path="profile" element={<PermissionBoundary anyOf={['client.profile.update']}><ClientProfilePage /></PermissionBoundary>} />
+            <Route path="membership" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientMembershipPage /></PermissionBoundary>} />
+            <Route path="receipts/:receiptId" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientReceiptPage /></PermissionBoundary>} />
             </Route>
           </Route>
         </Route>
@@ -143,7 +149,7 @@ export default function AppRoutes() {
           <Route path="/finance" element={<RoleDashboardLayout role="finance" />}>
             <Route index element={<RoleDashboardPage role="finance" />} />
             <Route path="revenue" element={<RolePlaceholderPage role="finance" title="Revenue" />} />
-            <Route path="invoices" element={<RolePlaceholderPage role="finance" title="Invoices" />} />
+            <Route path="invoices" element={<PermissionBoundary anyOf={['finance.invoices.view']}><FinanceBillingPage /></PermissionBoundary>} />
           </Route>
         </Route>
 

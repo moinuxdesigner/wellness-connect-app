@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
 import { adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
+import { archiveAdminMembershipPlan, getAdminMembershipPlans, publishAdminMembershipPlan, saveAdminMembershipPlan, type AdminMembershipPlan, type PlanDraft } from '../../shared/services/membershipApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
 import { clearAuthState, getAuthState } from '../../auth/auth';
 import {
@@ -1144,7 +1145,82 @@ export function ProgramManagementPage() {
 }
 
 export function MembershipPlanManagementPage() {
-  return <SimpleList title="Membership Plan Management" subtitle="Manage plan catalog and subscription policy placeholders." items={['Basic Care Plan', 'Mind + Body Plus Plan', 'Family Wellness Plan', 'Corporate Program Plan']} />;
+  const emptyDraft: PlanDraft = { name: '', description: '', duration_weeks: 4, credits: { counselling: 0, training: 0 }, tiers: [{ label: 'Standard', amount_minor: 0 }] };
+  const [plans, setPlans] = useState<AdminMembershipPlan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [editingId, setEditingId] = useState<number | undefined>();
+  const [draft, setDraft] = useState<PlanDraft>(emptyDraft);
+  const [showEditor, setShowEditor] = useState(false);
+
+  async function refresh() {
+    setLoading(true);
+    try { setPlans(await getAdminMembershipPlans()); } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to load membership plans.'); } finally { setLoading(false); }
+  }
+  useEffect(() => { void refresh(); }, []);
+  function edit(plan?: AdminMembershipPlan) {
+    const version = plan?.latestVersion;
+    setEditingId(plan?.id);
+    setDraft(plan && version ? {
+      name: plan.name, description: plan.description ?? '', duration_weeks: version.duration_weeks,
+      credits: { counselling: version.included_credits_json.counselling ?? 0, training: version.included_credits_json.training ?? 0 },
+      internal_cost_counselling_minor: version.internal_cost_counselling_minor ?? null,
+      internal_cost_training_minor: version.internal_cost_training_minor ?? null,
+      tiers: version.tiers.map((tier) => ({ label: tier.label, amount_minor: tier.amount_minor })),
+    } : { ...emptyDraft, credits: { ...emptyDraft.credits }, tiers: [...emptyDraft.tiers] });
+    setShowEditor(true);
+  }
+  async function save() {
+    try {
+      const result = await saveAdminMembershipPlan(draft, editingId);
+      setNotice(result.message); setShowEditor(false); await refresh();
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to save membership draft.'); }
+  }
+  async function publish(id: number) {
+    try { setNotice((await publishAdminMembershipPlan(id)).message); await refresh(); } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to publish plan.'); }
+  }
+  async function archive(id: number) {
+    try { setNotice((await archiveAdminMembershipPlan(id)).message); await refresh(); } catch (error) { setNotice(error instanceof Error ? error.message : 'Unable to archive plan.'); }
+  }
+
+  return <div className="space-y-6">
+    <PageTitle title="Membership Plan Management" subtitle="Publish immutable plan terms and one-time INR price tiers." />
+    {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
+    <div className="flex justify-end"><button type="button" onClick={() => edit()} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white">New Plan</button></div>
+    <section className="grid gap-4 md:grid-cols-3">
+      {loading ? Array.from({ length: 3 }).map((_, index) => <article key={index} className="h-52 animate-pulse rounded-2xl bg-slate-100" />) : plans.length ? plans.map((plan) => {
+        const version = plan.latestVersion;
+        const lowest = version?.tiers?.length ? Math.min(...version.tiers.map((tier) => tier.amount_minor)) : null;
+        const margin = lowest !== null && plan.estimatedCostMinor !== null ? lowest - plan.estimatedCostMinor : null;
+        return <article key={plan.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+          <div className="flex items-start justify-between gap-2"><h2 className="font-semibold text-slate-900">{plan.name}</h2><ToneBadge tone={plan.status === 'published' ? 'success' : plan.status === 'archived' ? 'danger' : 'warning'}>{plan.status}</ToneBadge></div>
+          <p className="mt-2 line-clamp-2 text-sm text-slate-600">{plan.description || 'No description'}</p>
+          <p className="mt-3 text-sm text-slate-700">{version?.included_credits_json.counselling ?? 0} counselling | {version?.included_credits_json.training ?? 0} training</p>
+          <p className="mt-1 text-xs text-slate-500">Versions: {plan.versionCount} | {lowest === null ? 'No price tier' : `From INR ${(lowest / 100).toFixed(0)}`}</p>
+          <p className="mt-1 text-xs text-slate-500">{margin === null ? 'Cost not configured' : `Estimated margin: INR ${(margin / 100).toFixed(0)}`}</p>
+          <div className="mt-4 flex gap-2"><button onClick={() => edit(plan)} className="rounded-lg border px-3 py-2 text-sm">Edit Draft</button><button onClick={() => void publish(plan.id)} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm text-white">Publish</button><button onClick={() => void archive(plan.id)} className="rounded-lg border px-3 py-2 text-sm">Archive</button></div>
+        </article>;
+      }) : <p className="col-span-full rounded-xl bg-slate-50 p-8 text-center text-slate-600">No membership plans exist yet.</p>}
+    </section>
+    {showEditor ? <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 p-4"><section className="max-h-[90vh] w-full max-w-xl overflow-y-auto rounded-2xl bg-white p-6">
+      <h2 className="text-xl font-semibold">{editingId ? 'Edit Plan Draft' : 'New Membership Plan'}</h2>
+      <p className="mt-1 text-sm text-slate-500">Publishing creates terms used only by future purchases.</p>
+      <div className="mt-5 grid gap-3">
+        <input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} placeholder="Plan name" className="rounded-xl border p-3" />
+        <textarea value={draft.description} onChange={(e) => setDraft({ ...draft, description: e.target.value })} placeholder="Description" className="rounded-xl border p-3" />
+        <label className="text-sm">Duration in weeks<input type="number" value={draft.duration_weeks} onChange={(e) => setDraft({ ...draft, duration_weeks: Number(e.target.value) })} className="mt-1 w-full rounded-xl border p-3" /></label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="text-sm">Counselling credits<input type="number" value={draft.credits.counselling} onChange={(e) => setDraft({ ...draft, credits: { ...draft.credits, counselling: Number(e.target.value) } })} className="mt-1 w-full rounded-xl border p-3" /></label>
+          <label className="text-sm">Training credits<input type="number" value={draft.credits.training} onChange={(e) => setDraft({ ...draft, credits: { ...draft.credits, training: Number(e.target.value) } })} className="mt-1 w-full rounded-xl border p-3" /></label>
+          <label className="text-sm">Counselling cost (INR)<input type="number" value={(draft.internal_cost_counselling_minor ?? 0) / 100} onChange={(e) => setDraft({ ...draft, internal_cost_counselling_minor: Number(e.target.value) * 100 })} className="mt-1 w-full rounded-xl border p-3" /></label>
+          <label className="text-sm">Training cost (INR)<input type="number" value={(draft.internal_cost_training_minor ?? 0) / 100} onChange={(e) => setDraft({ ...draft, internal_cost_training_minor: Number(e.target.value) * 100 })} className="mt-1 w-full rounded-xl border p-3" /></label>
+        </div>
+        {draft.tiers.map((tier, index) => <div key={index} className="grid grid-cols-2 gap-3"><input value={tier.label} onChange={(e) => setDraft({ ...draft, tiers: draft.tiers.map((item, i) => i === index ? { ...item, label: e.target.value } : item) })} placeholder="Tier label" className="rounded-xl border p-3" /><input type="number" value={tier.amount_minor / 100} onChange={(e) => setDraft({ ...draft, tiers: draft.tiers.map((item, i) => i === index ? { ...item, amount_minor: Number(e.target.value) * 100 } : item) })} placeholder="Price INR" className="rounded-xl border p-3" /></div>)}
+        <button type="button" onClick={() => setDraft({ ...draft, tiers: [...draft.tiers, { label: '', amount_minor: 0 }] })} className="rounded-xl border p-2 text-sm">Add Price Tier</button>
+      </div>
+      <div className="mt-6 flex justify-end gap-2"><button onClick={() => setShowEditor(false)} className="rounded-xl border px-4 py-2">Cancel</button><button disabled={!draft.name || !draft.tiers.length} onClick={() => void save()} className="rounded-xl bg-indigo-600 px-4 py-2 text-white disabled:opacity-50">Save Draft</button></div>
+    </section></div> : null}
+  </div>;
 }
 
 export function ActivityLogsPage() {

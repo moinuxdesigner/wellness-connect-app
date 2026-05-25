@@ -1,4 +1,4 @@
-import { Activity, BookOpenText, Calendar, HeartPulse, ListChecks } from 'lucide-react';
+import { Activity, BookOpenText, Calendar, ClipboardList, HeartPulse, ListChecks } from 'lucide-react';
 import { Outlet } from 'react-router';
 import DashboardLayout from '../../layout/DashboardLayout';
 import { getAuthState } from '../auth/auth';
@@ -10,6 +10,7 @@ export const clientNavItems = [
   { label: 'Calendar', to: '/client/appointments', icon: Calendar, permission: 'client.appointments.view' },
   { label: 'Progress', to: '/client/programs', icon: Activity },
   { label: 'Resources', to: '/client/profile', icon: BookOpenText, permission: 'client.profile.update' },
+  { label: 'Membership', to: '/client/membership', icon: ClipboardList, permission: 'client.memberships.manage' },
 ];
 
 export function ClientLayout() {

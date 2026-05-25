@@ -35,4 +35,9 @@ class Appointment extends Model
     {
         return $this->hasMany(AppointmentEvent::class);
     }
+
+    public function creditLedgerEntries()
+    {
+        return $this->hasMany(CreditLedgerEntry::class);
+    }
 }

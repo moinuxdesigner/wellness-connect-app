@@ -47,4 +47,9 @@ class User extends Authenticatable
     {
         return $this->hasMany(Appointment::class, 'client_user_id');
     }
+
+    public function membershipSubscriptions(): HasMany
+    {
+        return $this->hasMany(MembershipSubscription::class, 'client_user_id');
+    }
 }

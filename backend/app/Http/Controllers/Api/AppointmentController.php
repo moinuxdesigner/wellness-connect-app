@@ -6,6 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Appointment;
 use App\Models\AppointmentEvent;
 use App\Models\AvailabilitySlot;
+use App\Models\MembershipSubscription;
+use App\Services\MembershipEntitlementService;
 use App\Services\SlotBookingService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -14,7 +16,7 @@ use RuntimeException;
 
 class AppointmentController extends Controller
 {
-    public function __construct(private readonly SlotBookingService $slotBookingService)
+    public function __construct(private readonly SlotBookingService $slotBookingService, private readonly MembershipEntitlementService $entitlements)
     {
     }
 
@@ -37,16 +39,26 @@ class AppointmentController extends Controller
             'slot_id' => ['required', 'integer', 'exists:availability_slots,id'],
             'service_type' => ['required', 'in:psychology,training,combined,package'],
             'mode' => ['required', 'in:online,in_person,hybrid'],
+            'use_membership_credits' => ['nullable', 'boolean'],
+            'membership_subscription_id' => ['required_if:use_membership_credits,true', 'nullable', 'integer', 'exists:membership_subscriptions,id'],
         ]);
 
-        $appointment = $this->slotBookingService->book(
-            $request->user()->id,
-            $validated['practitioner_id'],
-            $validated['slot_id'],
-            $validated['service_type'],
-            $validated['mode'],
-            $validated['intake_flow_id'] ?? null,
-        );
+        $subscription = ($validated['use_membership_credits'] ?? false)
+            ? MembershipSubscription::query()->findOrFail($validated['membership_subscription_id'])
+            : null;
+        try {
+            $appointment = $this->slotBookingService->book(
+                $request->user()->id,
+                $validated['practitioner_id'],
+                $validated['slot_id'],
+                $validated['service_type'],
+                $validated['mode'],
+                $validated['intake_flow_id'] ?? null,
+                $subscription,
+            );
+        } catch (RuntimeException $exception) {
+            return response()->json(['message' => $exception->getMessage()], 422);
+        }
 
         return response()->json(['appointment' => $appointment], 201);
     }
@@ -121,7 +133,17 @@ class AppointmentController extends Controller
             'meta_json' => ['reason' => $validated['reason'] ?? null],
             'created_at' => now(),
         ]);
+        $this->entitlements->handleClientCancellation($appointment, $request->user()->id);
 
         return response()->json(['message' => 'Appointment cancelled.', 'appointment' => $appointment->fresh()]);
+    }
+
+    public function complete(Request $request, Appointment $appointment): JsonResponse
+    {
+        abort_if($appointment->status === 'cancelled', 422, 'Cancelled appointments cannot be completed.');
+        $appointment->update(['status' => 'completed']);
+        $this->entitlements->completeAppointment($appointment, $request->user()->id);
+
+        return response()->json(['message' => 'Appointment completed.', 'appointment' => $appointment->fresh()]);
     }
 }
