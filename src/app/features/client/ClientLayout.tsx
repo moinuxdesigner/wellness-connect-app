@@ -1,17 +1,20 @@
 import { Activity, BookOpenText, Calendar, HeartPulse, ListChecks } from 'lucide-react';
 import { Outlet } from 'react-router';
 import DashboardLayout from '../../layout/DashboardLayout';
+import { getAuthState } from '../auth/auth';
+import { hasPermission } from '../auth/permissions';
 
 export const clientNavItems = [
   { label: 'Home', to: '/client', icon: HeartPulse, end: true },
-  { label: 'Book Appointment', to: '/client/intake', icon: ListChecks },
-  { label: 'Calendar', to: '/client/appointments', icon: Calendar },
+  { label: 'Book Appointment', to: '/client/intake', icon: ListChecks, permission: 'client.intake.manage' },
+  { label: 'Calendar', to: '/client/appointments', icon: Calendar, permission: 'client.appointments.view' },
   { label: 'Progress', to: '/client/programs', icon: Activity },
-  { label: 'Resources', to: '/client/profile', icon: BookOpenText },
+  { label: 'Resources', to: '/client/profile', icon: BookOpenText, permission: 'client.profile.update' },
 ];
 
 export function ClientLayout() {
-  return <DashboardLayout navItems={clientNavItems} title="Client Portal"><Outlet /></DashboardLayout>;
+  const user = getAuthState().user;
+  return <DashboardLayout navItems={clientNavItems.filter((item) => !item.permission || hasPermission(user, item.permission))} title="Client Portal"><Outlet /></DashboardLayout>;
 }
 
 export function ClientPageTitle({ title, subtitle }: { title: string; subtitle: string }) {

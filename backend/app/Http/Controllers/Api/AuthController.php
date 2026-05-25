@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientProfile;
 use App\Models\User;
+use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -198,6 +199,7 @@ class AuthController extends Controller
             'consent_to_terms' => (bool) $user->consent_to_terms,
             'status' => $user->status ?? 'active',
             'requires_client_intake' => $requiresClientIntake,
+            'permissions' => app(PermissionService::class)->effectiveKeys($user),
         ];
     }
 }

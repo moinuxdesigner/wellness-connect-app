@@ -1,7 +1,4 @@
 import { mockAppointments } from '../../../data/mockAppointments';
-import { mockAdminMetrics, mockUsageMetrics } from '../../../data/mockAnalytics';
-import { mockPrograms } from '../../../data/mockPrograms';
-import { mockRoles, mockTickets } from '../../../data/mockTickets';
 import type { AppointmentSummary, DashboardMetric, ProgramSummary, Role, TicketSummary, UserSummary } from '../../types';
 import { getAuthState } from '../../auth/auth';
 
@@ -33,6 +30,34 @@ export type RoleChangeAudit = {
   changedAt: string | null;
 };
 
+export type PermissionItem = {
+  key: string;
+  module: string;
+  label: string;
+  action: string;
+  sortOrder: number;
+  configurable: boolean;
+  available: boolean;
+};
+
+export type PermissionChangeAudit = {
+  id: string;
+  actorName: string;
+  actorEmail: string;
+  targetRole: Role;
+  reason: string;
+  addedPermissions: string[];
+  removedPermissions: string[];
+  changedAt: string | null;
+};
+
+export type PermissionMatrixResponse = {
+  roles: Role[];
+  permissions: PermissionItem[];
+  grants: Partial<Record<Role, string[]>>;
+  audits: PermissionChangeAudit[];
+};
+
 function authHeaders(token = getAuthState().token, withJson = false): HeadersInit {
   return {
     Accept: 'application/json',
@@ -61,23 +86,8 @@ async function fetchAdmin<T>(path: string): Promise<T> {
   return data as T;
 }
 
-const fallbackOverview: AdminOverview = {
-  analytics: mockAdminMetrics,
-  usage_metrics: mockUsageMetrics,
-  role_distribution: mockRoles.map((item) => ({
-    role: item.role,
-    users: item.users,
-    status: item.status,
-  })),
-  recent_escalations: mockTickets,
-};
-
 export async function getAdminOverview() {
-  try {
-    return await fetchAdmin<AdminOverview>('overview');
-  } catch {
-    return fallbackOverview;
-  }
+  return fetchAdmin<AdminOverview>('overview');
 }
 
 export async function getAdminUsers() {
@@ -130,22 +140,32 @@ export async function adminUpdateUserRole(userId: string, role: Role, reason: st
   return data as { message: string; user: UserSummary; roleChange: RoleChangeAudit };
 }
 
+export async function getAdminPermissionMatrix() {
+  return fetchAdmin<PermissionMatrixResponse>('permissions');
+}
+
+export async function adminUpdatePermissions(role: Role, permissions: string[], reason: string) {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing admin session token.');
+
+  const response = await fetch(`${API_BASE}/admin/permissions/${role}`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify({ permissions, reason }),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to update permissions.'));
+  return data as { message: string; role: Role; permissions: string[]; audit: PermissionChangeAudit };
+}
+
 export async function getAdminPrograms() {
-  try {
-    const data = await fetchAdmin<{ programs: ProgramSummary[] }>('programs');
-    return data.programs;
-  } catch {
-    return mockPrograms;
-  }
+  const data = await fetchAdmin<{ programs: ProgramSummary[] }>('programs');
+  return data.programs;
 }
 
 export async function getAdminEscalations() {
-  try {
-    const data = await fetchAdmin<{ tickets: TicketSummary[] }>('escalations');
-    return data.tickets;
-  } catch {
-    return mockTickets;
-  }
+  const data = await fetchAdmin<{ tickets: TicketSummary[] }>('escalations');
+  return data.tickets;
 }
 
 export async function getAdminActivities() {

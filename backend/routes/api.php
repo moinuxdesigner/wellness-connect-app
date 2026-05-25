@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
+use App\Http\Controllers\Api\PermissionController;
 use App\Http\Controllers\Api\TrainerApplicationController;
 use App\Http\Controllers\Api\TrainerWorkspaceController;
 use App\Http\Controllers\Api\SupportRequestController;
@@ -28,38 +29,43 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::middleware(['auth:sanctum', 'account.active'])->group(function (): void {
-        Route::put('/client/profile', [ClientProfileController::class, 'update']);
+        Route::put('/client/profile', [ClientProfileController::class, 'update'])->middleware('permission:client.profile.update');
 
-        Route::post('/intake-flows', [IntakeFlowController::class, 'store']);
-        Route::get('/intake-flows/{intakeFlow}', [IntakeFlowController::class, 'show']);
-        Route::put('/intake-flows/{intakeFlow}/service', [IntakeFlowController::class, 'updateService']);
-        Route::put('/intake-flows/{intakeFlow}/intake', [IntakeFlowController::class, 'saveIntake']);
-        Route::post('/intake-flows/{intakeFlow}/submit', [IntakeFlowController::class, 'submit']);
-        Route::get('/intake-flows/{intakeFlow}/confirmation', [IntakeFlowController::class, 'confirmation']);
+        Route::middleware('permission:client.intake.manage')->group(function (): void {
+            Route::post('/intake-flows', [IntakeFlowController::class, 'store']);
+            Route::get('/intake-flows/{intakeFlow}', [IntakeFlowController::class, 'show']);
+            Route::put('/intake-flows/{intakeFlow}/service', [IntakeFlowController::class, 'updateService']);
+            Route::put('/intake-flows/{intakeFlow}/intake', [IntakeFlowController::class, 'saveIntake']);
+            Route::post('/intake-flows/{intakeFlow}/submit', [IntakeFlowController::class, 'submit']);
+            Route::get('/intake-flows/{intakeFlow}/confirmation', [IntakeFlowController::class, 'confirmation']);
+            Route::get('/intake-flows/{intakeFlowId}/recommended-practitioners', [PractitionerController::class, 'recommended']);
+            Route::get('/practitioners/{practitioner}/slots', [PractitionerController::class, 'slots']);
+        });
 
-        Route::get('/intake-flows/{intakeFlowId}/recommended-practitioners', [PractitionerController::class, 'recommended']);
-        Route::get('/practitioners/{practitioner}/slots', [PractitionerController::class, 'slots']);
+        Route::get('/client/appointments', [AppointmentController::class, 'index'])->middleware('permission:client.appointments.view');
+        Route::middleware('permission:client.appointments.manage')->group(function (): void {
+            Route::post('/appointments', [AppointmentController::class, 'store']);
+            Route::put('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
+            Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
+        });
 
-        Route::get('/client/appointments', [AppointmentController::class, 'index']);
-        Route::post('/appointments', [AppointmentController::class, 'store']);
-        Route::put('/appointments/{appointment}/reschedule', [AppointmentController::class, 'reschedule']);
-        Route::post('/appointments/{appointment}/cancel', [AppointmentController::class, 'cancel']);
-
-        Route::get('/trainer/access-status', [TrainerWorkspaceController::class, 'accessStatus']);
+        Route::get('/trainer/access-status', [TrainerWorkspaceController::class, 'accessStatus'])->middleware('permission:trainer.dashboard.view');
         Route::middleware('trainer.approved')->prefix('trainer')->group(function (): void {
-            Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard']);
+            Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard'])->middleware('permission:trainer.dashboard.view');
         });
 
         Route::prefix('admin')->group(function (): void {
-            Route::get('/overview', [AdminController::class, 'overview']);
+            Route::get('/overview', [AdminController::class, 'overview'])->middleware('permission:admin.dashboard.view,admin.usage.view');
             Route::get('/users', [AdminController::class, 'users']);
             Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
             Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole']);
             Route::get('/role-changes', [AdminController::class, 'roleChanges']);
+            Route::get('/permissions', [PermissionController::class, 'index']);
+            Route::put('/permissions/{role}', [PermissionController::class, 'update']);
             Route::get('/trainer-applications', [TrainerApplicationController::class, 'index']);
             Route::patch('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'updateStatus']);
-            Route::get('/programs', [AdminController::class, 'programs']);
-            Route::get('/escalations', [AdminController::class, 'escalations']);
+            Route::get('/programs', [AdminController::class, 'programs'])->middleware('permission:admin.programs.view');
+            Route::get('/escalations', [AdminController::class, 'escalations'])->middleware('permission:admin.escalations.view');
             Route::get('/activities', [AdminController::class, 'activities']);
         });
     });

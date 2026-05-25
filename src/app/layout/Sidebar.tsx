@@ -12,6 +12,7 @@ export interface NavItem {
   to: string;
   icon: LucideIcon;
   end?: boolean;
+  permission?: string;
 }
 
 export default function Sidebar({

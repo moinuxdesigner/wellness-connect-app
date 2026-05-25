@@ -3,7 +3,7 @@ import * as echarts from 'echarts';
 import { useNavigate } from 'react-router';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { adminResetUserPassword, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type RoleChangeAudit } from '../../shared/services/adminApi';
+import { adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
 import { clearAuthState, getAuthState } from '../../auth/auth';
 import {
@@ -443,7 +443,193 @@ export function RoleManagementPage() {
 }
 
 export function PermissionMatrixPage() {
-  return <SimpleList title="Permission Matrix" subtitle="RBAC placeholder for module-level permissions." items={['User read/write by role', 'Finance report visibility controls', 'Escalation visibility restrictions', 'Audit log access policy']} />;
+  const [roles, setRoles] = useState<Role[]>([]);
+  const [permissions, setPermissions] = useState<PermissionItem[]>([]);
+  const [grants, setGrants] = useState<Partial<Record<Role, string[]>>>({});
+  const [audits, setAudits] = useState<PermissionChangeAudit[]>([]);
+  const [selectedRole, setSelectedRole] = useState<Role>('client');
+  const [draftKeys, setDraftKeys] = useState<string[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
+  const [notice, setNotice] = useState('');
+  const [reason, setReason] = useState('');
+  const [confirming, setConfirming] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [reloadCount, setReloadCount] = useState(0);
+
+  useEffect(() => {
+    let mounted = true;
+    setLoading(true);
+    setLoadError('');
+
+    getAdminPermissionMatrix()
+      .then((data) => {
+        if (!mounted) return;
+        setRoles(data.roles);
+        setPermissions(data.permissions);
+        setGrants(data.grants);
+        setAudits(data.audits);
+        setDraftKeys(data.grants[selectedRole] ?? []);
+      })
+      .catch((error) => {
+        if (!mounted) return;
+        setLoadError(error instanceof Error ? error.message : 'Unable to load the permission matrix.');
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [reloadCount]);
+
+  useEffect(() => {
+    setDraftKeys(grants[selectedRole] ?? []);
+    setNotice('');
+  }, [grants, selectedRole]);
+
+  const baselineKeys = grants[selectedRole] ?? [];
+  const normalize = (keys: string[]) => [...keys].sort().join('|');
+  const changed = normalize(draftKeys) !== normalize(baselineKeys);
+  const moduleGroups = useMemo(() => {
+    const grouped = new Map<string, PermissionItem[]>();
+    permissions.forEach((permission) => {
+      const items = grouped.get(permission.module) ?? [];
+      items.push(permission);
+      grouped.set(permission.module, items);
+    });
+    return [...grouped.entries()];
+  }, [permissions]);
+  const configurableCount = permissions.filter((permission) => permission.configurable && permission.available).length;
+  const lockedCount = permissions.filter((permission) => !permission.configurable && permission.available).length;
+
+  function togglePermission(key: string) {
+    setDraftKeys((current) => current.includes(key) ? current.filter((item) => item !== key) : [...current, key]);
+  }
+
+  async function savePermissions() {
+    if (!reason.trim() || !changed || saving || selectedRole === 'admin') return;
+    setSaving(true);
+    setNotice('');
+
+    try {
+      const result = await adminUpdatePermissions(selectedRole, draftKeys, reason.trim());
+      setNotice(result.message);
+      setConfirming(false);
+      setReason('');
+      setReloadCount((count) => count + 1);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to save permissions.');
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      <PageTitle title="Permission Matrix" subtitle="Control role access to supported modules and actions." />
+      {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
+      {loadError ? (
+        <section role="alert" className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <p className="text-sm font-semibold text-rose-900">Permission data unavailable</p>
+            <p className="mt-1 text-sm text-rose-700">{loadError}</p>
+          </div>
+          <button type="button" onClick={() => setReloadCount((count) => count + 1)} className="rounded-xl border border-rose-300 bg-white px-4 py-2 text-sm font-semibold text-rose-700">Retry</button>
+        </section>
+      ) : null}
+
+      <section className="grid grid-cols-2 gap-3 md:grid-cols-3">
+        {loading ? Array.from({ length: 3 }).map((_, index) => (
+          <article key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><div className="h-3 w-20 animate-pulse rounded bg-slate-200" /><div className="mt-3 h-7 w-14 animate-pulse rounded bg-slate-200" /></article>
+        )) : (
+          <>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-medium uppercase text-slate-500">Roles</p><p className="mt-2 text-2xl font-semibold text-slate-900">{roles.length}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-medium uppercase text-slate-500">Configurable</p><p className="mt-2 text-2xl font-semibold text-indigo-700">{configurableCount}</p></article>
+            <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm"><p className="text-xs font-medium uppercase text-slate-500">Locked</p><p className="mt-2 text-2xl font-semibold text-slate-900">{lockedCount}</p></article>
+          </>
+        )}
+      </section>
+
+      <Panel title="Roles">
+        <div className="flex flex-wrap gap-2">
+          {loading ? Array.from({ length: 7 }).map((_, index) => <div key={index} className="h-10 w-24 animate-pulse rounded-xl bg-slate-100" />) : roles.map((role) => (
+            <button
+              key={role}
+              type="button"
+              onClick={() => setSelectedRole(role)}
+              className={`rounded-xl border px-4 py-2 text-sm font-semibold capitalize ${selectedRole === role ? 'border-indigo-500 bg-indigo-50 text-indigo-700' : 'border-slate-200 text-slate-700 hover:bg-slate-50'}`}
+            >
+              {role}{role === 'admin' ? ' (locked)' : ''}
+            </button>
+          ))}
+        </div>
+      </Panel>
+
+      <Panel title={`${selectedRole[0].toUpperCase()}${selectedRole.slice(1)} Permissions`}>
+        <div className="overflow-x-auto">
+          <table className="min-w-full text-left text-sm">
+            <thead className="text-slate-500"><tr><th className="py-2">Module</th><th className="py-2">Permission</th><th className="py-2">Action</th><th className="py-2">Policy</th><th className="py-2 text-right">Granted</th></tr></thead>
+            <tbody>
+              {loading ? Array.from({ length: 7 }).map((_, index) => (
+                <tr key={index} className="border-t border-slate-200"><td className="py-4"><div className="h-4 w-32 animate-pulse rounded bg-slate-200" /></td><td><div className="h-4 w-40 animate-pulse rounded bg-slate-200" /></td><td><div className="h-4 w-14 animate-pulse rounded bg-slate-200" /></td><td><div className="h-6 w-20 animate-pulse rounded bg-slate-200" /></td><td><div className="ml-auto h-6 w-10 animate-pulse rounded-full bg-slate-200" /></td></tr>
+              )) : moduleGroups.flatMap(([module, items]) => items.map((permission, index) => {
+                const enabled = draftKeys.includes(permission.key);
+                const editable = selectedRole !== 'admin' && permission.configurable && permission.available;
+                return (
+                  <tr key={permission.key} className="border-t border-slate-200">
+                    <td className="py-3 font-medium text-slate-900">{index === 0 ? module : ''}</td>
+                    <td className="py-3 text-slate-700">{permission.label}</td>
+                    <td className="py-3 capitalize text-slate-500">{permission.action}</td>
+                    <td className="py-3">
+                      {!permission.available ? <ToneBadge tone="neutral">Coming soon</ToneBadge> : editable ? <ToneBadge tone="success">Configurable</ToneBadge> : <ToneBadge tone="warning">Locked</ToneBadge>}
+                    </td>
+                    <td className="py-3 text-right">
+                      <input type="checkbox" checked={enabled} disabled={!editable} onChange={() => togglePermission(permission.key)} aria-label={`Grant ${permission.label}`} className="h-4 w-4 accent-indigo-600 disabled:opacity-50" />
+                    </td>
+                  </tr>
+                );
+              }))}
+            </tbody>
+          </table>
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button type="button" onClick={() => { setReason(''); setConfirming(true); setNotice(''); }} disabled={!changed || selectedRole === 'admin'} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white hover:bg-indigo-700 disabled:cursor-not-allowed disabled:opacity-50">Save Permission Changes</button>
+        </div>
+      </Panel>
+
+      <Panel title="Recent Permission Changes">
+        {loading ? <div className="space-y-3">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div> : audits.length ? (
+          <div className="space-y-3">
+            {audits.slice(0, 10).map((audit) => (
+              <article key={audit.id} className="rounded-xl border border-slate-200 p-4 text-sm">
+                <p className="font-semibold capitalize text-slate-900">{audit.targetRole} permissions updated <span className="font-normal text-slate-500">by {audit.actorName}</span></p>
+                <p className="mt-1 text-xs text-slate-500">{audit.changedAt ? new Date(audit.changedAt).toLocaleString() : 'Unknown time'} | {audit.reason}</p>
+                <p className="mt-2 text-xs text-slate-600">Added: {audit.addedPermissions.join(', ') || 'none'} | Removed: {audit.removedPermissions.join(', ') || 'none'}</p>
+              </article>
+            ))}
+          </div>
+        ) : <p className="text-sm text-slate-500">No permission changes recorded.</p>}
+      </Panel>
+
+      {confirming ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/30 px-4">
+          <section role="dialog" aria-modal="true" aria-labelledby="permission-confirm-title" className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl">
+            <h2 id="permission-confirm-title" className="text-xl font-semibold text-slate-900">Confirm permission changes</h2>
+            <p className="mt-2 text-sm text-slate-600">Changes to <span className="font-semibold capitalize">{selectedRole}</span> access apply immediately to active sessions.</p>
+            <label className="mt-5 block text-sm font-medium text-slate-700">Reason for change</label>
+            <textarea rows={3} maxLength={500} value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Explain why this permission update is needed" className="mt-2 w-full rounded-xl border border-slate-300 px-3 py-3 text-sm focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100" />
+            {notice ? <p className="mt-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-700">{notice}</p> : null}
+            <div className="mt-6 flex justify-end gap-3">
+              <button type="button" disabled={saving} onClick={() => setConfirming(false)} className="rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-semibold text-slate-700">Cancel</button>
+              <button type="button" disabled={saving || !reason.trim()} onClick={() => void savePermissions()} className="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-50">{saving ? 'Saving...' : 'Confirm Changes'}</button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+    </div>
+  );
 }
 
 export function ProfessionalApprovalsPage() {

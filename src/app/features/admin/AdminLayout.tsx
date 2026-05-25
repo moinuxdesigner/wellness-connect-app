@@ -20,21 +20,22 @@ import {
 import DashboardLayout from '../../layout/DashboardLayout';
 import { clearAuthState, getAuthState } from '../auth/auth';
 import { meRequest } from '../auth/apiAuth';
+import { hasPermission } from '../auth/permissions';
 
 export const adminNavItems = [
-  { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop, end: true },
-  { label: 'User Management', to: '/admin/users', icon: Users },
-  { label: 'Role Management', to: '/admin/roles', icon: UserCog },
-  { label: 'Permission Matrix', to: '/admin/permissions', icon: Lock },
-  { label: 'Professional Approvals', to: '/admin/approvals', icon: UserCheck },
-  { label: 'Trainer Applications', to: '/admin/trainer-applications', icon: UserRoundCheck },
+  { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop, end: true, permission: 'admin.dashboard.view' },
+  { label: 'User Management', to: '/admin/users', icon: Users, permission: 'admin.users.manage' },
+  { label: 'Role Management', to: '/admin/roles', icon: UserCog, permission: 'admin.roles.manage' },
+  { label: 'Permission Matrix', to: '/admin/permissions', icon: Lock, permission: 'admin.permissions.manage' },
+  { label: 'Professional Approvals', to: '/admin/approvals', icon: UserCheck, permission: 'admin.approvals.manage' },
+  { label: 'Trainer Applications', to: '/admin/trainer-applications', icon: UserRoundCheck, permission: 'admin.trainer_applications.manage' },
   { label: 'Workflow Configuration', to: '/admin/workflows', icon: ListChecks },
   { label: 'Revenue Reports', to: '/admin/revenue', icon: BadgeIndianRupee },
-  { label: 'Usage Metrics', to: '/admin/usage', icon: BarChart3 },
+  { label: 'Usage Metrics', to: '/admin/usage', icon: BarChart3, permission: 'admin.usage.view' },
   { label: 'Performance Dashboard', to: '/admin/performance', icon: Gauge },
   { label: 'Platform Health', to: '/admin/health', icon: ShieldCheck },
-  { label: 'Escalations', to: '/admin/escalations', icon: ShieldAlert },
-  { label: 'Program Management', to: '/admin/programs', icon: BookOpen },
+  { label: 'Escalations', to: '/admin/escalations', icon: ShieldAlert, permission: 'admin.escalations.view' },
+  { label: 'Program Management', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
   { label: 'Membership Plans', to: '/admin/memberships', icon: ClipboardList },
   { label: 'Activity Logs', to: '/admin/logs', icon: Activity },
 ];
@@ -55,9 +56,9 @@ export function AdminLayout() {
     }
 
     void meRequest()
-      .then((user) => {
+      .then(() => {
         if (!mounted) return;
-        setSessionState(user.role === 'admin' ? 'authenticated' : 'invalid');
+        setSessionState('authenticated');
       })
       .catch(() => {
         if (mounted) setSessionState('invalid');
@@ -80,7 +81,12 @@ export function AdminLayout() {
     return <Navigate to="/login" replace state={{ authNotice: 'Your admin session is not valid for database access. Please sign in again.' }} />;
   }
 
-  return <DashboardLayout navItems={adminNavItems} title="Admin Console"><Outlet /></DashboardLayout>;
+  const user = getAuthState().user;
+  const visibleNavItems = adminNavItems.filter((item) => (
+    item.permission ? hasPermission(user, item.permission) : user?.role === 'admin'
+  ));
+
+  return <DashboardLayout navItems={visibleNavItems} title="Admin Console"><Outlet /></DashboardLayout>;
 }
 
 export function PageTitle({ title, subtitle }: { title: string; subtitle: string }) {

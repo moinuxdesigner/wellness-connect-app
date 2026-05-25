@@ -4,7 +4,7 @@ import PublicLayout from '../layout/PublicLayout';
 import LoginPage from '../features/auth/LoginPage';
 import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../features/auth/ResetPasswordPage';
-import { RequireAuth, RequireRole } from '../features/auth/guards';
+import { PermissionBoundary, RequireAuth, RequirePermission, RequireRole } from '../features/auth/guards';
 import LandingPage from '../features/public/LandingPage';
 import GetStartedWizardPage from '../features/public/GetStartedWizardPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
@@ -71,34 +71,34 @@ export default function AppRoutes() {
       <Route path="/reset-password" element={<AuthLayout><ResetPasswordPage /></AuthLayout>} />
 
       <Route element={<RequireAuth />}>
-        <Route element={<RequireRole allow={['admin']} />}>
-          <Route path="/admin" element={<AdminLayout />}>
-            <Route index element={<AdminDashboardPage />} />
-            <Route path="users" element={<UserManagementPage />} />
-            <Route path="roles" element={<RoleManagementPage />} />
-            <Route path="permissions" element={<PermissionMatrixPage />} />
-            <Route path="approvals" element={<ProfessionalApprovalsPage />} />
-            <Route path="trainer-applications" element={<TrainerApplicationsPage />} />
-            <Route path="workflows" element={<WorkflowConfigurationPage />} />
-            <Route path="revenue" element={<RevenueReportsPage />} />
-            <Route path="usage" element={<UsageMetricsPage />} />
-            <Route path="performance" element={<PerformanceDashboardPage />} />
-            <Route path="health" element={<PlatformHealthPage />} />
-            <Route path="escalations" element={<EscalationsPage />} />
-            <Route path="programs" element={<ProgramManagementPage />} />
-            <Route path="memberships" element={<MembershipPlanManagementPage />} />
-            <Route path="logs" element={<ActivityLogsPage />} />
-          </Route>
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<PermissionBoundary anyOf={['admin.dashboard.view']}><AdminDashboardPage /></PermissionBoundary>} />
+          <Route path="users" element={<PermissionBoundary anyOf={['admin.users.manage']}><UserManagementPage /></PermissionBoundary>} />
+          <Route path="roles" element={<PermissionBoundary anyOf={['admin.roles.manage']}><RoleManagementPage /></PermissionBoundary>} />
+          <Route path="permissions" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PermissionMatrixPage /></PermissionBoundary>} />
+          <Route path="approvals" element={<PermissionBoundary anyOf={['admin.approvals.manage']}><ProfessionalApprovalsPage /></PermissionBoundary>} />
+          <Route path="trainer-applications" element={<PermissionBoundary anyOf={['admin.trainer_applications.manage']}><TrainerApplicationsPage /></PermissionBoundary>} />
+          <Route path="workflows" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><WorkflowConfigurationPage /></PermissionBoundary>} />
+          <Route path="revenue" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><RevenueReportsPage /></PermissionBoundary>} />
+          <Route path="usage" element={<PermissionBoundary anyOf={['admin.usage.view']}><UsageMetricsPage /></PermissionBoundary>} />
+          <Route path="performance" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PerformanceDashboardPage /></PermissionBoundary>} />
+          <Route path="health" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PlatformHealthPage /></PermissionBoundary>} />
+          <Route path="escalations" element={<PermissionBoundary anyOf={['admin.escalations.view']}><EscalationsPage /></PermissionBoundary>} />
+          <Route path="programs" element={<PermissionBoundary anyOf={['admin.programs.view']}><ProgramManagementPage /></PermissionBoundary>} />
+          <Route path="memberships" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><MembershipPlanManagementPage /></PermissionBoundary>} />
+          <Route path="logs" element={<PermissionBoundary anyOf={['admin.activity_logs.view']}><ActivityLogsPage /></PermissionBoundary>} />
         </Route>
 
         <Route element={<RequireRole allow={['client']} />}>
-          <Route path="/client" element={<ClientLayout />}>
+          <Route element={<RequirePermission anyOf={['client.dashboard.view']} />}>
+            <Route path="/client" element={<ClientLayout />}>
             <Route index element={<ClientDashboardPage />} />
-            <Route path="intake" element={<ClientIntakeFlowPage />} />
-            <Route path="appointments" element={<ClientAppointmentsPage />} />
+            <Route path="intake" element={<PermissionBoundary anyOf={['client.intake.manage']}><ClientIntakeFlowPage /></PermissionBoundary>} />
+            <Route path="appointments" element={<PermissionBoundary anyOf={['client.appointments.view']}><ClientAppointmentsPage /></PermissionBoundary>} />
             <Route path="programs" element={<ClientProgramsPage />} />
             <Route path="tasks" element={<ClientTasksPage />} />
-            <Route path="profile" element={<ClientProfilePage />} />
+            <Route path="profile" element={<PermissionBoundary anyOf={['client.profile.update']}><ClientProfilePage /></PermissionBoundary>} />
+            </Route>
           </Route>
         </Route>
 
@@ -111,12 +111,14 @@ export default function AppRoutes() {
         </Route>
 
         <Route element={<RequireRole allow={['trainer']} />}>
-          <Route element={<TrainerProtectedRoute />}>
+          <Route element={<RequirePermission anyOf={['trainer.dashboard.view']} />}>
+            <Route element={<TrainerProtectedRoute />}>
             <Route path="/trainer/submitted-profile" element={<Navigate to="/trainer" replace />} />
             <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
               <Route index element={<RoleDashboardPage role="trainer" />} />
               <Route path="plans" element={<TrainerPlansPage />} />
               <Route path="check-ins" element={<TrainerCheckinsPage />} />
+            </Route>
             </Route>
           </Route>
         </Route>

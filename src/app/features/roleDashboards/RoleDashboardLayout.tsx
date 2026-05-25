@@ -18,6 +18,8 @@ import {
 import DashboardLayout from '../../layout/DashboardLayout';
 import type { NavItem } from '../../layout/Sidebar';
 import type { Role } from '../../types';
+import { getAuthState } from '../auth/auth';
+import { hasPermission } from '../auth/permissions';
 
 const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
   admin: {
@@ -93,9 +95,16 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
 
 export function RoleDashboardLayout({ role }: { role: Role }) {
   const shell = roleShells[role];
+  const user = getAuthState().user;
+  const delegatedItems = [
+    { label: 'Operations Overview', to: '/admin', icon: LayoutPanelTop, permission: 'admin.dashboard.view' },
+    { label: 'Programs', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
+    { label: 'Escalations', to: '/admin/escalations', icon: Activity, permission: 'admin.escalations.view' },
+  ];
+  const navItems = [...shell.navItems, ...delegatedItems.filter((item) => hasPermission(user, item.permission))];
 
   return (
-    <DashboardLayout navItems={shell.navItems} title={shell.title}>
+    <DashboardLayout navItems={navItems} title={shell.title}>
       <Outlet />
     </DashboardLayout>
   );

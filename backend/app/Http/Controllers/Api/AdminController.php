@@ -18,8 +18,6 @@ class AdminController extends Controller
 {
     public function overview(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $usersCount = User::count();
         $activeUsersCount = User::where('status', 'active')->count();
         $appointmentsCount = Appointment::count();
@@ -239,8 +237,6 @@ class AdminController extends Controller
 
     public function programs(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $programs = WellnessPackage::query()
             ->select('id', 'name', 'is_active', 'description')
             ->latest()
@@ -260,8 +256,6 @@ class AdminController extends Controller
 
     public function escalations(Request $request): JsonResponse
     {
-        $this->authorizeAdmin($request);
-
         $tickets = Notification::query()
             ->where('type', 'escalation')
             ->latest()

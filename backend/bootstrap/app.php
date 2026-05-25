@@ -6,6 +6,7 @@ use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Middleware\HandleCors;
 use App\Http\Middleware\EnsureActiveAccount;
 use App\Http\Middleware\EnsureApprovedTrainer;
+use App\Http\Middleware\EnsurePermission;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -18,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->prepend(HandleCors::class);
         $middleware->alias([
             'account.active' => EnsureActiveAccount::class,
+            'permission' => EnsurePermission::class,
             'trainer.approved' => EnsureApprovedTrainer::class,
         ]);
     })

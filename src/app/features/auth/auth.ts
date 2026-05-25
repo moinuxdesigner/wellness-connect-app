@@ -13,6 +13,7 @@ export interface AuthUser {
   consent_to_terms?: boolean;
   status?: 'active' | 'pending' | 'suspended';
   requires_client_intake?: boolean;
+  permissions?: string[];
 }
 
 export interface AuthState {
