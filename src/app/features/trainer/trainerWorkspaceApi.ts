@@ -1,0 +1,122 @@
+import { getAuthState } from '../auth/auth';
+
+const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
+
+export type TrainerClient = { id: number; name: string; email: string; eligibleForPlan: boolean };
+export type TrainerActivity = { id: number; title: string; activityType: string; scheduledFor: string; status: 'scheduled' | 'completed' | 'missed' | 'modified' | 'cancelled'; notes?: string | null };
+export type TrainerPlan = {
+  id: number;
+  clientUserId: number;
+  clientName: string;
+  clientEmail: string;
+  goalTitle: string;
+  goalDescription?: string | null;
+  startsOn: string;
+  targetDate?: string | null;
+  status: 'active' | 'completed' | 'paused' | 'archived';
+  weeklyAdherence: number | null;
+  latestProgress: number | null;
+  activities: TrainerActivity[];
+};
+export type TrainerCheckIn = {
+  id: number;
+  planId: number;
+  planTitle: string;
+  clientName: string;
+  checkedInOn: string;
+  weightKg: number | null;
+  goalProgressPercent: number;
+  notes?: string | null;
+  painReported: boolean;
+  painSeverity?: 'mild' | 'moderate' | 'severe' | null;
+  painNotes?: string | null;
+};
+export type TrainerScheduleItem = {
+  id: string;
+  sourceId: number;
+  type: 'session' | 'call' | 'follow_up';
+  title: string;
+  clientName?: string | null;
+  startsAt: string;
+  endsAt: string;
+  status: string;
+  notes?: string | null;
+};
+export type TrainerAlert = {
+  id: number;
+  type: 'pain_injury' | 'low_adherence' | 'follow_up_due';
+  priority: 'high' | 'medium' | 'low';
+  status: 'open' | 'acknowledged' | 'scheduled_follow_up' | 'escalated' | 'resolved';
+  summary: string;
+  clientName?: string | null;
+  dueAt?: string | null;
+};
+export type TrainerNotification = {
+  id: number;
+  type: string;
+  message: string;
+  read: boolean;
+  createdAt: string;
+  meta: Record<string, unknown>;
+};
+export type TrainerDashboard = {
+  snapshot: { todaySessions: number; upcomingSessions: number; activeClients: number; highPriorityAlerts: number; lowAdherenceClients: number };
+  dailySchedule: TrainerScheduleItem[];
+  notifications: { unreadCount: number; items: TrainerNotification[] };
+  priorityQueue: TrainerAlert[];
+  analytics: {
+    labels: string[];
+    attendance: { completed: number[]; missed: number[] };
+    adherence: Array<number | null>;
+    goalProgress: Array<number | null>;
+    weightSeries: Array<{ clientId: number; clientName: string; points: Array<{ date: string; weightKg: number }> }>;
+  };
+};
+
+function headers(withJson = false): HeadersInit {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing trainer session token.');
+  return { Accept: 'application/json', Authorization: `Bearer ${token}`, ...(withJson ? { 'Content-Type': 'application/json' } : {}) };
+}
+
+async function request<T>(path: string, options?: RequestInit): Promise<T> {
+  const response = await fetch(`${API_BASE}/trainer/${path}`, { ...options, headers: options?.headers ?? headers(Boolean(options?.body)) });
+  const data = await response.json();
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to complete trainer workspace request.'));
+  return data as T;
+}
+
+export async function getTrainerDashboard() { return request<TrainerDashboard>('dashboard'); }
+export async function getTrainerClients() { return (await request<{ clients: TrainerClient[] }>('clients')).clients; }
+export async function getTrainerPlans() { return (await request<{ plans: TrainerPlan[] }>('plans')).plans; }
+export async function createTrainerPlan(payload: { clientUserId: number; goalTitle: string; goalDescription?: string; startsOn: string; targetDate?: string }) {
+  return (await request<{ plan: TrainerPlan }>('plans', { method: 'POST', headers: headers(true), body: JSON.stringify(payload) })).plan;
+}
+export async function updateTrainerPlan(id: number, payload: Partial<{ goalTitle: string; goalDescription: string; targetDate: string | null; status: TrainerPlan['status'] }>) {
+  return (await request<{ plan: TrainerPlan }>(`plans/${id}`, { method: 'PUT', headers: headers(true), body: JSON.stringify(payload) })).plan;
+}
+export async function createTrainerActivity(planId: number, payload: { title: string; activityType?: string; scheduledFor: string; notes?: string }) {
+  return (await request<{ activity: TrainerActivity }>(`plans/${planId}/activities`, { method: 'POST', headers: headers(true), body: JSON.stringify(payload) })).activity;
+}
+export async function updateTrainerActivity(id: number, payload: { status: TrainerActivity['status']; notes?: string }) {
+  return (await request<{ activity: TrainerActivity }>(`activities/${id}`, { method: 'PATCH', headers: headers(true), body: JSON.stringify(payload) })).activity;
+}
+export async function getTrainerCheckIns() { return (await request<{ checkIns: TrainerCheckIn[] }>('check-ins')).checkIns; }
+export async function createTrainerCheckIn(payload: {
+  planId: number; checkedInOn: string; weightKg?: number; goalProgressPercent: number; notes?: string; painReported: boolean;
+  painSeverity?: 'mild' | 'moderate' | 'severe'; painNotes?: string; activityUpdates?: Array<{ id: number; status: TrainerActivity['status'] }>;
+}) {
+  return (await request<{ checkIn: TrainerCheckIn }>('check-ins', { method: 'POST', headers: headers(true), body: JSON.stringify(payload) })).checkIn;
+}
+export async function createTrainerTask(payload: { clientUserId?: number; planId?: number; alertId?: number; type: 'call' | 'follow_up'; title: string; startsAt: string; endsAt: string; notes?: string }) {
+  return (await request<{ task: TrainerScheduleItem }>('tasks', { method: 'POST', headers: headers(true), body: JSON.stringify(payload) })).task;
+}
+export async function updateTrainerTask(id: number, payload: { status?: 'scheduled' | 'completed' | 'cancelled'; startsAt?: string; endsAt?: string; notes?: string }) {
+  return (await request<{ task: TrainerScheduleItem }>(`tasks/${id}`, { method: 'PATCH', headers: headers(true), body: JSON.stringify(payload) })).task;
+}
+export async function updateTrainerAlert(id: number, action: 'acknowledge' | 'resolve' | 'escalate', note?: string) {
+  return (await request<{ alert: TrainerAlert }>(`alerts/${id}`, { method: 'PATCH', headers: headers(true), body: JSON.stringify({ action, note }) })).alert;
+}
+export async function updateTrainerNotification(id: number, read: boolean) {
+  return (await request<{ notification: TrainerNotification }>(`notifications/${id}`, { method: 'PATCH', headers: headers(true), body: JSON.stringify({ read }) })).notification;
+}

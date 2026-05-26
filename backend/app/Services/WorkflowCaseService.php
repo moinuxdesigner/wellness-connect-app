@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\IntakeFlow;
 use App\Models\Notification;
 use App\Models\SupportRequest;
+use App\Models\TrainerAlert;
 use App\Models\User;
 use App\Models\WorkflowCase;
 use Illuminate\Support\Collection;
@@ -312,6 +313,7 @@ class WorkflowCaseService
         $subject = match ($case->subject_type) {
             IntakeFlow::class => IntakeFlow::query()->with('client:id,name,email')->find($case->subject_id),
             SupportRequest::class => SupportRequest::query()->find($case->subject_id),
+            TrainerAlert::class => TrainerAlert::query()->with('client:id,name,email')->find($case->subject_id),
             default => null,
         };
 
@@ -331,6 +333,16 @@ class WorkflowCaseService
                 'id' => $subject->id,
                 'label' => $subject->ticket_number ?: ('Support #' . $subject->id),
                 'secondaryLabel' => $subject->subject,
+                'status' => $subject->status,
+            ];
+        }
+
+        if ($subject instanceof TrainerAlert) {
+            return [
+                'type' => 'trainer_alert',
+                'id' => $subject->id,
+                'label' => sprintf('Training safety alert #%d', $subject->id),
+                'secondaryLabel' => (string) optional($subject->client)->name,
                 'status' => $subject->status,
             ];
         }

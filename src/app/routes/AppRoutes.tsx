@@ -1,3 +1,4 @@
+import { lazy, Suspense, type ReactNode } from 'react';
 import { Navigate, Route, Routes } from 'react-router';
 import AuthLayout from '../layout/AuthLayout';
 import PublicLayout from '../layout/PublicLayout';
@@ -45,14 +46,20 @@ import { RoleDashboardPage, RolePlaceholderPage } from '../features/roleDashboar
 import TrainerOnboardingPage from '../features/trainer/TrainerOnboardingPage';
 import CounsellorSessionsPage from '../features/counsellor/CounsellorSessionsPage';
 import CounsellorClientsPage from '../features/counsellor/CounsellorClientsPage';
-import TrainerPlansPage from '../features/trainer/TrainerPlansPage';
-import TrainerCheckinsPage from '../features/trainer/TrainerCheckinsPage';
 import TrainerProtectedRoute from '../features/trainer/TrainerProtectedRoute';
 import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
 import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
 import ContentProgramsPage from '../features/content/ContentProgramsPage';
 import ContentAssetsPage from '../features/content/ContentAssetsPage';
 import FinanceBillingPage from '../features/finance/FinanceBillingPage';
+
+const TrainerDashboardPage = lazy(() => import('../features/trainer/TrainerDashboardPage'));
+const TrainerPlansPage = lazy(() => import('../features/trainer/TrainerPlansPage'));
+const TrainerCheckinsPage = lazy(() => import('../features/trainer/TrainerCheckinsPage'));
+
+function TrainerPageLoader({ children }: { children: ReactNode }) {
+  return <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading trainer workspace...</div>}>{children}</Suspense>;
+}
 
 export default function AppRoutes() {
   return (
@@ -123,9 +130,9 @@ export default function AppRoutes() {
             <Route element={<TrainerProtectedRoute />}>
             <Route path="/trainer/submitted-profile" element={<Navigate to="/trainer" replace />} />
             <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
-              <Route index element={<RoleDashboardPage role="trainer" />} />
-              <Route path="plans" element={<TrainerPlansPage />} />
-              <Route path="check-ins" element={<TrainerCheckinsPage />} />
+              <Route index element={<TrainerPageLoader><TrainerDashboardPage /></TrainerPageLoader>} />
+              <Route path="plans" element={<TrainerPageLoader><TrainerPlansPage /></TrainerPageLoader>} />
+              <Route path="check-ins" element={<TrainerPageLoader><TrainerCheckinsPage /></TrainerPageLoader>} />
               <Route path="activity" element={<PermissionBoundary anyOf={['trainer.activity_logs.view']}><ActivityLogPage title="Trainer Activity" subtitle="Review your onboarding, appointment, and account activity." emptyMessage="Your trainer activity feed will populate as onboarding and care workflows progress." /></PermissionBoundary>} />
             </Route>
             </Route>

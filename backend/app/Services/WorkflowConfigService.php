@@ -18,6 +18,7 @@ class WorkflowConfigService
     public const SESSION_NO_SHOW = 'session_no_show';
     public const CRITICAL_RISK_ESCALATION = 'critical_risk_escalation';
     public const CROSS_TEAM_FOLLOW_UP_SLA = 'cross_team_follow_up_sla';
+    public const TRAINER_SAFETY_ESCALATION = 'trainer_safety_escalation';
 
     public const WORKFLOW_KEYS = [
         self::INTAKE_ASSIGNMENT,
@@ -148,6 +149,10 @@ class WorkflowConfigService
             self::CROSS_TEAM_FOLLOW_UP_SLA => [
                 'label' => 'Cross-team follow-up SLA policy',
                 'description' => 'Configure support and escalation response targets and breach notifications.',
+            ],
+            self::TRAINER_SAFETY_ESCALATION => [
+                'label' => 'Trainer safety escalation',
+                'description' => 'Training-related pain or injury concerns escalated by approved trainers.',
             ],
             default => throw ValidationException::withMessages([
                 'workflow' => ['Unknown workflow key.'],

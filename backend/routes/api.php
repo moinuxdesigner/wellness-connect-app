@@ -76,6 +76,25 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/trainer/application/submit', [TrainerApplicationController::class, 'submitCurrent']);
         Route::middleware('trainer.approved')->prefix('trainer')->group(function (): void {
             Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard'])->middleware('permission:trainer.dashboard.view');
+            Route::middleware('permission:trainer.plans.manage')->group(function (): void {
+                Route::get('/clients', [TrainerWorkspaceController::class, 'clients']);
+                Route::get('/plans', [TrainerWorkspaceController::class, 'plans']);
+                Route::post('/plans', [TrainerWorkspaceController::class, 'storePlan']);
+                Route::put('/plans/{plan}', [TrainerWorkspaceController::class, 'updatePlan']);
+                Route::post('/plans/{plan}/activities', [TrainerWorkspaceController::class, 'storeActivity']);
+                Route::patch('/activities/{activity}', [TrainerWorkspaceController::class, 'updateActivity']);
+            });
+            Route::middleware('permission:trainer.checkins.view')->group(function (): void {
+                Route::get('/check-ins', [TrainerWorkspaceController::class, 'checkIns']);
+                Route::post('/check-ins', [TrainerWorkspaceController::class, 'storeCheckIn']);
+            });
+            Route::middleware('permission:trainer.tasks.manage')->group(function (): void {
+                Route::get('/tasks', [TrainerWorkspaceController::class, 'tasks']);
+                Route::post('/tasks', [TrainerWorkspaceController::class, 'storeTask']);
+                Route::patch('/tasks/{task}', [TrainerWorkspaceController::class, 'updateTask']);
+            });
+            Route::patch('/alerts/{alert}', [TrainerWorkspaceController::class, 'updateAlert'])->middleware('permission:trainer.alerts.manage');
+            Route::patch('/notifications/{notification}', [TrainerWorkspaceController::class, 'updateNotification'])->middleware('permission:trainer.notifications.view');
         });
 
         Route::prefix('admin')->group(function (): void {

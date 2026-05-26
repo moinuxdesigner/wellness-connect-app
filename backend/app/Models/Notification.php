@@ -6,7 +6,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'type', 'channel', 'payload_json', 'status', 'sent_at'])]
+#[Fillable(['user_id', 'type', 'channel', 'payload_json', 'status', 'sent_at', 'read_at'])]
 class Notification extends Model
 {
     protected function casts(): array
@@ -14,6 +14,7 @@ class Notification extends Model
         return [
             'payload_json' => 'array',
             'sent_at' => 'datetime',
+            'read_at' => 'datetime',
         ];
     }
 

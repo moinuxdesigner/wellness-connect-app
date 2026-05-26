@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\TrainerApplication;
+use App\Models\Practitioner;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
@@ -296,6 +297,11 @@ class TrainerApplicationController extends Controller
         if (!$application->applicant_user_id) {
             $application->forceFill(['applicant_user_id' => $user->id])->save();
         }
+
+        Practitioner::query()->updateOrCreate(
+            ['user_id' => $user->id],
+            ['practitioner_type' => 'trainer', 'is_active' => true]
+        );
 
         $this->activityLogs->record('trainer_application', 'trainer_account_provisioned', sprintf('Trainer account %s was %s.', $user->email, $created ? 'created' : 'updated'), [
             'targetUser' => $user,
