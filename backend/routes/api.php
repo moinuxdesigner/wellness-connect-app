@@ -24,7 +24,9 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register']);
-        Route::post('/trainer-register', [AuthController::class, 'registerTrainerApplicant']);
+        Route::post('/trainer-register/otp/request', [AuthController::class, 'requestTrainerRegistrationOtp']);
+        Route::post('/trainer-register/otp/verify', [AuthController::class, 'verifyTrainerRegistrationOtp']);
+        Route::post('/trainer-register/otp/resend', [AuthController::class, 'resendTrainerRegistrationOtp']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);

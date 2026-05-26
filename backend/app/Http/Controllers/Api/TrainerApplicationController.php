@@ -33,7 +33,7 @@ class TrainerApplicationController extends Controller
             'values' => ['required', 'array'],
         ]);
 
-        $values = $validated['values'];
+        $values = $this->enforceVerifiedMobile($validated['values'], $request->user());
         $summary = $this->extractSummary($values);
 
         Validator::make($summary, [
@@ -107,7 +107,7 @@ class TrainerApplicationController extends Controller
             'values' => ['required', 'array'],
             'currentScreen' => ['required', 'string', 'in:' . implode(',', self::SCREEN_IDS)],
         ]);
-        $values = $validated['values'];
+        $values = $this->enforceVerifiedMobile($validated['values'], $request->user());
         $summary = $this->extractSummary($values);
 
         $application->fill([
@@ -130,7 +130,7 @@ class TrainerApplicationController extends Controller
         $validated = $request->validate([
             'values' => ['required', 'array'],
         ]);
-        $values = $validated['values'];
+        $values = $this->enforceVerifiedMobile($validated['values'], $request->user());
         $this->validateCompletedValues($values);
         $summary = $this->extractSummary($values);
         $timestamp = now();
@@ -346,6 +346,15 @@ class TrainerApplicationController extends Controller
             'city' => trim((string) Arr::get($values, 'profile.city', '')),
             'state' => trim((string) Arr::get($values, 'profile.state', '')),
         ];
+    }
+
+    private function enforceVerifiedMobile(array $values, ?User $user): array
+    {
+        if ($user?->role === 'trainer' && $user->phone) {
+            Arr::set($values, 'profile.mobile', (string) $user->phone);
+        }
+
+        return $values;
     }
 
     private function validateCompletedValues(array $values): void

@@ -42,9 +42,9 @@
         }
       }
     },
-    "/auth/trainer-register": {
+    "/auth/trainer-register/otp/request": {
       "post": {
-        "summary": "Create a trainer applicant account and draft application",
+        "summary": "Request mobile verification before creating a trainer applicant account",
         "requestBody": {
           "required": true,
           "content": {
@@ -53,12 +53,37 @@
                 "name": "Arjun Mehta",
                 "email": "arjun.trainer@email.com",
                 "password": "StrongPass@123",
+                "mobile": "+919876543210",
                 "consent_to_terms": true
               }
             }
           }
         },
-        "responses": { "201": { "description": "Trainer applicant account and draft created" } }
+        "responses": { "201": { "description": "OTP challenge issued; no user or application is created yet" } }
+      }
+    },
+    "/auth/trainer-register/otp/verify": {
+      "post": {
+        "summary": "Verify trainer mobile and create the restricted trainer account and draft",
+        "description": "The dummy development SMS provider accepts OTP 123456. Replace the configured sender with a real provider such as Twilio for production.",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "challengeToken": "opaque-challenge-token", "otp": "123456" } } }
+        },
+        "responses": { "201": { "description": "Verified trainer applicant account and draft created" } }
+      }
+    },
+    "/auth/trainer-register/otp/resend": {
+      "post": {
+        "summary": "Resend a trainer applicant mobile verification OTP",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "challengeToken": "opaque-challenge-token" } } }
+        },
+        "responses": {
+          "200": { "description": "Verification OTP resent" },
+          "429": { "description": "Resend cooldown is still active" }
+        }
       }
     },
     "/auth/login": {

@@ -31,6 +31,7 @@ import {
 import { Link, useNavigate } from 'react-router';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
+import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp';
 import { Textarea } from '../../components/ui/textarea';
 import { cn } from '../../components/ui/utils';
 import {
@@ -62,9 +63,12 @@ import { getAuthState } from '../auth/auth';
 import { logoutRequest } from '../auth/apiAuth';
 import {
   fetchCurrentTrainerApplicationFromApi,
-  registerTrainerApplicant,
+  requestTrainerRegistrationOtp,
+  resendTrainerRegistrationOtp,
   saveTrainerDraftToApi,
   submitTrainerApplicationToApi,
+  verifyTrainerRegistrationOtp,
+  type TrainerOtpChallenge,
 } from './trainerApplicationsApi';
 
 const reviewScreenIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === 'review');
@@ -584,10 +588,14 @@ function renderCurrentScreen({
           <FormInput
             label="Mobile number"
             type="tel"
-            placeholder="+91 98765 43210"
-            inputProps={register('profile.mobile')}
+            value={values.profile.mobile}
+            inputProps={{ readOnly: true }}
             error={findErrorMessage(errors, 'profile.mobile')}
           />
+          <p className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
+            <ShieldCheck size={16} />
+            Verified during account setup
+          </p>
         </div>
       );
 
@@ -1051,52 +1059,197 @@ function renderCurrentScreen({
 }
 
 function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
+  const navigate = useNavigate();
+  const [screen, setScreen] = useState<'account' | 'otp'>('account');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [mobile, setMobile] = useState('');
   const [consent, setConsent] = useState(true);
+  const [otp, setOtp] = useState('');
+  const [challenge, setChallenge] = useState<TrainerOtpChallenge | null>(null);
   const [notice, setNotice] = useState('');
   const [loading, setLoading] = useState(false);
+  const [clock, setClock] = useState(Date.now());
+
+  useEffect(() => {
+    if (screen !== 'otp') return;
+    const interval = window.setInterval(() => setClock(Date.now()), 1000);
+    return () => window.clearInterval(interval);
+  }, [screen]);
+
+  const canResend = challenge ? new Date(challenge.resendAvailableAt).getTime() <= clock : false;
+  const resendSeconds = challenge ? Math.max(0, Math.ceil((new Date(challenge.resendAvailableAt).getTime() - clock) / 1000)) : 0;
+  const expired = challenge ? new Date(challenge.expiresAt).getTime() <= clock : false;
+
+  async function sendOtp() {
+    setLoading(true);
+    setNotice('');
+    try {
+      const nextChallenge = await requestTrainerRegistrationOtp({
+        name,
+        email,
+        password,
+        mobile,
+        consent_to_terms: consent,
+      });
+      setChallenge(nextChallenge);
+      setOtp('');
+      setScreen('otp');
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to send a verification code.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function verifyOtp() {
+    if (!challenge) return;
+    setLoading(true);
+    setNotice('');
+    try {
+      await verifyTrainerRegistrationOtp({ challengeToken: challenge.challengeToken, otp });
+      onCreated();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to verify your mobile number.');
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function resendOtp() {
+    if (!challenge) return;
+    setLoading(true);
+    setNotice('');
+    try {
+      const nextChallenge = await resendTrainerRegistrationOtp(challenge.challengeToken);
+      setChallenge(nextChallenge);
+      setOtp('');
+      setClock(Date.now());
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to resend a verification code.');
+    } finally {
+      setLoading(false);
+    }
+  }
 
   return (
-    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
-      <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-        <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Personal trainer application</p>
-        <h1 className="mt-3 text-2xl font-semibold text-slate-950">Create your trainer account</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-600">Save your application as you work and return any time before submitting.</p>
-        <form
-          className="mt-6 space-y-4"
-          onSubmit={async (event) => {
-            event.preventDefault();
-            setLoading(true);
-            setNotice('');
-            try {
-              await registerTrainerApplicant({ name, email, password, consent_to_terms: consent });
-              onCreated();
-            } catch (error) {
-              setNotice(error instanceof Error ? error.message : 'Unable to create trainer account.');
-            } finally {
-              setLoading(false);
-            }
-          }}
-        >
-          <FormInput label="Full name" placeholder="Your full name" value={name} onChange={(event) => setName(event.target.value)} />
-          <FormInput label="Email" type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
-          <FormInput label="Password" type="password" placeholder="Minimum 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} />
-          <label className="flex items-start gap-2 text-sm text-slate-600">
-            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />
-            <span>I agree to the terms and privacy policy.</span>
-          </label>
-          {notice ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{notice}</p> : null}
-          <Button type="submit" disabled={loading || !consent || password.length < 8} className="h-12 w-full rounded-xl bg-[var(--ds-brand)] text-white">
-            {loading ? 'Creating account...' : 'Start application'}
-          </Button>
-        </form>
-        <p className="mt-5 text-center text-sm text-slate-600">
-          Already started? <Link to="/login" className="font-semibold text-[var(--ds-brand)]">Sign in to continue</Link>
-        </p>
-      </section>
-    </main>
+    <div className="min-h-screen bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
+      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-0 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
+        <OnboardingHeader
+          isSuccess={false}
+          onBack={() => screen === 'otp' ? setScreen('account') : navigate('/')}
+          onClose={() => navigate('/')}
+        />
+        <OnboardingLayout
+          animation={
+            <OnboardingAnimationPlaceholder
+              animationKey="personalInfo"
+              title={screen === 'account' ? 'Begin your trainer journey' : 'Secure your profile'}
+              description={screen === 'account' ? 'Trainer application' : 'Mobile verification'}
+            />
+          }
+          content={
+            <>
+              <div className="flex-1 overflow-y-auto pb-28 lg:pb-10">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.section
+                    key={screen}
+                    initial={{ opacity: 0, x: 22 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -18 }}
+                    transition={{ duration: 0.25 }}
+                    className="mx-auto w-full max-w-[520px] px-0 py-3 sm:py-4"
+                  >
+                    {screen === 'account' ? (
+                      <>
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Personal trainer application</p>
+                          <h1 className="text-[1.9rem] font-semibold leading-tight text-slate-950 sm:text-[2.2rem]">Create your trainer account</h1>
+                          <p className="text-[15px] leading-7 text-slate-600">Set up your secure account before building your professional profile.</p>
+                        </div>
+                        <div className="mt-7 space-y-5">
+                          <FormInput label="Full name" placeholder="Your full name" value={name} onChange={(event) => setName(event.target.value)} />
+                          <FormInput label="Email" type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+                          <FormInput label="Mobile number" type="tel" inputMode="tel" placeholder="+91 98765 43210" value={mobile} onChange={(event) => setMobile(event.target.value)} />
+                          <FormInput label="Password" type="password" placeholder="Minimum 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} />
+                          <label className="flex items-start gap-3 text-sm text-slate-600">
+                            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[var(--ds-brand)]" />
+                            <span>I agree to the terms and privacy policy.</span>
+                          </label>
+                          <p className="text-sm text-slate-600">
+                            Already started? <Link to="/login" className="font-semibold text-[var(--ds-brand)]">Sign in to continue</Link>
+                          </p>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="space-y-3">
+                          <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Mobile verification</p>
+                          <h1 className="text-[1.9rem] font-semibold leading-tight text-slate-950 sm:text-[2.2rem]">Enter verification code</h1>
+                          <p className="text-[15px] leading-7 text-slate-600">We sent a 6-digit code to <span className="font-semibold text-slate-900">{challenge?.maskedMobile}</span>.</p>
+                        </div>
+                        <div className="mt-9 space-y-6">
+                          <InputOTP
+                            maxLength={6}
+                            value={otp}
+                            onChange={(value) => setOtp(value.replace(/\D/g, ''))}
+                            inputMode="numeric"
+                            containerClassName="justify-center"
+                          >
+                            <InputOTPGroup className="gap-2">
+                              {[0, 1, 2, 3, 4, 5].map((index) => (
+                                <InputOTPSlot key={index} index={index} className="h-14 w-12 rounded-lg border text-xl" />
+                              ))}
+                            </InputOTPGroup>
+                          </InputOTP>
+                          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm">
+                            <button type="button" onClick={() => { setScreen('account'); setNotice(''); }} className="font-semibold text-slate-600 hover:text-slate-900">Change mobile number</button>
+                            <button type="button" onClick={() => void resendOtp()} disabled={!canResend || loading || expired} className="font-semibold text-[var(--ds-brand)] disabled:text-slate-400">
+                              {canResend ? 'Resend code' : `Resend in ${resendSeconds}s`}
+                            </button>
+                          </div>
+                          {expired ? <p className="text-center text-sm text-rose-600">This code has expired. Return and request a new code.</p> : null}
+                        </div>
+                      </>
+                    )}
+                    {notice ? <p className="mt-6 rounded-lg bg-rose-50 px-3 py-3 text-sm text-rose-700">{notice}</p> : null}
+                  </motion.section>
+                </AnimatePresence>
+              </div>
+              <TrainerEntryFooter
+                label={screen === 'account' ? 'Send verification code' : 'Verify & start application'}
+                loading={loading}
+                disabled={screen === 'account' ? !consent || password.length < 8 || !name || !email || !mobile : otp.length !== 6 || expired}
+                onAction={() => void (screen === 'account' ? sendOtp() : verifyOtp())}
+              />
+            </>
+          }
+        />
+      </div>
+    </div>
+  );
+}
+
+function TrainerEntryFooter({
+  label,
+  loading,
+  disabled,
+  onAction,
+}: {
+  label: string;
+  loading: boolean;
+  disabled: boolean;
+  onAction: () => void;
+}) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 lg:static lg:mt-6 lg:px-0 lg:py-4">
+      <div className="mx-auto w-full max-w-[520px]">
+        <Button type="button" onClick={onAction} disabled={loading || disabled} className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold hover:bg-[var(--ds-brand-strong)]">
+          {loading ? 'Please wait...' : <span className="inline-flex items-center gap-2">{label} <ArrowRight size={18} /></span>}
+        </Button>
+      </div>
+    </div>
   );
 }
 

@@ -44,4 +44,11 @@ return [
         'free_cancellation_before_hours' => (int) env('FREE_CANCELLATION_BEFORE_HOURS', 24),
     ],
 
+    'trainer_otp' => [
+        'code' => env('TRAINER_OTP_DUMMY_CODE', '123456'),
+        'expiry_minutes' => (int) env('TRAINER_OTP_EXPIRY_MINUTES', 10),
+        'resend_seconds' => (int) env('TRAINER_OTP_RESEND_SECONDS', 60),
+        'max_attempts' => (int) env('TRAINER_OTP_MAX_ATTEMPTS', 5),
+    ],
+
 ];
