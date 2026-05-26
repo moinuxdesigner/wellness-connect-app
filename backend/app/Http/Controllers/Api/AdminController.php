@@ -187,15 +187,18 @@ class AdminController extends Controller
             'role' => (string) $user->role,
         ];
 
+        $blockers = $this->userDeletionBlockers($user);
+        if ($blockers !== []) {
+            return $this->blockedUserDeletionResponse($blockers);
+        }
+
         try {
             DB::transaction(function () use ($user): void {
                 $user->tokens()->delete();
                 $user->delete();
             });
         } catch (QueryException) {
-            return response()->json([
-                'message' => 'This user cannot be deleted because protected billing or audit records are linked to the account.',
-            ], 409);
+            return $this->blockedUserDeletionResponse($this->userDeletionBlockers($user));
         }
 
         $this->activityLogs->record('account', 'user_deleted', sprintf('%s deleted the account for %s.', $actor->name, $deletedUser['name']), [
@@ -381,6 +384,80 @@ class AdminController extends Controller
     private function authorizeAdmin(Request $request): void
     {
         abort_unless($request->user()?->role === 'admin', 403, 'Admin access required.');
+    }
+
+    private function userDeletionBlockers(User $user): array
+    {
+        $blockers = [];
+        $addBlocker = static function (array &$items, string $code, string $label, int $count): void {
+            if ($count > 0) {
+                $items[] = ['code' => $code, 'label' => $label, 'count' => $count];
+            }
+        };
+
+        $addBlocker(
+            $blockers,
+            'appointment_events',
+            'Appointment audit events',
+            DB::table('appointment_events')->where('actor_user_id', $user->id)->count()
+        );
+        $addBlocker(
+            $blockers,
+            'credit_adjustments',
+            'Credit adjustment actions',
+            DB::table('credit_adjustments')->where('actor_id', $user->id)->count()
+        );
+        $addBlocker(
+            $blockers,
+            'membership_refund_actions',
+            'Membership refund actions',
+            DB::table('membership_refunds')->where('actor_user_id', $user->id)->count()
+        );
+
+        $subscriptionIds = DB::table('membership_subscriptions')
+            ->where('client_user_id', $user->id)
+            ->pluck('id');
+
+        if ($subscriptionIds->isNotEmpty()) {
+            $addBlocker(
+                $blockers,
+                'membership_receipts',
+                'Membership receipts',
+                DB::table('membership_receipts')->whereIn('subscription_id', $subscriptionIds)->count()
+            );
+            $addBlocker(
+                $blockers,
+                'membership_refunds',
+                'Membership refunds',
+                DB::table('membership_refunds')->whereIn('subscription_id', $subscriptionIds)->count()
+            );
+            $addBlocker(
+                $blockers,
+                'entitlement_periods',
+                'Membership entitlement history',
+                DB::table('entitlement_periods')->whereIn('subscription_id', $subscriptionIds)->count()
+            );
+            $addBlocker(
+                $blockers,
+                'revenue_recognitions',
+                'Revenue recognition history',
+                DB::table('revenue_recognitions')->whereIn('subscription_id', $subscriptionIds)->count()
+            );
+        }
+
+        return $blockers;
+    }
+
+    private function blockedUserDeletionResponse(array $blockers): JsonResponse
+    {
+        $message = $blockers === []
+            ? 'This user cannot be permanently deleted because an unidentified protected record is linked to the account.'
+            : 'This user cannot be permanently deleted because protected records are linked to the account.';
+
+        return response()->json([
+            'message' => $message,
+            'blockers' => $blockers,
+        ], 409);
     }
 
     private function roleChangePayload(RoleChangeAudit $audit): array

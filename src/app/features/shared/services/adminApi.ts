@@ -327,6 +327,22 @@ export async function adminResetUserPassword(user: UserSummary) {
   return String(data?.message ?? `Password reset for ${user.email}. New password: password123`);
 }
 
+export type AdminUserDeletionBlocker = {
+  code: string;
+  label: string;
+  count: number;
+};
+
+export class AdminUserDeletionError extends Error {
+  blockers: AdminUserDeletionBlocker[];
+
+  constructor(message: string, blockers: AdminUserDeletionBlocker[]) {
+    super(message);
+    this.name = 'AdminUserDeletionError';
+    this.blockers = blockers;
+  }
+}
+
 export async function adminDeleteUser(user: UserSummary) {
   const token = getAuthState().token;
   if (!token) throw new Error('Missing admin session token.');
@@ -338,6 +354,17 @@ export async function adminDeleteUser(user: UserSummary) {
   const data = await readJson(response);
 
   if (!response.ok) {
+    if (response.status === 409 && Array.isArray(data?.blockers)) {
+      const blockers = data.blockers
+        .filter((item: unknown): item is AdminUserDeletionBlocker => (
+          typeof item === 'object'
+          && item !== null
+          && typeof (item as AdminUserDeletionBlocker).code === 'string'
+          && typeof (item as AdminUserDeletionBlocker).label === 'string'
+          && typeof (item as AdminUserDeletionBlocker).count === 'number'
+        ));
+      throw new AdminUserDeletionError(String(data?.message ?? 'Unable to delete user.'), blockers);
+    }
     throw new Error(String(data?.message ?? 'Unable to delete user.'));
   }
 

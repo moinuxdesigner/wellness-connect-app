@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts';
-import { TriangleAlert, Trash2 } from 'lucide-react';
+import { TriangleAlert, Trash2, X } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { adminDeleteUser, adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
+import { AdminUserDeletionError, adminDeleteUser, adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type AdminUserDeletionBlocker, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
 import { archiveAdminMembershipPlan, getAdminMembershipPlans, publishAdminMembershipPlan, saveAdminMembershipPlan, type AdminMembershipPlan, type PlanDraft } from '../../shared/services/membershipApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
 import { clearAuthState, getAuthState } from '../../auth/auth';
@@ -40,6 +40,7 @@ export function UserManagementPage() {
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
   const [deletingUser, setDeletingUser] = useState<UserSummary | null>(null);
   const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const [blockedDeletion, setBlockedDeletion] = useState<{ user: UserSummary; message: string; blockers: AdminUserDeletionBlocker[] } | null>(null);
   const signedInUserId = String(getAuthState().user?.id ?? '');
 
   useEffect(() => {
@@ -75,6 +76,7 @@ export function UserManagementPage() {
   async function handlePasswordReset(user: UserSummary) {
     setResettingUserId(user.id);
     setNotice('');
+    setBlockedDeletion(null);
 
     try {
       const message = await adminResetUserPassword(user);
@@ -88,17 +90,23 @@ export function UserManagementPage() {
 
   async function handleDeleteUser() {
     if (!deletingUser) return;
-    setDeletingUserId(deletingUser.id);
+    const user = deletingUser;
+    setDeletingUserId(user.id);
     setNotice('');
+    setBlockedDeletion(null);
 
     try {
-      const message = await adminDeleteUser(deletingUser);
-      setUsers((items) => items.filter((item) => item.id !== deletingUser.id));
+      const message = await adminDeleteUser(user);
+      setUsers((items) => items.filter((item) => item.id !== user.id));
       setNotice(message);
-      setDeletingUser(null);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Unable to delete user.');
+      if (error instanceof AdminUserDeletionError) {
+        setBlockedDeletion({ user, message: error.message, blockers: error.blockers });
+      } else {
+        setNotice(error instanceof Error ? error.message : 'Unable to delete user.');
+      }
     } finally {
+      setDeletingUser(null);
       setDeletingUserId(null);
     }
   }
@@ -107,6 +115,38 @@ export function UserManagementPage() {
     <div className="space-y-6">
       <PageTitle title="User Management" subtitle="Manage member and staff lifecycle." />
       {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
+      {blockedDeletion ? (
+        <section role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3">
+              <TriangleAlert className="mt-0.5 shrink-0 text-amber-700" size={20} />
+              <div>
+                <p className="text-sm font-semibold">Cannot permanently delete {blockedDeletion.user.name}</p>
+                <p className="mt-1 text-sm text-amber-800">
+                  {blockedDeletion.user.email} has historical records that must be retained. Permanent deletion is unavailable.
+                </p>
+                {blockedDeletion.blockers.length ? (
+                  <ul className="mt-3 space-y-1 text-sm text-amber-900">
+                    {blockedDeletion.blockers.map((blocker) => (
+                      <li key={blocker.code}>{blocker.label}: <span className="font-semibold">{blocker.count}</span></li>
+                    ))}
+                  </ul>
+                ) : (
+                  <p className="mt-3 text-sm text-amber-900">{blockedDeletion.message}</p>
+                )}
+              </div>
+            </div>
+            <button
+              type="button"
+              aria-label="Dismiss deletion warning"
+              onClick={() => setBlockedDeletion(null)}
+              className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-amber-700 transition hover:bg-amber-100"
+            >
+              <X size={17} />
+            </button>
+          </div>
+        </section>
+      ) : null}
       {loadError ? (
         <section role="alert" className="flex flex-col gap-4 rounded-2xl border border-rose-200 bg-rose-50 p-5 text-rose-900 sm:flex-row sm:items-center sm:justify-between">
           <div>
@@ -196,7 +236,7 @@ export function UserManagementPage() {
                         type="button"
                         aria-label={`Delete ${u.name}`}
                         title={`Delete ${u.name}`}
-                        onClick={() => setDeletingUser(u)}
+                        onClick={() => { setBlockedDeletion(null); setDeletingUser(u); }}
                         disabled={deletingUserId === u.id}
                         className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
                       >
@@ -254,7 +294,7 @@ export function UserManagementPage() {
                               type="button"
                               aria-label={`Delete ${u.name}`}
                               title={`Delete ${u.name}`}
-                              onClick={() => setDeletingUser(u)}
+                              onClick={() => { setBlockedDeletion(null); setDeletingUser(u); }}
                               disabled={deletingUserId === u.id}
                               className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
                             >
