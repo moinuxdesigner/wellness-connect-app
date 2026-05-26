@@ -84,6 +84,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/users', [AdminController::class, 'users']);
             Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
             Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole']);
+            Route::delete('/users/{user}', [AdminController::class, 'destroyUser']);
             Route::get('/role-changes', [AdminController::class, 'roleChanges']);
             Route::get('/permissions', [PermissionController::class, 'index']);
             Route::put('/permissions/{role}', [PermissionController::class, 'update']);

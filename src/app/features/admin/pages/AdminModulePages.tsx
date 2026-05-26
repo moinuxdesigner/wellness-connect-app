@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import * as echarts from 'echarts';
+import { TriangleAlert, Trash2 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import { PageTitle } from '../AdminLayout';
 import { Panel, ToneBadge } from '../../shared/components/Ui';
-import { adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
+import { adminDeleteUser, adminResetUserPassword, adminUpdatePermissions, adminUpdateUserRole, getAdminActivities, getAdminEscalations, getAdminOverview, getAdminPermissionMatrix, getAdminPrograms, getAdminRoleChanges, getAdminUsers, type PermissionChangeAudit, type PermissionItem, type RoleChangeAudit } from '../../shared/services/adminApi';
 import { archiveAdminMembershipPlan, getAdminMembershipPlans, publishAdminMembershipPlan, saveAdminMembershipPlan, type AdminMembershipPlan, type PlanDraft } from '../../shared/services/membershipApi';
 import type { AppointmentSummary, ProgramSummary, Role, TicketSummary, UserSummary } from '../../../types';
 import { clearAuthState, getAuthState } from '../../auth/auth';
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from '../../../components/ui/alert-dialog';
 import {
   nextActionLabel,
   statusLabel,
@@ -36,6 +38,9 @@ export function UserManagementPage() {
   const [loadError, setLoadError] = useState('');
   const [reloadCount, setReloadCount] = useState(0);
   const [resettingUserId, setResettingUserId] = useState<string | null>(null);
+  const [deletingUser, setDeletingUser] = useState<UserSummary | null>(null);
+  const [deletingUserId, setDeletingUserId] = useState<string | null>(null);
+  const signedInUserId = String(getAuthState().user?.id ?? '');
 
   useEffect(() => {
     let mounted = true;
@@ -78,6 +83,23 @@ export function UserManagementPage() {
       setNotice(error instanceof Error ? error.message : 'Unable to reset password.');
     } finally {
       setResettingUserId(null);
+    }
+  }
+
+  async function handleDeleteUser() {
+    if (!deletingUser) return;
+    setDeletingUserId(deletingUser.id);
+    setNotice('');
+
+    try {
+      const message = await adminDeleteUser(deletingUser);
+      setUsers((items) => items.filter((item) => item.id !== deletingUser.id));
+      setNotice(message);
+      setDeletingUser(null);
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : 'Unable to delete user.');
+    } finally {
+      setDeletingUserId(null);
     }
   }
 
@@ -160,14 +182,28 @@ export function UserManagementPage() {
                     </div>
                   </div>
                   <p className="mt-3 text-xs font-medium uppercase tracking-wide text-slate-500">{u.role}</p>
-                  <button
-                    type="button"
-                    onClick={() => handlePasswordReset(u)}
-                    disabled={resettingUserId === u.id}
-                    className="mt-4 w-full rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
-                  </button>
+                  <div className="mt-4 flex gap-2">
+                    <button
+                      type="button"
+                      onClick={() => handlePasswordReset(u)}
+                      disabled={resettingUserId === u.id || deletingUserId === u.id}
+                      className="flex-1 rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                    >
+                      {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
+                    </button>
+                    {u.id !== signedInUserId ? (
+                      <button
+                        type="button"
+                        aria-label={`Delete ${u.name}`}
+                        title={`Delete ${u.name}`}
+                        onClick={() => setDeletingUser(u)}
+                        disabled={deletingUserId === u.id}
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                      >
+                        <Trash2 size={17} />
+                      </button>
+                    ) : null}
+                  </div>
                 </article>
               ))}
         </div>
@@ -204,14 +240,28 @@ export function UserManagementPage() {
                       <td className="py-2 capitalize">{u.role}</td>
                       <td className="py-2"><ToneBadge tone={toneByUserStatus(u.status)}>{u.status}</ToneBadge></td>
                       <td className="py-2 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handlePasswordReset(u)}
-                          disabled={resettingUserId === u.id}
-                          className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                        >
-                          {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
-                        </button>
+                        <div className="flex justify-end gap-2">
+                          <button
+                            type="button"
+                            onClick={() => handlePasswordReset(u)}
+                            disabled={resettingUserId === u.id || deletingUserId === u.id}
+                            className="rounded-xl border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
+                          >
+                            {resettingUserId === u.id ? 'Resetting...' : 'Reset Password'}
+                          </button>
+                          {u.id !== signedInUserId ? (
+                            <button
+                              type="button"
+                              aria-label={`Delete ${u.name}`}
+                              title={`Delete ${u.name}`}
+                              onClick={() => setDeletingUser(u)}
+                              disabled={deletingUserId === u.id}
+                              className="inline-flex h-10 w-10 items-center justify-center rounded-xl border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-60"
+                            >
+                              <Trash2 size={17} />
+                            </button>
+                          ) : null}
+                        </div>
                       </td>
                     </tr>
                   ))}
@@ -219,6 +269,38 @@ export function UserManagementPage() {
           </table>
         </div>
       </Panel>
+
+      <AlertDialog open={deletingUser !== null} onOpenChange={(open) => { if (!open && !deletingUserId) setDeletingUser(null); }}>
+        <AlertDialogContent className="gap-0 overflow-hidden p-0 sm:max-w-[460px]">
+          <div className="flex items-start gap-4 px-6 pb-5 pt-6">
+            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+              <TriangleAlert size={21} />
+            </span>
+            <AlertDialogHeader className="gap-2 pt-0.5 text-left">
+              <AlertDialogTitle>Delete user account?</AlertDialogTitle>
+              <AlertDialogDescription>
+                {deletingUser ? `Deleting ${deletingUser.name} (${deletingUser.email}) permanently removes their account and signs out active sessions.` : ''}
+              </AlertDialogDescription>
+              <p className="text-sm font-medium text-rose-700">This action cannot be undone.</p>
+            </AlertDialogHeader>
+          </div>
+          <AlertDialogFooter className="border-t border-slate-200 bg-slate-50 px-6 py-4">
+            <AlertDialogCancel
+              disabled={deletingUserId !== null}
+              className="h-10 border-slate-300 bg-white px-4 text-slate-700 hover:bg-slate-100 hover:text-slate-900"
+            >
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(event) => { event.preventDefault(); void handleDeleteUser(); }}
+              disabled={deletingUserId !== null}
+              className="h-10 bg-rose-600 px-4 text-white hover:bg-rose-700 focus-visible:ring-rose-300"
+            >
+              {deletingUserId ? 'Deleting...' : 'Delete user'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }
@@ -403,7 +485,6 @@ export function RoleManagementPage() {
           </table>
         </div>
       </Panel>
-
       <Panel title="Recent Role Changes">
         {loading ? (
           <div className="space-y-3">{Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-16 animate-pulse rounded-xl bg-slate-100" />)}</div>

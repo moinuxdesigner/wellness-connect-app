@@ -327,6 +327,23 @@ export async function adminResetUserPassword(user: UserSummary) {
   return String(data?.message ?? `Password reset for ${user.email}. New password: password123`);
 }
 
+export async function adminDeleteUser(user: UserSummary) {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing admin session token.');
+
+  const response = await fetch(`${API_BASE}/admin/users/${user.id}`, {
+    method: 'DELETE',
+    headers: authHeaders(token),
+  });
+  const data = await readJson(response);
+
+  if (!response.ok) {
+    throw new Error(String(data?.message ?? 'Unable to delete user.'));
+  }
+
+  return String(data?.message ?? `Deleted user ${user.email}.`);
+}
+
 export async function getAdminRoleChanges() {
   const data = await fetchAdmin<{ roleChanges: RoleChangeAudit[] }>('role-changes');
   return data.roleChanges;

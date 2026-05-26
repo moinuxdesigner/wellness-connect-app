@@ -12,6 +12,7 @@ use App\Models\WellnessPackage;
 use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 
@@ -160,6 +161,54 @@ class AdminController extends Controller
                 'id' => (string) $user->id,
                 'email' => (string) $user->email,
             ],
+        ]);
+    }
+
+    public function destroyUser(Request $request, User $user): JsonResponse
+    {
+        $this->authorizeAdmin($request);
+
+        $actor = $request->user();
+        abort_if($actor?->id === $user->id, 422, 'You cannot delete your own administrator account.');
+
+        if ($user->role === 'admin' && $user->status === 'active') {
+            $activeAdminCount = User::query()
+                ->where('role', 'admin')
+                ->where('status', 'active')
+                ->count();
+
+            abort_if($activeAdminCount <= 1, 422, 'The last active administrator cannot be deleted.');
+        }
+
+        $deletedUser = [
+            'id' => (string) $user->id,
+            'name' => (string) $user->name,
+            'email' => (string) $user->email,
+            'role' => (string) $user->role,
+        ];
+
+        try {
+            DB::transaction(function () use ($user): void {
+                $user->tokens()->delete();
+                $user->delete();
+            });
+        } catch (QueryException) {
+            return response()->json([
+                'message' => 'This user cannot be deleted because protected billing or audit records are linked to the account.',
+            ], 409);
+        }
+
+        $this->activityLogs->record('account', 'user_deleted', sprintf('%s deleted the account for %s.', $actor->name, $deletedUser['name']), [
+            'actor' => $actor,
+            'targetRole' => $deletedUser['role'],
+            'subject' => ['type' => User::class, 'id' => $deletedUser['id'], 'label' => $deletedUser['name']],
+            'details' => ['email' => $deletedUser['email'], 'role' => $deletedUser['role']],
+            'audienceRoles' => ['admin'],
+        ]);
+
+        return response()->json([
+            'message' => "Deleted user {$deletedUser['email']}.",
+            'user' => $deletedUser,
         ]);
     }
 
