@@ -246,7 +246,7 @@ export default function CareersPage() {
                   <p className="mt-3 flex-1 text-sm leading-6 text-slate-600">{role.description}</p>
 
                   <Link
-                    to={`/professional-onboarding?role=${role.role}`}
+                    to={role.role === 'personal-trainer' ? '/trainer/onboarding' : `/professional-onboarding?role=${role.role}`}
                     className="mt-6 inline-flex w-full items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                   >
                     Get Started

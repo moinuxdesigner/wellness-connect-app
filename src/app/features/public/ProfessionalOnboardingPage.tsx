@@ -1,4 +1,4 @@
-import { Link, useSearchParams } from 'react-router';
+import { Link, Navigate, useSearchParams } from 'react-router';
 import { ArrowLeft, ArrowRight, BadgeCheck, ClipboardList, HeartHandshake, ShieldCheck } from 'lucide-react';
 
 const ROLE_LABELS: Record<string, string> = {
@@ -30,7 +30,12 @@ const NEXT_STEPS = [
 
 export default function ProfessionalOnboardingPage() {
   const [searchParams] = useSearchParams();
-  const selectedRole = ROLE_LABELS[searchParams.get('role') ?? ''];
+  const role = searchParams.get('role') ?? '';
+  const selectedRole = ROLE_LABELS[role];
+
+  if (role === 'personal-trainer') {
+    return <Navigate to="/trainer/onboarding" replace />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-50">
