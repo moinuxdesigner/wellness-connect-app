@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 #[Fillable([
     'application_id',
+    'applicant_user_id',
     'reviewed_by_user_id',
     'applicant_name',
     'applicant_email',
@@ -16,12 +18,18 @@ use Illuminate\Database\Eloquent\Model;
     'expertise_json',
     'values_json',
     'status',
+    'current_screen',
     'admin_remarks',
     'review_history_json',
     'submitted_at',
 ])]
 class TrainerApplication extends Model
 {
+    public function applicant(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'applicant_user_id');
+    }
+
     protected function casts(): array
     {
         return [

@@ -42,6 +42,25 @@
         }
       }
     },
+    "/auth/trainer-register": {
+      "post": {
+        "summary": "Create a trainer applicant account and draft application",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "example": {
+                "name": "Arjun Mehta",
+                "email": "arjun.trainer@email.com",
+                "password": "StrongPass@123",
+                "consent_to_terms": true
+              }
+            }
+          }
+        },
+        "responses": { "201": { "description": "Trainer applicant account and draft created" } }
+      }
+    },
     "/auth/login": {
       "post": {
         "requestBody": {
@@ -66,6 +85,28 @@
     },
     "/auth/me": { "get": { "responses": { "200": { "description": "Current user" } } } },
     "/auth/logout": { "post": { "responses": { "200": { "description": "Logged out" } } } },
+    "/trainer/application": {
+      "get": {
+        "summary": "Fetch the authenticated trainer applicant's current application",
+        "responses": { "200": { "description": "Current trainer application" } }
+      }
+    },
+    "/trainer/application/draft": {
+      "put": {
+        "summary": "Autosave an authenticated trainer applicant draft",
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "example": { "currentScreen": "clientPitch", "values": {} } } }
+        },
+        "responses": { "200": { "description": "Draft saved" } }
+      }
+    },
+    "/trainer/application/submit": {
+      "post": {
+        "summary": "Submit the authenticated trainer application for review",
+        "responses": { "200": { "description": "Application submitted" } }
+      }
+    },
     "/client/profile": {
       "put": {
         "requestBody": {

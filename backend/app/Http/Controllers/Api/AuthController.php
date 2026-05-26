@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientProfile;
+use App\Models\TrainerApplication;
 use App\Models\User;
 use App\Services\ActivityLogService;
 use App\Services\PermissionService;
@@ -11,6 +12,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Password;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
 
@@ -60,6 +62,66 @@ class AuthController extends Controller
             'token' => $token,
             'user' => $this->userPayload($user),
             'profile' => $profile,
+        ], 201);
+    }
+
+    public function registerTrainerApplicant(Request $request): JsonResponse
+    {
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:120'],
+            'email' => ['required', 'email', 'max:255', 'unique:users,email'],
+            'password' => ['required', 'string', 'min:8', 'max:120'],
+            'consent_to_terms' => ['required', 'accepted'],
+        ]);
+
+        [$user, $application] = DB::transaction(function () use ($validated): array {
+            $user = User::query()->create([
+                'name' => $validated['name'],
+                'email' => $validated['email'],
+                'password' => $validated['password'],
+                'role' => 'trainer',
+                'status' => 'active',
+                'consent_to_terms' => true,
+            ]);
+
+            $application = TrainerApplication::query()->create([
+                'application_id' => 'TRN-' . now()->format('YmdHis') . '-' . Str::upper(Str::random(6)),
+                'applicant_user_id' => $user->id,
+                'applicant_name' => $user->name,
+                'applicant_email' => $user->email,
+                'values_json' => [
+                    'profile' => [
+                        'fullName' => $user->name,
+                        'email' => $user->email,
+                    ],
+                ],
+                'status' => 'draft',
+                'current_screen' => 'personalInfo',
+                'review_history_json' => [],
+            ]);
+
+            return [$user, $application];
+        });
+
+        $token = $user->createToken('auth-token')->plainTextToken;
+
+        $this->activityLogs->record('account', 'registered', sprintf('%s started a trainer application.', $user->name), [
+            'actor' => $user,
+            'subject' => $application,
+            'details' => ['role' => 'trainer', 'applicationId' => $application->application_id],
+            'audienceUsers' => [$user],
+            'audienceRoles' => ['admin'],
+        ]);
+
+        return response()->json([
+            'token' => $token,
+            'user' => $this->userPayload($user),
+            'application' => [
+                'applicationId' => (string) $application->application_id,
+                'status' => 'draft',
+                'currentScreen' => 'personalInfo',
+                'values' => $application->values_json,
+            ],
         ], 201);
     }
 

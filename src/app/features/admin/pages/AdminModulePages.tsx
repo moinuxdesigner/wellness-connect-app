@@ -759,6 +759,7 @@ export function TrainerApplicationsPage() {
             ['Expertise', selectedApplication.expertise.length ? selectedApplication.expertise.join(', ') : 'Not provided'],
             ['Years experience', selectedApplication.values.experience.yearsExperience || 'Not provided'],
             ['Clients trained', selectedApplication.values.experience.clientsTrained || 'Not provided'],
+            ['Why clients should choose them', selectedApplication.values.clientPitch || 'Not provided'],
           ],
         },
         {
@@ -768,9 +769,9 @@ export function TrainerApplicationsPage() {
             ['Certificate file', selectedApplication.values.certification.certificate?.name || 'Missing'],
             ['PAN', selectedApplication.values.identity.pan?.name || 'Missing'],
             ['Primary ID', selectedApplication.values.identity.aadhaar?.name || selectedApplication.values.identity.passport?.name || selectedApplication.values.identity.drivingLicense?.name || 'Missing'],
-            ['Transformation photos', selectedApplication.values.showcase.transformationPhotos.length ? selectedApplication.values.showcase.transformationPhotos.map((item) => item.name).join(', ') : 'Missing'],
-            ['Videos', selectedApplication.values.showcase.videos.length ? selectedApplication.values.showcase.videos.map((item) => item.name).join(', ') : 'Missing'],
-            ['Intro video', selectedApplication.values.training.introductionVideo?.name || 'Missing'],
+            ['Transformation photos', selectedApplication.values.showcase.transformationPhotos.length ? selectedApplication.values.showcase.transformationPhotos.map((item) => item.name).join(', ') : 'Skipped for now'],
+            ['Videos', selectedApplication.values.showcase.videos.length ? selectedApplication.values.showcase.videos.map((item) => item.name).join(', ') : 'Skipped for now'],
+            ['Intro video', selectedApplication.values.training.introductionVideo?.name || 'Skipped for now'],
           ],
         },
         {
@@ -778,7 +779,9 @@ export function TrainerApplicationsPage() {
           rows: [
             ['Training modes', selectedApplication.values.availability.modes.length ? selectedApplication.values.availability.modes.join(', ') : 'Not provided'],
             ['Available days', selectedApplication.values.availability.days.length ? selectedApplication.values.availability.days.join(', ') : 'Not provided'],
-            ['Pricing plans', selectedApplication.values.availability.pricingPlans || 'Not provided'],
+            ['Per session rate', selectedApplication.values.availability.perSessionRateInr ? `INR ${selectedApplication.values.availability.perSessionRateInr}` : 'Not provided'],
+            ['Monthly rate', selectedApplication.values.availability.monthlyRateInr ? `INR ${selectedApplication.values.availability.monthlyRateInr}` : 'Not provided'],
+            ['Pricing notes', selectedApplication.values.availability.pricingPlans || 'Not provided'],
             ['Bank name', selectedApplication.values.payout.bankName || 'Not provided'],
             ['Account number', selectedApplication.values.payout.accountNumber ? `•••• ${selectedApplication.values.payout.accountNumber.slice(-4)}` : 'Not provided'],
             ['IFSC', selectedApplication.values.payout.ifsc || 'Not provided'],

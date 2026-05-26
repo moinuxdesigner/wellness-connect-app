@@ -33,6 +33,22 @@ class AuthAccessControlTest extends TestCase
         ])->assertCreated()->assertJsonPath('user.role', 'client');
     }
 
+    public function test_trainer_applicant_registration_creates_restricted_account_and_draft(): void
+    {
+        $this->postJson('/api/v1/auth/trainer-register', [
+            'name' => 'Draft Trainer',
+            'email' => 'draft.trainer@example.com',
+            'password' => 'password123',
+            'consent_to_terms' => true,
+        ])->assertCreated()
+            ->assertJsonPath('user.role', 'trainer')
+            ->assertJsonPath('application.status', 'draft')
+            ->assertJsonPath('application.currentScreen', 'personalInfo');
+
+        $this->assertDatabaseHas('users', ['email' => 'draft.trainer@example.com', 'role' => 'trainer']);
+        $this->assertDatabaseHas('trainer_applications', ['applicant_email' => 'draft.trainer@example.com', 'status' => 'draft']);
+    }
+
     public function test_inactive_accounts_cannot_login(): void
     {
         foreach (['pending', 'suspended'] as $status) {

@@ -38,6 +38,11 @@ class User extends Authenticatable
         return $this->hasOne(Practitioner::class);
     }
 
+    public function trainerApplication(): HasOne
+    {
+        return $this->hasOne(TrainerApplication::class, 'applicant_user_id');
+    }
+
     public function intakeFlows(): HasMany
     {
         return $this->hasMany(IntakeFlow::class, 'client_user_id');

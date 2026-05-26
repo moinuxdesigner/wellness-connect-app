@@ -31,6 +31,58 @@ class TrainerWorkspaceAccessTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_trainer_can_save_and_resume_draft_before_submission(): void
+    {
+        $trainer = User::factory()->create(['email' => 'draft@example.com', 'role' => 'trainer', 'status' => 'active']);
+        $application = TrainerApplication::query()->create([
+            'application_id' => 'TRN-DRAFT',
+            'applicant_user_id' => $trainer->id,
+            'applicant_name' => $trainer->name,
+            'applicant_email' => $trainer->email,
+            'values_json' => [],
+            'status' => 'draft',
+            'current_screen' => 'personalInfo',
+        ]);
+        Sanctum::actingAs($trainer);
+
+        $this->putJson('/api/v1/trainer/application/draft', [
+            'values' => ['profile' => ['fullName' => 'Draft Trainer', 'email' => 'draft@example.com']],
+            'currentScreen' => 'clientPitch',
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'draft')
+            ->assertJsonPath('application.currentScreen', 'clientPitch');
+
+        $this->getJson('/api/v1/trainer/application')
+            ->assertOk()
+            ->assertJsonPath('application.applicationId', $application->application_id)
+            ->assertJsonPath('application.currentScreen', 'clientPitch')
+            ->assertJsonPath('application.values.profile.fullName', 'Draft Trainer');
+    }
+
+    public function test_trainer_can_submit_complete_application_without_optional_media(): void
+    {
+        $trainer = User::factory()->create(['email' => 'submit@example.com', 'role' => 'trainer', 'status' => 'active']);
+        TrainerApplication::query()->create([
+            'application_id' => 'TRN-SUBMIT',
+            'applicant_user_id' => $trainer->id,
+            'applicant_name' => $trainer->name,
+            'applicant_email' => $trainer->email,
+            'values_json' => [],
+            'status' => 'draft',
+        ]);
+        Sanctum::actingAs($trainer);
+
+        $this->postJson('/api/v1/trainer/application/submit', [
+            'values' => $this->completeApplicationValues(),
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'submitted')
+            ->assertJsonPath('application.values.clientPitch', $this->completeApplicationValues()['clientPitch'])
+            ->assertJsonPath('application.values.showcase.transformationPhotos', [])
+            ->assertJsonPath('application.values.training.introductionVideo', null);
+
+        $this->getJson('/api/v1/trainer/access-status')->assertOk()->assertJsonPath('status', 'pending_review');
+    }
+
     public function test_approved_trainer_can_access_workspace_dashboard(): void
     {
         $trainer = User::factory()->create([
@@ -86,7 +138,10 @@ class TrainerWorkspaceAccessTest extends TestCase
         $this->patchJson("/api/v1/admin/trainer-applications/{$application->application_id}", [
             'status' => 'approved',
             'adminRemarks' => 'Qualifications verified.',
-        ])->assertOk()->assertJsonPath('application.status', 'approved');
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'approved')
+            ->assertJsonPath('account.created', false)
+            ->assertJsonPath('account.temporaryPassword', null);
 
         Sanctum::actingAs($trainer);
         $this->getJson('/api/v1/trainer/dashboard')->assertOk();
@@ -141,6 +196,7 @@ class TrainerWorkspaceAccessTest extends TestCase
     {
         return TrainerApplication::query()->create([
             'application_id' => 'TRN-' . $trainer->id,
+            'applicant_user_id' => $trainer->id,
             'applicant_name' => $trainer->name,
             'applicant_email' => $trainer->email,
             'applicant_mobile' => '+91 9000000000',
@@ -150,5 +206,36 @@ class TrainerWorkspaceAccessTest extends TestCase
             'status' => $status,
             'submitted_at' => now(),
         ]);
+    }
+
+    private function completeApplicationValues(): array
+    {
+        return [
+            'profile' => [
+                'fullName' => 'Complete Trainer',
+                'gender' => 'Man',
+                'dateOfBirth' => '1990-01-01',
+                'email' => 'submit@example.com',
+                'mobile' => '+91 9000000000',
+                'city' => 'Hyderabad',
+                'state' => 'Telangana',
+            ],
+            'photo' => ['file' => ['name' => 'photo.jpg']],
+            'certification' => ['institute' => 'Fitness Academy', 'type' => 'CPT', 'certificate' => ['name' => 'certificate.pdf']],
+            'expertise' => ['Strength Training'],
+            'experience' => ['yearsExperience' => '4', 'clientsTrained' => '80'],
+            'clientPitch' => 'I help clients build lasting strength through safe, practical coaching that fits real life.',
+            'showcase' => ['transformationPhotos' => [], 'videos' => []],
+            'training' => ['philosophy' => 'I focus on sustainable movement quality, consistency, and confident progress.', 'introductionVideo' => null],
+            'availability' => [
+                'modes' => ['Online Coaching'],
+                'days' => ['Monday'],
+                'perSessionRateInr' => '1500',
+                'monthlyRateInr' => '8000',
+                'pricingPlans' => '',
+            ],
+            'identity' => ['pan' => ['name' => 'pan.pdf'], 'aadhaar' => ['name' => 'aadhaar.pdf'], 'passport' => null, 'drivingLicense' => null],
+            'payout' => ['bankName' => 'HDFC', 'accountNumber' => '012345678901', 'ifsc' => 'HDFC0001234'],
+        ];
     }
 }

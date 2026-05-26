@@ -48,7 +48,9 @@ export default function TrainerProtectedRoute() {
     case 'pending_review':
       return location.pathname === '/trainer/submitted-profile' && access.application
         ? <SubmittedTrainerProfile application={access.application} />
-        : <TrainerStatusPage status="pending_review" />;
+        : <TrainerStatusPage status="pending_review" application={access.application} />;
+    case 'needs_resubmission':
+      return <TrainerStatusPage status="needs_resubmission" remarks={access.adminRemarks} />;
     case 'rejected':
       return <TrainerStatusPage status="rejected" remarks={access.adminRemarks} />;
     case 'suspended':
@@ -64,7 +66,7 @@ function TrainerStatusLoading() {
   );
 }
 
-function TrainerStatusPage({ status, remarks }: { status: 'pending_review' | 'rejected' | 'suspended'; remarks?: string }) {
+function TrainerStatusPage({ status, remarks, application }: { status: 'pending_review' | 'needs_resubmission' | 'rejected' | 'suspended'; remarks?: string; application?: TrainerApplicationRecord | null }) {
   const content = {
     pending_review: {
       icon: Clock3,
@@ -74,13 +76,21 @@ function TrainerStatusPage({ status, remarks }: { status: 'pending_review' | 're
       primaryLabel: 'View submitted profile',
       primaryTo: '/trainer/submitted-profile',
     },
-    rejected: {
+    needs_resubmission: {
       icon: CircleAlert,
       tone: 'bg-amber-50 text-amber-700',
       title: 'Your trainer profile needs attention',
       message: 'Your application was not approved in its current form. Review the admin feedback, update your information, and resubmit your profile for approval.',
       primaryLabel: 'Update and resubmit profile',
       primaryTo: '/trainer/onboarding',
+    },
+    rejected: {
+      icon: CircleAlert,
+      tone: 'bg-rose-50 text-rose-700',
+      title: 'Your trainer application was not approved',
+      message: 'This application has been closed. Contact support if you need clarification about the decision.',
+      primaryLabel: 'Contact support',
+      primaryTo: '/contact',
     },
     suspended: {
       icon: Ban,
@@ -113,7 +123,12 @@ function TrainerStatusPage({ status, remarks }: { status: 'pending_review' | 're
         </div>
         <h1 className="mt-7 text-3xl font-semibold tracking-tight text-slate-950">{content.title}</h1>
         <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-slate-600">{content.message}</p>
-        {status === 'rejected' && remarks ? (
+        {status === 'pending_review' && application ? (
+          <p className="mt-4 text-sm font-medium text-slate-500">
+            Application {application.applicationId} submitted on {displayDate(application.submittedAt)}
+          </p>
+        ) : null}
+        {(status === 'needs_resubmission' || status === 'rejected') && remarks ? (
           <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
             <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Admin feedback</p>
             <p className="mt-2 text-sm leading-6 text-amber-950">{remarks}</p>
@@ -123,7 +138,7 @@ function TrainerStatusPage({ status, remarks }: { status: 'pending_review' | 're
           <Link to={content.primaryTo} className="rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white transition hover:bg-indigo-700">
             {content.primaryLabel}
           </Link>
-          {status !== 'suspended' ? (
+          {(status === 'pending_review' || status === 'needs_resubmission') ? (
             <Link to="/contact" className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
               Contact support
             </Link>
@@ -192,13 +207,25 @@ function SubmittedTrainerProfile({ application }: { application: TrainerApplicat
         ['Expertise', values.expertise.length ? values.expertise.join(', ') : application.expertise.join(', ') || 'Not provided'],
         ['Experience', values.experience.yearsExperience ? `${values.experience.yearsExperience} years` : 'Not provided'],
         ['Clients trained', values.experience.clientsTrained || 'Not provided'],
+        ['Why clients should choose you', values.clientPitch || 'Not provided'],
       ],
     },
     {
-      title: 'Availability and verification',
+      title: 'Coaching and rates',
       items: [
+        ['Training philosophy', values.training.philosophy || 'Not provided'],
+        ['Introduction video', values.training.introductionVideo?.name || 'Skipped for now'],
         ['Training modes', values.availability.modes.join(', ') || 'Not provided'],
         ['Available days', values.availability.days.join(', ') || 'Not provided'],
+        ['Per session rate', values.availability.perSessionRateInr ? `INR ${values.availability.perSessionRateInr}` : 'Not provided'],
+        ['Monthly rate', values.availability.monthlyRateInr ? `INR ${values.availability.monthlyRateInr}` : 'Not provided'],
+      ],
+    },
+    {
+      title: 'Portfolio and verification',
+      items: [
+        ['Transformation photos', values.showcase.transformationPhotos.map((item) => item.name).join(', ') || 'Skipped for now'],
+        ['Showcase videos', values.showcase.videos.map((item) => item.name).join(', ') || 'Skipped for now'],
         ['PAN card', values.identity.pan?.name || 'Not uploaded'],
         ['Aadhaar', values.identity.aadhaar?.name || 'Not uploaded'],
         ['Passport', values.identity.passport?.name || 'Not uploaded'],

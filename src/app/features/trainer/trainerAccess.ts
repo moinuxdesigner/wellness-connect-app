@@ -3,7 +3,7 @@ import { mergeTrainerOnboardingValues, readTrainerApplications, type TrainerAppl
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
-export type TrainerAccessStatus = 'onboarding_pending' | 'pending_review' | 'rejected' | 'suspended' | 'approved';
+export type TrainerAccessStatus = 'onboarding_pending' | 'pending_review' | 'needs_resubmission' | 'rejected' | 'suspended' | 'approved';
 
 export type TrainerAccessState = {
   status: TrainerAccessStatus;
@@ -29,8 +29,9 @@ function localTrainerAccessState(): TrainerAccessState {
   switch (application.status) {
     case 'approved':
       return { status: 'approved', application, adminRemarks: application.adminRemarks };
-    case 'rejected':
     case 'needs_resubmission':
+      return { status: 'needs_resubmission', application, adminRemarks: application.adminRemarks };
+    case 'rejected':
       return { status: 'rejected', application, adminRemarks: application.adminRemarks };
     case 'draft':
       return { status: 'onboarding_pending', application, adminRemarks: application.adminRemarks };

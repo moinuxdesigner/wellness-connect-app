@@ -1,7 +1,5 @@
-import { getAuthState } from '../auth/auth';
+import { getAuthState, setAuthState, type AuthUser } from '../auth/auth';
 import {
-  buildTrainerApplicationRecord,
-  createHistoryItem,
   findTrainerApplication,
   mergeTrainerOnboardingValues,
   readTrainerApplications,
@@ -28,6 +26,7 @@ type TrainerApplicationResponse = {
     updatedAt: string;
     adminRemarks: string;
     reviewHistory: TrainerApplicationRecord['reviewHistory'];
+    currentScreen?: TrainerApplicationRecord['currentScreen'];
   };
   account?: {
     userId: string;
@@ -71,56 +70,66 @@ function normalizeTrainerApplicationRecord(application: TrainerApplicationRespon
     updatedAt: application.updatedAt,
     adminRemarks: application.adminRemarks ?? '',
     reviewHistory: application.reviewHistory ?? [],
+    currentScreen: application.currentScreen,
   };
 }
 
-export async function submitTrainerApplicationToApi(input: {
-  applicationId?: string | null;
-  values: TrainerOnboardingFormValues;
-}) {
-  try {
-    const response = await fetch(`${API_BASE}/trainer-applications`, {
-      method: 'POST',
-      headers: authHeaders(true),
-      body: JSON.stringify({
-        applicationId: input.applicationId ?? undefined,
-        values: input.values,
-      }),
-    });
-
-    const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
-    if (!response.ok || !data || !('application' in data)) {
-      throw new Error(String(data && 'message' in data ? data.message : 'Unable to submit trainer onboarding.'));
-    }
-
-    const application = normalizeTrainerApplicationRecord(data.application);
-    upsertTrainerApplication(application);
-    return application;
-  } catch {
-    const timestamp = new Date().toISOString();
-    const existingApplication = findTrainerApplication(input.applicationId);
-    const fallback = buildTrainerApplicationRecord({
-      applicationId: input.applicationId ?? `TRN-${Date.now()}`,
-      values: input.values,
-      submittedAt: timestamp,
-      status: 'submitted',
-      adminRemarks: '',
-      previousHistory: [
-        ...(existingApplication?.reviewHistory ?? []),
-        createHistoryItem({
-          action: 'submitted',
-          actor: 'trainer',
-          note: existingApplication?.status === 'needs_resubmission'
-            ? 'Trainer resubmitted the application after admin remarks.'
-            : 'Trainer submitted the onboarding application.',
-          at: timestamp,
-        }),
-      ],
-    });
-
-    upsertTrainerApplication(fallback);
-    return fallback;
+export async function registerTrainerApplicant(input: { name: string; email: string; password: string; consent_to_terms: boolean }) {
+  const response = await fetch(`${API_BASE}/auth/trainer-register`, {
+    method: 'POST',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: JSON.stringify(input),
+  });
+  const data = await readJson(response) as (TrainerApplicationResponse & { token?: string; user?: AuthUser; message?: string }) | null;
+  if (!response.ok || !data?.token || !data.user || !data.application) {
+    throw new Error(String(data?.message ?? 'Unable to create trainer application account.'));
   }
+
+  setAuthState(data.token, data.user);
+  const application = normalizeTrainerApplicationRecord(data.application);
+  upsertTrainerApplication(application);
+  return application;
+}
+
+export async function fetchCurrentTrainerApplicationFromApi() {
+  const response = await fetch(`${API_BASE}/trainer/application`, { headers: authHeaders() });
+  const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
+  if (!response.ok || !data || !('application' in data)) {
+    throw new Error(String(data && 'message' in data ? data.message : 'Unable to load your trainer application.'));
+  }
+  const application = normalizeTrainerApplicationRecord(data.application);
+  upsertTrainerApplication(application);
+  return application;
+}
+
+export async function saveTrainerDraftToApi(input: { values: TrainerOnboardingFormValues; currentScreen: TrainerApplicationRecord['currentScreen'] }) {
+  const response = await fetch(`${API_BASE}/trainer/application/draft`, {
+    method: 'PUT',
+    headers: authHeaders(true),
+    body: JSON.stringify(input),
+  });
+  const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
+  if (!response.ok || !data || !('application' in data)) {
+    throw new Error(String(data && 'message' in data ? data.message : 'Unable to save your trainer application.'));
+  }
+  const application = normalizeTrainerApplicationRecord(data.application);
+  upsertTrainerApplication(application);
+  return application;
+}
+
+export async function submitTrainerApplicationToApi(input: { values: TrainerOnboardingFormValues }) {
+  const response = await fetch(`${API_BASE}/trainer/application/submit`, {
+    method: 'POST',
+    headers: authHeaders(true),
+    body: JSON.stringify({ values: input.values }),
+  });
+  const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
+  if (!response.ok || !data || !('application' in data)) {
+    throw new Error(String(data && 'message' in data ? data.message : 'Unable to submit trainer onboarding.'));
+  }
+  const application = normalizeTrainerApplicationRecord(data.application);
+  upsertTrainerApplication(application);
+  return application;
 }
 
 export async function fetchTrainerApplicationFromApi(applicationId: string | null | undefined) {

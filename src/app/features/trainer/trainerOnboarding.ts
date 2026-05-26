@@ -1,8 +1,8 @@
 import type { FieldPath } from 'react-hook-form';
 import { z } from 'zod';
 
-export const trainerOnboardingStorageKey = 'wc_trainer_onboarding_v2';
-export const trainerOnboardingSchemaVersion = 2;
+export const trainerOnboardingStorageKey = 'wc_trainer_onboarding_v3';
+export const trainerOnboardingSchemaVersion = 3;
 export const trainerApplicationsStorageKey = 'wc_trainer_applications_v1';
 
 export const trainerAnimationMap = {
@@ -100,18 +100,21 @@ export const trainerOnboardingSchema = z
         .min(1, 'Add how many clients you have trained.')
         .refine(isPositiveInteger, 'Use a valid whole number.'),
     }),
+    clientPitch: z.string().trim().min(40, 'Tell clients why they should choose you in at least 40 characters.'),
     showcase: z.object({
-      transformationPhotos: z.array(uploadValueSchema).min(1, 'Upload at least one transformation photo.'),
-      videos: z.array(uploadValueSchema).min(1, 'Upload at least one video.'),
+      transformationPhotos: z.array(uploadValueSchema),
+      videos: z.array(uploadValueSchema),
     }),
     training: z.object({
       philosophy: z.string().trim().min(40, 'Share a short training philosophy in at least 40 characters.'),
-      introductionVideo: uploadValueSchema.nullable().refine(Boolean, 'Upload an introduction video.'),
+      introductionVideo: uploadValueSchema.nullable(),
     }),
     availability: z.object({
       modes: z.array(z.string()).min(1, 'Choose at least one training mode.'),
       days: z.array(z.string()).min(1, 'Choose at least one available day.'),
-      pricingPlans: z.string().trim().min(30, 'Describe your pricing plans in at least 30 characters.'),
+      perSessionRateInr: z.string().trim().regex(/^[1-9]\d*$/, 'Enter a valid per-session rate.'),
+      monthlyRateInr: z.string().trim().regex(/^[1-9]\d*$/, 'Enter a valid monthly rate.'),
+      pricingPlans: z.string().trim(),
     }),
     identity: z.object({
       aadhaar: uploadValueSchema.nullable(),
@@ -178,6 +181,7 @@ export const trainerOnboardingDefaultValues: TrainerOnboardingFormValues = {
     yearsExperience: '',
     clientsTrained: '',
   },
+  clientPitch: '',
   showcase: {
     transformationPhotos: [],
     videos: [],
@@ -189,6 +193,8 @@ export const trainerOnboardingDefaultValues: TrainerOnboardingFormValues = {
   availability: {
     modes: [],
     days: [],
+    perSessionRateInr: '',
+    monthlyRateInr: '',
     pricingPlans: '',
   },
   identity: {
@@ -232,6 +238,7 @@ export type TrainerOnboardingScreenId =
   | 'certification'
   | 'expertise'
   | 'experience'
+  | 'clientPitch'
   | 'showcase'
   | 'training'
   | 'availability'
@@ -333,6 +340,16 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
     fields: ['experience.yearsExperience', 'experience.clientsTrained'],
   },
   {
+    id: 'clientPitch',
+    animationKey: 'experience',
+    eyebrow: 'Your Difference',
+    title: 'Why should clients choose you?',
+    description: 'Share what makes your coaching credible, supportive, and worth choosing.',
+    helper: 'Write this as clients will see it.',
+    buttonLabel: 'Next',
+    fields: ['clientPitch'],
+  },
+  {
     id: 'showcase',
     animationKey: 'mediaUpload',
     eyebrow: 'Portfolio',
@@ -340,7 +357,7 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
     description: 'Share a little proof of outcomes and coaching style so the review team can understand your impact quickly.',
     helper: 'One strong example is better than many average ones.',
     buttonLabel: 'Next',
-    fields: ['showcase.transformationPhotos', 'showcase.videos'],
+    fields: [],
   },
   {
     id: 'training',
@@ -350,7 +367,7 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
     description: 'Tell us how you think about progress, safety, motivation, and the kind of client experience you create.',
     helper: 'Keep it human and specific.',
     buttonLabel: 'Next',
-    fields: ['training.philosophy', 'training.introductionVideo'],
+    fields: ['training.philosophy'],
   },
   {
     id: 'availability',
@@ -358,9 +375,9 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
     eyebrow: 'Schedule',
     title: 'Availability and pricing',
     description: 'This helps us understand how you deliver sessions and what offer structure makes sense for you.',
-    helper: 'You can describe one-to-one, online, or package pricing.',
+    helper: 'Add your standard rates in INR; package notes are optional.',
     buttonLabel: 'Next',
-    fields: ['availability.modes', 'availability.days', 'availability.pricingPlans'],
+    fields: ['availability.modes', 'availability.days', 'availability.perSessionRateInr', 'availability.monthlyRateInr'],
   },
   {
     id: 'identity',
@@ -430,6 +447,7 @@ export interface TrainerApplicationRecord {
   updatedAt: string;
   adminRemarks: string;
   reviewHistory: TrainerApplicationHistoryItem[];
+  currentScreen?: TrainerOnboardingScreenId;
 }
 
 export interface PersistedTrainerOnboardingState {
@@ -449,6 +467,7 @@ export function mergeTrainerOnboardingValues(values?: Partial<TrainerOnboardingF
     certification: { ...trainerOnboardingDefaultValues.certification, ...values?.certification },
     expertise: values?.expertise ?? trainerOnboardingDefaultValues.expertise,
     experience: { ...trainerOnboardingDefaultValues.experience, ...values?.experience },
+    clientPitch: values?.clientPitch ?? trainerOnboardingDefaultValues.clientPitch,
     showcase: {
       transformationPhotos: values?.showcase?.transformationPhotos ?? trainerOnboardingDefaultValues.showcase.transformationPhotos,
       videos: values?.showcase?.videos ?? trainerOnboardingDefaultValues.showcase.videos,
@@ -457,6 +476,8 @@ export function mergeTrainerOnboardingValues(values?: Partial<TrainerOnboardingF
     availability: {
       modes: values?.availability?.modes ?? trainerOnboardingDefaultValues.availability.modes,
       days: values?.availability?.days ?? trainerOnboardingDefaultValues.availability.days,
+      perSessionRateInr: values?.availability?.perSessionRateInr ?? trainerOnboardingDefaultValues.availability.perSessionRateInr,
+      monthlyRateInr: values?.availability?.monthlyRateInr ?? trainerOnboardingDefaultValues.availability.monthlyRateInr,
       pricingPlans: values?.availability?.pricingPlans ?? trainerOnboardingDefaultValues.availability.pricingPlans,
     },
     identity: { ...trainerOnboardingDefaultValues.identity, ...values?.identity },

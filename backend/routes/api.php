@@ -24,6 +24,7 @@ use Illuminate\Support\Facades\Route;
 Route::prefix('v1')->group(function (): void {
     Route::prefix('auth')->group(function (): void {
         Route::post('/register', [AuthController::class, 'register']);
+        Route::post('/trainer-register', [AuthController::class, 'registerTrainerApplicant']);
         Route::post('/login', [AuthController::class, 'login']);
         Route::post('/forgot-password', [AuthController::class, 'forgotPassword']);
         Route::post('/reset-password', [AuthController::class, 'resetPassword']);
@@ -68,6 +69,9 @@ Route::prefix('v1')->group(function (): void {
         });
 
         Route::get('/trainer/access-status', [TrainerWorkspaceController::class, 'accessStatus'])->middleware('permission:trainer.dashboard.view');
+        Route::get('/trainer/application', [TrainerApplicationController::class, 'current']);
+        Route::put('/trainer/application/draft', [TrainerApplicationController::class, 'saveDraft']);
+        Route::post('/trainer/application/submit', [TrainerApplicationController::class, 'submitCurrent']);
         Route::middleware('trainer.approved')->prefix('trainer')->group(function (): void {
             Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard'])->middleware('permission:trainer.dashboard.view');
         });

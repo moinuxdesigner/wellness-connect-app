@@ -28,7 +28,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { useNavigate } from 'react-router';
+import { Link, useNavigate } from 'react-router';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { Textarea } from '../../components/ui/textarea';
@@ -58,7 +58,14 @@ import {
   type UploadKind,
   type UploadValue,
 } from './trainerOnboarding';
-import { fetchTrainerApplicationFromApi, submitTrainerApplicationToApi } from './trainerApplicationsApi';
+import { getAuthState } from '../auth/auth';
+import { logoutRequest } from '../auth/apiAuth';
+import {
+  fetchCurrentTrainerApplicationFromApi,
+  registerTrainerApplicant,
+  saveTrainerDraftToApi,
+  submitTrainerApplicationToApi,
+} from './trainerApplicationsApi';
 
 const reviewScreenIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === 'review');
 const successScreenIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === 'success');
@@ -174,6 +181,8 @@ async function toUploadValue(file: File, kind: UploadKind, withPreview = false) 
 
 export default function TrainerOnboardingPage() {
   const navigate = useNavigate();
+  const auth = getAuthState();
+  const isTrainerApplicant = auth.isAuthenticated && auth.user?.role === 'trainer';
   const prefersReducedMotion = useReducedMotion();
   const restoredState = useMemo(readStoredState, []);
   const [screenIndex, setScreenIndex] = useState(restoredState.screenIndex);
@@ -186,6 +195,8 @@ export default function TrainerOnboardingPage() {
   const [adminRemarks, setAdminRemarks] = useState(restoredState.adminRemarks);
   const [reviewHistory, setReviewHistory] = useState<TrainerApplicationHistoryItem[]>(restoredState.reviewHistory);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isDraftReady, setIsDraftReady] = useState(false);
+  const [isSavingAndLeaving, setIsSavingAndLeaving] = useState(false);
 
   const form = useForm<TrainerOnboardingFormValues>({
     defaultValues: restoredState.values,
@@ -195,6 +206,36 @@ export default function TrainerOnboardingPage() {
 
   const values = useWatch({ control: form.control });
   const currentScreen = trainerOnboardingScreens[screenIndex];
+
+  useEffect(() => {
+    if (!isTrainerApplicant) return;
+
+    let active = true;
+    void fetchCurrentTrainerApplicationFromApi()
+      .then((application) => {
+        if (!active) return;
+        if (['submitted', 'under_review', 'approved', 'rejected'].includes(application.status)) {
+          navigate('/trainer', { replace: true });
+          return;
+        }
+
+        const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === application.currentScreen);
+        form.reset(application.values);
+        setApplicationId(application.applicationId);
+        setApplicationStatus(application.status);
+        setAdminRemarks(application.adminRemarks);
+        setReviewHistory(application.reviewHistory);
+        setSubmitted(false);
+        setScreenIndex(nextIndex >= 0 ? nextIndex : 0);
+        setSavedAt(application.updatedAt);
+        setIsDraftReady(true);
+      })
+      .catch(() => setIsDraftReady(true));
+
+    return () => {
+      active = false;
+    };
+  }, [auth.token]);
 
   useEffect(() => {
     const payload: PersistedTrainerOnboardingState = {
@@ -208,37 +249,20 @@ export default function TrainerOnboardingPage() {
     };
 
     localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
-    setSavedAt(payload.savedAt);
   }, [applicationId, screenIndex, submitted, submittedAt, values]);
 
   useEffect(() => {
-    let cancelled = false;
+    if (!isTrainerApplicant || !isDraftReady || submitted || !applicationId) return;
 
-    async function syncApplicationState() {
-      const currentApplication = await fetchTrainerApplicationFromApi(applicationId);
-      if (!currentApplication || cancelled) return;
+    const timeout = window.setTimeout(() => {
+      void saveTrainerDraftToApi({
+        values: values ?? trainerOnboardingDefaultValues,
+        currentScreen: currentScreen.id === 'success' ? 'review' : currentScreen.id,
+      }).then((application) => setSavedAt(application.updatedAt));
+    }, 650);
 
-      setApplicationStatus(currentApplication.status);
-      setAdminRemarks(currentApplication.adminRemarks);
-      setReviewHistory(currentApplication.reviewHistory);
-      setSubmitted(true);
-      setSubmittedAt(currentApplication.submittedAt);
-    }
-
-    void syncApplicationState();
-    const handleSync = () => {
-      void syncApplicationState();
-    };
-
-    window.addEventListener('focus', handleSync);
-    window.addEventListener('storage', handleSync);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('focus', handleSync);
-      window.removeEventListener('storage', handleSync);
-    };
-  }, [applicationId]);
+    return () => window.clearTimeout(timeout);
+  }, [applicationId, currentScreen.id, isDraftReady, isTrainerApplicant, submitted, values]);
 
   async function moveNext() {
     if (currentScreen.id === 'review' && applicationStatus === 'rejected') return;
@@ -278,7 +302,6 @@ export default function TrainerOnboardingPage() {
     setIsSubmitting(true);
     try {
       const application = await submitTrainerApplicationToApi({
-        applicationId,
         values: allValues,
       });
 
@@ -300,8 +323,7 @@ export default function TrainerOnboardingPage() {
       setSubmitted(true);
       setSubmittedAt(application.submittedAt);
       setSavedAt(application.updatedAt);
-      setDirection(1);
-      setScreenIndex(successScreenIndex);
+      navigate('/trainer', { replace: true });
     } finally {
       setIsSubmitting(false);
     }
@@ -338,16 +360,17 @@ export default function TrainerOnboardingPage() {
           ['Expertise', values?.expertise.length ? values.expertise.join(', ') : 'Not added yet'],
           ['Years experience', values?.experience.yearsExperience || 'Not added yet'],
           ['Clients trained', values?.experience.clientsTrained || 'Not added yet'],
+          ['Why clients should choose you', values?.clientPitch || 'Not added yet'],
         ],
       },
       {
         title: 'Showcase and coaching style',
         screenId: 'showcase' as const,
         rows: [
-          ['Transformation photos', values?.showcase.transformationPhotos.length ? values.showcase.transformationPhotos.map((item) => item.name).join(', ') : 'Not uploaded yet'],
-          ['Videos', values?.showcase.videos.length ? values.showcase.videos.map((item) => item.name).join(', ') : 'Not uploaded yet'],
+          ['Transformation photos', values?.showcase.transformationPhotos.length ? values.showcase.transformationPhotos.map((item) => item.name).join(', ') : 'Skipped for now'],
+          ['Videos', values?.showcase.videos.length ? values.showcase.videos.map((item) => item.name).join(', ') : 'Skipped for now'],
           ['Training philosophy', values?.training.philosophy || 'Not added yet'],
-          ['Introduction video', values?.training.introductionVideo?.name || 'Not uploaded yet'],
+          ['Introduction video', values?.training.introductionVideo?.name || 'Skipped for now'],
         ],
       },
       {
@@ -356,7 +379,9 @@ export default function TrainerOnboardingPage() {
         rows: [
           ['Training modes', values?.availability.modes.length ? values.availability.modes.join(', ') : 'Not added yet'],
           ['Available days', values?.availability.days.length ? values.availability.days.join(', ') : 'Not added yet'],
-          ['Pricing plans', values?.availability.pricingPlans || 'Not added yet'],
+          ['Per session rate', values?.availability.perSessionRateInr ? `INR ${values.availability.perSessionRateInr}` : 'Not added yet'],
+          ['Monthly rate', values?.availability.monthlyRateInr ? `INR ${values.availability.monthlyRateInr}` : 'Not added yet'],
+          ['Pricing notes', values?.availability.pricingPlans || 'Not added yet'],
           ['PAN', values?.identity.pan?.name || 'Not uploaded yet'],
           ['Primary ID', values?.identity.aadhaar?.name || values?.identity.passport?.name || values?.identity.drivingLicense?.name || 'Not uploaded yet'],
           ['Bank name', values?.payout.bankName || 'Not added yet'],
@@ -375,6 +400,30 @@ export default function TrainerOnboardingPage() {
         ? 'Application Rejected'
         : currentScreen.buttonLabel
     : currentScreen.buttonLabel;
+
+  async function saveAndLogout() {
+    setIsSavingAndLeaving(true);
+    try {
+      if (applicationId) {
+        await saveTrainerDraftToApi({
+          values: values ?? trainerOnboardingDefaultValues,
+          currentScreen: currentScreen.id === 'success' ? 'review' : currentScreen.id,
+        });
+      }
+      await logoutRequest();
+      navigate('/login', { replace: true, state: { authNotice: 'Your trainer application has been saved. Sign in to continue.' } });
+    } finally {
+      setIsSavingAndLeaving(false);
+    }
+  }
+
+  if (!isTrainerApplicant) {
+    return <TrainerApplicantAccessPage onCreated={() => window.location.reload()} />;
+  }
+
+  if (!isDraftReady) {
+    return <div className="flex min-h-screen items-center justify-center bg-white text-sm font-medium text-slate-500">Loading your application...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
@@ -417,6 +466,10 @@ export default function TrainerOnboardingPage() {
                         reviewHistory,
                         submitted,
                         submittedAt,
+                        onSkipShowcase: () => {
+                          setDirection(1);
+                          setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
+                        },
                         onJumpToScreen: (screenId) => {
                           const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === screenId);
                           if (nextIndex < 0) return;
@@ -434,7 +487,8 @@ export default function TrainerOnboardingPage() {
                   label={footerLabel}
                   savedLabel={formatSavedTime(savedAt)}
                   onPrimaryAction={moveNext}
-                  loading={isSubmitting}
+                  onSaveAndLogout={() => void saveAndLogout()}
+                  loading={isSubmitting || isSavingAndLeaving}
                   disabled={applicationStatus === 'rejected' && currentScreen.id === 'review'}
                 />
               ) : null}
@@ -456,6 +510,7 @@ function renderCurrentScreen({
   reviewHistory,
   submitted,
   submittedAt,
+  onSkipShowcase,
   onJumpToScreen,
 }: {
   screen: TrainerOnboardingScreen;
@@ -467,6 +522,7 @@ function renderCurrentScreen({
   reviewHistory: TrainerApplicationHistoryItem[];
   submitted: boolean;
   submittedAt: string | null;
+  onSkipShowcase: () => void;
   onJumpToScreen: (screenId: TrainerOnboardingScreenId) => void;
 }) {
   const {
@@ -639,6 +695,16 @@ function renderCurrentScreen({
         </div>
       );
 
+    case 'clientPitch':
+      return (
+        <FormTextArea
+          label="Why should clients choose you?"
+          placeholder="Share your coaching approach, the outcomes you help clients reach, and what working with you feels like."
+          textAreaProps={register('clientPitch')}
+          error={findErrorMessage(errors, 'clientPitch')}
+        />
+      );
+
     case 'showcase':
       return (
         <div className="space-y-5">
@@ -689,6 +755,10 @@ function renderCurrentScreen({
               )
             }
           />
+
+          <Button type="button" variant="outline" onClick={onSkipShowcase} className="h-12 w-full rounded-xl border-slate-300">
+            Skip for now
+          </Button>
         </div>
       );
 
@@ -703,7 +773,7 @@ function renderCurrentScreen({
           />
 
           <SingleUploadField
-            label="Introduction video"
+            label="Introduction video (optional)"
             hint="A short self-introduction helps the review team understand your energy and clarity"
             icon={Video}
             file={values.training.introductionVideo}
@@ -751,11 +821,30 @@ function renderCurrentScreen({
           />
 
           <FormTextArea
-            label="Pricing plans"
-            placeholder="Example: 1:1 studio sessions at INR 1,500, online coaching at INR 8,000 per month, and 12-session starter packages for new clients."
+            label="Pricing notes (optional)"
+            placeholder="Add package details, online coaching options, or other pricing notes."
             textAreaProps={register('availability.pricingPlans')}
             error={findErrorMessage(errors, 'availability.pricingPlans')}
           />
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormInput
+              label="Per session rate (INR)"
+              type="number"
+              inputMode="numeric"
+              placeholder="1500"
+              inputProps={register('availability.perSessionRateInr')}
+              error={findErrorMessage(errors, 'availability.perSessionRateInr')}
+            />
+            <FormInput
+              label="Per month rate (INR)"
+              type="number"
+              inputMode="numeric"
+              placeholder="8000"
+              inputProps={register('availability.monthlyRateInr')}
+              error={findErrorMessage(errors, 'availability.monthlyRateInr')}
+            />
+          </div>
         </div>
       );
 
@@ -961,6 +1050,56 @@ function renderCurrentScreen({
   }
 }
 
+function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
+  const [name, setName] = useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [consent, setConsent] = useState(true);
+  const [notice, setNotice] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  return (
+    <main className="flex min-h-screen items-center justify-center bg-slate-50 px-4 py-8">
+      <section className="w-full max-w-md rounded-xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+        <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Personal trainer application</p>
+        <h1 className="mt-3 text-2xl font-semibold text-slate-950">Create your trainer account</h1>
+        <p className="mt-2 text-sm leading-6 text-slate-600">Save your application as you work and return any time before submitting.</p>
+        <form
+          className="mt-6 space-y-4"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            setLoading(true);
+            setNotice('');
+            try {
+              await registerTrainerApplicant({ name, email, password, consent_to_terms: consent });
+              onCreated();
+            } catch (error) {
+              setNotice(error instanceof Error ? error.message : 'Unable to create trainer account.');
+            } finally {
+              setLoading(false);
+            }
+          }}
+        >
+          <FormInput label="Full name" placeholder="Your full name" value={name} onChange={(event) => setName(event.target.value)} />
+          <FormInput label="Email" type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
+          <FormInput label="Password" type="password" placeholder="Minimum 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} />
+          <label className="flex items-start gap-2 text-sm text-slate-600">
+            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1" />
+            <span>I agree to the terms and privacy policy.</span>
+          </label>
+          {notice ? <p className="rounded-lg bg-rose-50 px-3 py-2 text-sm text-rose-700">{notice}</p> : null}
+          <Button type="submit" disabled={loading || !consent || password.length < 8} className="h-12 w-full rounded-xl bg-[var(--ds-brand)] text-white">
+            {loading ? 'Creating account...' : 'Start application'}
+          </Button>
+        </form>
+        <p className="mt-5 text-center text-sm text-slate-600">
+          Already started? <Link to="/login" className="font-semibold text-[var(--ds-brand)]">Sign in to continue</Link>
+        </p>
+      </section>
+    </main>
+  );
+}
+
 function OnboardingLayout({ animation, content }: { animation: React.ReactNode; content: React.ReactNode }) {
   return (
     <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-12">
@@ -1090,12 +1229,14 @@ function OnboardingFooter({
   loading,
   disabled,
   onPrimaryAction,
+  onSaveAndLogout,
 }: {
   label: string;
   savedLabel: string;
   loading: boolean;
   disabled?: boolean;
   onPrimaryAction: () => void;
+  onSaveAndLogout: () => void;
 }) {
   return (
     <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 lg:static lg:mt-6 lg:px-0 lg:py-4">
@@ -1109,6 +1250,9 @@ function OnboardingFooter({
         >
           {loading ? 'Submitting...' : <span className="inline-flex items-center gap-2">{label} <ArrowRight size={18} /></span>}
         </Button>
+        <button type="button" onClick={onSaveAndLogout} disabled={loading} className="text-sm font-semibold text-slate-600 hover:text-slate-900 disabled:opacity-50">
+          Save application & Log out
+        </button>
       </div>
     </div>
   );

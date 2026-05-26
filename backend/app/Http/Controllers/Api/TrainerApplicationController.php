@@ -16,6 +16,12 @@ use Illuminate\Support\Str;
 
 class TrainerApplicationController extends Controller
 {
+    private const SCREEN_IDS = [
+        'personalInfo', 'dateOfBirth', 'contact', 'location', 'photo', 'certification',
+        'expertise', 'experience', 'showcase', 'clientPitch', 'training', 'availability',
+        'identity', 'payout', 'review',
+    ];
+
     public function __construct(private readonly ActivityLogService $activityLogs)
     {
     }
@@ -83,6 +89,86 @@ class TrainerApplicationController extends Controller
         ], $application->wasRecentlyCreated ? 201 : 200);
     }
 
+    public function current(Request $request): JsonResponse
+    {
+        $application = $this->applicationForTrainer($request);
+
+        return response()->json([
+            'application' => $this->applicationPayload($application),
+        ]);
+    }
+
+    public function saveDraft(Request $request): JsonResponse
+    {
+        $application = $this->applicationForTrainer($request);
+        abort_unless(in_array($application->status, ['draft', 'needs_resubmission'], true), 409, 'Submitted applications cannot be edited.');
+
+        $validated = $request->validate([
+            'values' => ['required', 'array'],
+            'currentScreen' => ['required', 'string', 'in:' . implode(',', self::SCREEN_IDS)],
+        ]);
+        $values = $validated['values'];
+        $summary = $this->extractSummary($values);
+
+        $application->fill([
+            ...$summary,
+            'expertise_json' => Arr::get($values, 'expertise', []),
+            'values_json' => $values,
+            'current_screen' => $validated['currentScreen'],
+        ])->save();
+
+        return response()->json([
+            'application' => $this->applicationPayload($application->fresh()),
+        ]);
+    }
+
+    public function submitCurrent(Request $request): JsonResponse
+    {
+        $application = $this->applicationForTrainer($request);
+        abort_unless(in_array($application->status, ['draft', 'needs_resubmission'], true), 409, 'This application has already been submitted.');
+
+        $validated = $request->validate([
+            'values' => ['required', 'array'],
+        ]);
+        $values = $validated['values'];
+        $this->validateCompletedValues($values);
+        $summary = $this->extractSummary($values);
+        $timestamp = now();
+        $wasResubmission = $application->status === 'needs_resubmission';
+        $history = is_array($application->review_history_json) ? $application->review_history_json : [];
+        $history[] = $this->historyItem(
+            action: 'submitted',
+            actor: 'trainer',
+            note: $wasResubmission
+                ? 'Trainer resubmitted the application after admin remarks.'
+                : 'Trainer submitted the onboarding application.',
+            at: $timestamp,
+        );
+
+        $application->fill([
+            ...$summary,
+            'expertise_json' => Arr::get($values, 'expertise', []),
+            'values_json' => $values,
+            'status' => 'submitted',
+            'current_screen' => 'review',
+            'admin_remarks' => '',
+            'review_history_json' => $history,
+            'submitted_at' => $timestamp,
+        ])->save();
+
+        $this->activityLogs->record('trainer_application', $wasResubmission ? 'application_resubmitted' : 'application_submitted', sprintf('%s submitted a trainer application.', $application->applicant_name), [
+            'actor' => $request->user(),
+            'subject' => $application,
+            'details' => ['applicationId' => $application->application_id, 'status' => $application->status],
+            'audienceRoles' => ['admin'],
+            'audienceUsers' => [$request->user()],
+        ]);
+
+        return response()->json([
+            'application' => $this->applicationPayload($application->fresh()),
+        ]);
+    }
+
     public function show(string $applicationId): JsonResponse
     {
         $application = TrainerApplication::query()
@@ -105,6 +191,7 @@ class TrainerApplicationController extends Controller
         $this->authorizeAdmin($request);
 
         $applications = TrainerApplication::query()
+            ->where('status', '!=', 'draft')
             ->latest('updated_at')
             ->get()
             ->map(fn (TrainerApplication $application) => $this->applicationPayload($application))
@@ -175,9 +262,9 @@ class TrainerApplicationController extends Controller
 
     private function provisionApprovedTrainerAccount(TrainerApplication $application): array
     {
-        $user = User::query()
-            ->whereRaw('LOWER(email) = ?', [strtolower((string) $application->applicant_email)])
-            ->first();
+        $user = $application->applicant_user_id
+            ? User::query()->find($application->applicant_user_id)
+            : User::query()->whereRaw('LOWER(email) = ?', [strtolower((string) $application->applicant_email)])->first();
         $temporaryPassword = null;
         $created = false;
 
@@ -206,6 +293,10 @@ class TrainerApplicationController extends Controller
             ])->save();
         }
 
+        if (!$application->applicant_user_id) {
+            $application->forceFill(['applicant_user_id' => $user->id])->save();
+        }
+
         $this->activityLogs->record('trainer_application', 'trainer_account_provisioned', sprintf('Trainer account %s was %s.', $user->email, $created ? 'created' : 'updated'), [
             'targetUser' => $user,
             'subject' => $user,
@@ -229,6 +320,7 @@ class TrainerApplicationController extends Controller
     {
         return [
             'applicationId' => (string) $application->application_id,
+            'applicantUserId' => $application->applicant_user_id ? (string) $application->applicant_user_id : null,
             'status' => (string) $application->status,
             'applicantName' => (string) $application->applicant_name,
             'applicantEmail' => (string) $application->applicant_email,
@@ -237,6 +329,7 @@ class TrainerApplicationController extends Controller
             'state' => (string) $application->state,
             'expertise' => array_values($application->expertise_json ?? []),
             'values' => is_array($application->values_json) ? $application->values_json : [],
+            'currentScreen' => (string) ($application->current_screen ?? 'personalInfo'),
             'submittedAt' => optional($application->submitted_at)->toIso8601String() ?? optional($application->created_at)->toIso8601String() ?? now()->toIso8601String(),
             'updatedAt' => optional($application->updated_at)->toIso8601String() ?? now()->toIso8601String(),
             'adminRemarks' => (string) ($application->admin_remarks ?? ''),
@@ -253,6 +346,61 @@ class TrainerApplicationController extends Controller
             'city' => trim((string) Arr::get($values, 'profile.city', '')),
             'state' => trim((string) Arr::get($values, 'profile.state', '')),
         ];
+    }
+
+    private function validateCompletedValues(array $values): void
+    {
+        Validator::make($values, [
+            'profile.fullName' => ['required', 'string', 'min:2', 'max:160'],
+            'profile.email' => ['required', 'email', 'max:255'],
+            'profile.mobile' => ['required', 'string', 'max:30'],
+            'profile.city' => ['required', 'string', 'min:2', 'max:120'],
+            'profile.state' => ['required', 'string', 'min:2', 'max:120'],
+            'photo.file' => ['required', 'array'],
+            'certification.institute' => ['required', 'string', 'min:2'],
+            'certification.type' => ['required', 'string', 'min:2'],
+            'certification.certificate' => ['required', 'array'],
+            'expertise' => ['required', 'array', 'min:1'],
+            'experience.yearsExperience' => ['required', 'integer', 'min:0'],
+            'experience.clientsTrained' => ['required', 'integer', 'min:0'],
+            'clientPitch' => ['required', 'string', 'min:40'],
+            'training.philosophy' => ['required', 'string', 'min:40'],
+            'availability.modes' => ['required', 'array', 'min:1'],
+            'availability.days' => ['required', 'array', 'min:1'],
+            'availability.perSessionRateInr' => ['required', 'integer', 'min:1'],
+            'availability.monthlyRateInr' => ['required', 'integer', 'min:1'],
+            'identity.pan' => ['required', 'array'],
+            'payout.bankName' => ['required', 'string', 'min:2'],
+            'payout.accountNumber' => ['required', 'string'],
+            'payout.ifsc' => ['required', 'string'],
+        ])->after(function ($validator) use ($values): void {
+            if (!Arr::get($values, 'identity.aadhaar') && !Arr::get($values, 'identity.passport') && !Arr::get($values, 'identity.drivingLicense')) {
+                $validator->errors()->add('identity.aadhaar', 'Upload Aadhaar, Passport, or Driving License.');
+            }
+        })->validate();
+    }
+
+    private function applicationForTrainer(Request $request): TrainerApplication
+    {
+        $user = $request->user();
+        abort_unless($user?->role === 'trainer', 403, 'Trainer access required.');
+
+        $application = TrainerApplication::query()
+            ->where('applicant_user_id', $user->id)
+            ->orWhere(function ($query) use ($user): void {
+                $query->whereNull('applicant_user_id')
+                    ->whereRaw('LOWER(applicant_email) = ?', [strtolower((string) $user->email)]);
+            })
+            ->latest('updated_at')
+            ->first();
+
+        abort_unless($application, 404, 'Trainer application not found.');
+
+        if (!$application->applicant_user_id) {
+            $application->forceFill(['applicant_user_id' => $user->id])->save();
+        }
+
+        return $application;
     }
 
     private function historyItem(string $action, string $actor, string $note, Carbon $at): array
