@@ -1,7 +1,9 @@
-import { useEffect, useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Controller, useForm, useWatch, type FieldErrors, type FieldPath } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { AnimatePresence, motion, useReducedMotion } from 'motion/react';
+import Cropper from 'cropperjs';
+import 'cropperjs/dist/cropper.css';
 import {
   ArrowLeft,
   ArrowRight,
@@ -16,6 +18,9 @@ import {
   GraduationCap,
   ImagePlus,
   MapPin,
+  Minus,
+  Plus,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   Upload,
@@ -553,19 +558,12 @@ function renderCurrentScreen({
       return (
         <PhotoCropEditor
           file={values.photo.file}
-          cropX={values.photo.cropX}
-          cropY={values.photo.cropY}
-          zoom={values.photo.zoom}
           error={findErrorMessage(errors, 'photo.file')}
-          onSelect={async (file) => {
-            const upload = await toUploadValue(file, 'image', true);
+          onApply={(upload) => {
             setValue('photo.file', upload, { shouldDirty: true, shouldValidate: true });
             clearErrors('photo.file');
           }}
           onClear={() => setValue('photo.file', null, { shouldDirty: true, shouldValidate: true })}
-          onCropXChange={(value) => setValue('photo.cropX', value, { shouldDirty: true })}
-          onCropYChange={(value) => setValue('photo.cropY', value, { shouldDirty: true })}
-          onZoomChange={(value) => setValue('photo.zoom', value, { shouldDirty: true })}
         />
       );
 
@@ -1419,28 +1417,95 @@ function MultiUploadField({
 
 function PhotoCropEditor({
   file,
-  cropX,
-  cropY,
-  zoom,
   error,
-  onSelect,
+  onApply,
   onClear,
-  onCropXChange,
-  onCropYChange,
-  onZoomChange,
 }: {
   file: UploadValue | null;
-  cropX: number;
-  cropY: number;
-  zoom: number;
   error?: string;
-  onSelect: (file: File) => void | Promise<void>;
+  onApply: (file: UploadValue) => void;
   onClear: () => void;
-  onCropXChange: (value: number) => void;
-  onCropYChange: (value: number) => void;
-  onZoomChange: (value: number) => void;
 }) {
   const inputId = useId();
+  const imageRef = useRef<HTMLImageElement | null>(null);
+  const cropperRef = useRef<Cropper | null>(null);
+  const [source, setSource] = useState<{ name: string; previewUrl: string } | null>(null);
+  const [isReady, setIsReady] = useState(false);
+  const [isApplying, setIsApplying] = useState(false);
+
+  useEffect(() => () => cropperRef.current?.destroy(), []);
+
+  function closeEditor() {
+    cropperRef.current?.destroy();
+    cropperRef.current = null;
+    setIsReady(false);
+    setSource(null);
+  }
+
+  async function openSelectedImage(selected: File) {
+    closeEditor();
+    setSource({
+      name: selected.name,
+      previewUrl: await readFileAsDataUrl(selected),
+    });
+  }
+
+  function initialiseCropper() {
+    if (!imageRef.current) return;
+
+    cropperRef.current?.destroy();
+    cropperRef.current = new Cropper(imageRef.current, {
+      aspectRatio: 4 / 5,
+      viewMode: 1,
+      dragMode: 'move',
+      autoCropArea: 0.94,
+      background: false,
+      center: true,
+      cropBoxMovable: false,
+      cropBoxResizable: false,
+      guides: true,
+      highlight: false,
+      preview: '.trainer-photo-crop-preview',
+      responsive: true,
+      restore: false,
+      toggleDragModeOnDblclick: false,
+      ready: () => setIsReady(true),
+    });
+  }
+
+  async function applyCrop() {
+    const canvas = cropperRef.current?.getCroppedCanvas({
+      width: 640,
+      height: 800,
+      fillColor: '#ffffff',
+      imageSmoothingEnabled: true,
+      imageSmoothingQuality: 'high',
+    });
+
+    if (!canvas || !source) return;
+
+    setIsApplying(true);
+
+    try {
+      const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      if (!blob) return;
+
+      const baseName = source.name.replace(/\.[^.]+$/, '') || 'trainer-photo';
+      const name = `${baseName}-profile.jpg`;
+
+      onApply({
+        id: `${name}-${blob.size}-${Date.now()}`,
+        kind: 'image',
+        name,
+        size: blob.size,
+        type: 'image/jpeg',
+        previewUrl: canvas.toDataURL('image/jpeg', 0.92),
+      });
+      closeEditor();
+    } finally {
+      setIsApplying(false);
+    }
+  }
 
   return (
     <div className="space-y-4">
@@ -1451,109 +1516,114 @@ function PhotoCropEditor({
         className="sr-only"
         onChange={(event) => {
           const selected = event.target.files?.[0];
-          if (selected) void onSelect(selected);
+          if (selected) void openSelectedImage(selected);
           event.currentTarget.value = '';
         }}
       />
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
-        <div className="relative overflow-hidden rounded-xl bg-slate-50 p-3">
-          <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[linear-gradient(145deg,#eef2ff,#dbeafe)]">
-            {file?.previewUrl ? (
-              <img
-                src={file.previewUrl}
-                alt="Trainer profile preview"
-                className="h-full w-full object-cover transition duration-200"
-                style={{ objectPosition: `${cropX}% ${cropY}%`, transform: `scale(${zoom})` }}
-              />
-            ) : (
-              <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-500">
-                <CircleUserRound size={40} />
-                <p className="max-w-[12rem] text-sm">Your portrait preview appears here once you upload it.</p>
-              </div>
-            )}
-          </div>
-        </div>
-
-        <div className="space-y-4">
-          <label
-            htmlFor={inputId}
-            className={cn(
-              'block cursor-pointer rounded-xl border border-dashed px-4 py-4 transition',
-              error ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-transparent hover:border-slate-400',
-            )}
-          >
-            <div className="flex items-start gap-3">
-              <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
-                <Camera size={20} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm font-semibold text-slate-900">Upload a clear portrait</span>
-                <span className="mt-1 block text-sm text-slate-500">A front-facing image with good lighting works best.</span>
-                <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
-                  <Upload size={16} />
-                  {file ? 'Replace photo' : 'Choose photo'}
-                </span>
-              </span>
+      {source ? (
+        <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+            <div>
+              <h3 className="text-sm font-semibold text-slate-950">Frame your profile photo</h3>
+              <p className="mt-0.5 text-sm text-slate-500">Professional 4:5 portrait</p>
             </div>
-          </label>
+            <button type="button" onClick={closeEditor} className="text-sm font-semibold text-slate-500 hover:text-slate-800">
+              Cancel
+            </button>
+          </header>
 
-          {file ? (
-            <div className="space-y-3 border-t border-slate-200 pt-4">
-              <div className="flex items-center justify-between gap-3">
+          <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_180px]">
+            <div className="h-[390px] overflow-hidden rounded-lg bg-slate-950 sm:h-[480px]">
+              <img
+                ref={imageRef}
+                src={source.previewUrl}
+                alt="Crop profile photo"
+                className="block max-w-full"
+                onLoad={initialiseCropper}
+              />
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <p className="text-xs font-semibold uppercase text-slate-500">Profile preview</p>
+                <div className="trainer-photo-crop-preview mt-2 aspect-[4/5] overflow-hidden rounded-lg border border-slate-200 bg-slate-100" />
+              </div>
+
+              <div className="grid grid-cols-3 gap-2" aria-label="Crop controls">
+                <button type="button" title="Zoom out" onClick={() => cropperRef.current?.zoom(-0.1)} className="flex h-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <Minus size={16} />
+                </button>
+                <button type="button" title="Reset crop" onClick={() => cropperRef.current?.reset()} className="flex h-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <RotateCcw size={16} />
+                </button>
+                <button type="button" title="Zoom in" onClick={() => cropperRef.current?.zoom(0.1)} className="flex h-10 items-center justify-center rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50">
+                  <Plus size={16} />
+                </button>
+              </div>
+
+              <Button type="button" onClick={() => void applyCrop()} disabled={!isReady || isApplying} className="w-full">
+                <Check size={16} />
+                {isApplying ? 'Applying...' : 'Apply crop'}
+              </Button>
+            </div>
+          </div>
+        </section>
+      ) : (
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+          <div className="relative overflow-hidden rounded-xl bg-slate-50 p-3">
+            <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[linear-gradient(145deg,#eef2ff,#dbeafe)]">
+              {file?.previewUrl ? (
+                <img src={file.previewUrl} alt="Trainer profile preview" className="h-full w-full object-cover" />
+              ) : (
+                <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-500">
+                  <CircleUserRound size={40} />
+                  <p className="max-w-[12rem] text-sm">Your portrait preview appears here once you upload it.</p>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="space-y-4">
+            <label
+              htmlFor={inputId}
+              className={cn(
+                'block cursor-pointer rounded-xl border border-dashed px-4 py-4 transition',
+                error ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-transparent hover:border-slate-400',
+              )}
+            >
+              <div className="flex items-start gap-3">
+                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
+                  <Camera size={20} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-sm font-semibold text-slate-900">Upload a clear portrait</span>
+                  <span className="mt-1 block text-sm text-slate-500">Clear, front-facing JPG or PNG portrait.</span>
+                  <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
+                    <Upload size={16} />
+                    {file ? 'Replace photo' : 'Choose photo'}
+                  </span>
+                </span>
+              </div>
+            </label>
+
+            {file ? (
+              <div className="flex items-center justify-between gap-3 border-t border-slate-200 pt-4">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
-                  <p className="text-sm text-slate-500">{formatBytes(file.size)}</p>
+                  <p className="text-sm text-slate-500">{formatBytes(file.size)} - 4:5 portrait crop applied</p>
                 </div>
                 <button type="button" onClick={onClear} className="text-sm font-medium text-slate-500 hover:text-slate-700">
                   Remove
                 </button>
               </div>
-
-              <RangeField label="Horizontal crop" value={cropX} min={0} max={100} step={1} onChange={onCropXChange} />
-              <RangeField label="Vertical crop" value={cropY} min={0} max={100} step={1} onChange={onCropYChange} />
-              <RangeField label="Zoom" value={zoom} min={1} max={1.8} step={0.05} onChange={onZoomChange} />
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </div>
-      </div>
+      )}
 
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
     </div>
-  );
-}
-
-function RangeField({
-  label,
-  value,
-  min,
-  max,
-  step,
-  onChange,
-}: {
-  label: string;
-  value: number;
-  min: number;
-  max: number;
-  step: number;
-  onChange: (value: number) => void;
-}) {
-  return (
-    <label className="block space-y-2">
-      <span className="flex items-center justify-between text-sm font-semibold text-slate-800">
-        <span>{label}</span>
-        <span className="text-slate-500">{value.toFixed(step < 1 ? 2 : 0)}</span>
-      </span>
-      <input
-        type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={value}
-        onChange={(event) => onChange(Number(event.target.value))}
-        className="h-2.5 w-full cursor-pointer appearance-none rounded-full bg-slate-200 accent-[var(--ds-brand)]"
-      />
-    </label>
   );
 }
 
