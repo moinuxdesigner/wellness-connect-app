@@ -64,9 +64,9 @@ export default function ProfessionalOnboardingPage() {
       <main className="mx-auto max-w-5xl px-4 py-12 lg:px-8 lg:py-16">
         <section className="rounded-[1.75rem] border border-slate-200 bg-[linear-gradient(135deg,_rgba(99,102,241,0.08),_rgba(16,185,129,0.06))] p-8 shadow-sm sm:p-10">
           <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Professional Onboarding</p>
-          <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-900">Your onboarding workspace is ready</h1>
+          <h1 className="mt-3 text-4xl font-bold tracking-tight text-slate-900">This onboarding path is not live yet</h1>
           <p className="mt-4 max-w-3xl text-base leading-7 text-slate-600">
-            This route is prepared as the placeholder entry point for the professional onboarding flow. The production form can now be connected here without affecting the existing client onboarding journey.
+            This route is still a placeholder for future non-trainer professional onboarding. The live account-creation and onboarding flow available today is for personal trainers.
           </p>
           {selectedRole ? (
             <div className="mt-6 inline-flex rounded-full border border-indigo-200 bg-white px-4 py-2 text-sm font-medium text-slate-700 shadow-sm">
@@ -93,20 +93,26 @@ export default function ProfessionalOnboardingPage() {
 
         <section className="mt-8 rounded-[1.5rem] border border-dashed border-slate-300 bg-white p-6 shadow-sm">
           {/* TODO: Replace this placeholder with the full professional onboarding form and submission workflow. */}
-          <h2 className="text-lg font-semibold text-slate-900">Next implementation step</h2>
+          <h2 className="text-lg font-semibold text-slate-900">Choose a supported starting point</h2>
           <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">
-            Connect this page to the final multi-step application form, document upload, verification checks, and role-specific review logic.
+            Return to careers to review the available professional roles, or use the live trainer onboarding flow if you are applying as a personal trainer.
           </p>
           <div className="mt-5 flex flex-wrap gap-3">
             <Link
-              to="/careers"
+              to="/careers#open-roles"
+              className="inline-flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+            >
+              Review roles on careers page
+            </Link>
+            <Link
+              to="/trainer/onboarding"
               className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
-              Review roles again
+              Personal Trainer onboarding
             </Link>
             <Link
               to="/login"
-              className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-4 py-3 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+              className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
             >
               Sign In
               <ArrowRight size={16} />

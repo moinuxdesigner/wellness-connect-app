@@ -87,6 +87,51 @@ class TrainerWorkspaceAccessTest extends TestCase
         $this->getJson('/api/v1/trainer/access-status')->assertOk()->assertJsonPath('status', 'pending_review');
     }
 
+    public function test_pending_review_trainer_can_edit_and_resubmit_application(): void
+    {
+        $trainer = User::factory()->create(['email' => 'review-edit@example.com', 'role' => 'trainer', 'status' => 'active']);
+        $application = TrainerApplication::query()->create([
+            'application_id' => 'TRN-EDIT',
+            'applicant_user_id' => $trainer->id,
+            'applicant_name' => $trainer->name,
+            'applicant_email' => $trainer->email,
+            'applicant_mobile' => '+91 9000000000',
+            'city' => 'Hyderabad',
+            'state' => 'Telangana',
+            'values_json' => $this->completeApplicationValues(),
+            'status' => 'submitted',
+            'current_screen' => 'review',
+            'submitted_at' => now()->subDay(),
+        ]);
+        Sanctum::actingAs($trainer);
+
+        $editedValues = $this->completeApplicationValues();
+        $editedValues['profile']['city'] = 'Bengaluru';
+        $editedValues['training']['philosophy'] = 'I coach with a calm, sustainable structure that keeps progress practical and measurable.';
+
+        $this->putJson('/api/v1/trainer/application/draft', [
+            'values' => $editedValues,
+            'currentScreen' => 'training',
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'submitted')
+            ->assertJsonPath('application.currentScreen', 'training')
+            ->assertJsonPath('application.values.profile.city', 'Bengaluru');
+
+        $this->postJson('/api/v1/trainer/application/submit', [
+            'values' => $editedValues,
+        ])->assertOk()
+            ->assertJsonPath('application.status', 'submitted')
+            ->assertJsonPath('application.currentScreen', 'review')
+            ->assertJsonPath('application.values.training.philosophy', $editedValues['training']['philosophy']);
+
+        $this->assertDatabaseHas('trainer_applications', [
+            'id' => $application->id,
+            'status' => 'submitted',
+            'city' => 'Bengaluru',
+            'current_screen' => 'review',
+        ]);
+    }
+
     public function test_approved_trainer_can_access_workspace_dashboard(): void
     {
         $trainer = User::factory()->create([
@@ -286,13 +331,26 @@ class TrainerWorkspaceAccessTest extends TestCase
             'activityUpdates' => [['id' => $activityId, 'status' => 'missed']],
         ])->assertCreated();
 
+        $this->postJson('/api/v1/trainer/check-ins', [
+            'planId' => $planId,
+            'checkedInOn' => today()->format('Y-m-d'),
+            'goalProgressPercent' => 42,
+            'notes' => 'Pain remains elevated after the missed session.',
+            'painReported' => true,
+            'painSeverity' => 'severe',
+            'painNotes' => 'Follow-up pain alert for the same client.',
+        ])->assertCreated();
+
         $dashboard = $this->getJson('/api/v1/trainer/dashboard')->assertOk();
-        $dashboard->assertJsonPath('snapshot.highPriorityAlerts', 1)
+        $dashboard->assertJsonPath('snapshot.highPriorityAlerts', 2)
+            ->assertJsonPath('snapshot.highRiskClients', 1)
             ->assertJsonPath('snapshot.lowAdherenceClients', 1)
+            ->assertJsonPath('nextActions.0.kind', 'review_high_risk')
+            ->assertJsonPath('nextActions.1.kind', 'resolve_low_adherence')
             ->assertJsonFragment(['type' => 'pain_injury', 'priority' => 'high'])
             ->assertJsonFragment(['type' => 'low_adherence', 'priority' => 'medium'])
             ->assertJsonFragment(['type' => 'trainer_missed_workout']);
-        $this->assertGreaterThanOrEqual(3, (int) $dashboard->json('notifications.unreadCount'));
+        $this->assertGreaterThanOrEqual(4, (int) $dashboard->json('notifications.unreadCount'));
 
         $notificationId = $dashboard->json('notifications.items.0.id');
         $this->patchJson("/api/v1/trainer/notifications/{$notificationId}", ['read' => true])
@@ -345,6 +403,114 @@ class TrainerWorkspaceAccessTest extends TestCase
             ->assertOk()
             ->assertJsonPath('cases.0.subject.type', 'trainer_alert')
             ->assertJsonPath('cases.0.subject.secondaryLabel', $client->name);
+    }
+
+    public function test_dashboard_next_actions_are_prioritized_and_capped_to_top_three(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $clientWithPlan = User::factory()->create(['role' => 'client', 'status' => 'active']);
+        $clientWithoutPlan = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $clientWithPlan->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->subDay()->addHour(),
+            'status' => 'completed',
+        ]);
+        Appointment::query()->create([
+            'client_user_id' => $clientWithoutPlan->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->addDay(),
+            'ends_at' => now()->addDay()->addHour(),
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $planId = $this->postJson('/api/v1/trainer/plans', [
+            'clientUserId' => $clientWithPlan->id,
+            'goalTitle' => 'Reduce pain and restore consistency',
+            'startsOn' => today()->subWeek()->format('Y-m-d'),
+        ])->assertCreated()->json('plan.id');
+        $activityId = $this->postJson("/api/v1/trainer/plans/{$planId}/activities", [
+            'title' => 'Strength session',
+            'scheduledFor' => today()->subDay()->format('Y-m-d'),
+        ])->assertCreated()->json('activity.id');
+
+        $this->postJson('/api/v1/trainer/check-ins', [
+            'planId' => $planId,
+            'checkedInOn' => today()->format('Y-m-d'),
+            'goalProgressPercent' => 25,
+            'painReported' => true,
+            'painSeverity' => 'severe',
+            'painNotes' => 'Acute pain flare-up.',
+            'activityUpdates' => [['id' => $activityId, 'status' => 'missed']],
+        ])->assertCreated();
+
+        $this->postJson('/api/v1/trainer/tasks', [
+            'clientUserId' => $clientWithPlan->id,
+            'planId' => $planId,
+            'type' => 'follow_up',
+            'title' => 'Overdue recovery follow-up',
+            'startsAt' => now()->subHours(3)->toIso8601String(),
+            'endsAt' => now()->subHours(2)->toIso8601String(),
+        ])->assertCreated();
+
+        $dashboard = $this->getJson('/api/v1/trainer/dashboard')->assertOk();
+        $dashboard->assertJsonCount(3, 'nextActions')
+            ->assertJsonPath('nextActions.0.kind', 'review_high_risk')
+            ->assertJsonPath('nextActions.1.kind', 'complete_follow_up')
+            ->assertJsonPath('nextActions.2.kind', 'resolve_low_adherence');
+    }
+
+    public function test_dashboard_next_actions_include_log_check_in_when_today_update_is_missing(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $client = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $client->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->subDay()->addHour(),
+            'status' => 'completed',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $this->postJson('/api/v1/trainer/plans', [
+            'clientUserId' => $client->id,
+            'goalTitle' => 'Daily consistency',
+            'startsOn' => today()->subWeek()->format('Y-m-d'),
+        ])->assertCreated();
+
+        $dashboard = $this->getJson('/api/v1/trainer/dashboard')->assertOk();
+        $this->assertContains('log_check_in', collect($dashboard->json('nextActions'))->pluck('kind')->all());
+    }
+
+    public function test_dashboard_next_actions_include_create_plan_for_booked_clients_without_active_plan(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $client = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $client->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->addHour(),
+            'ends_at' => now()->addHours(2),
+            'status' => 'scheduled',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $dashboard = $this->getJson('/api/v1/trainer/dashboard')->assertOk();
+        $this->assertContains('create_plan', collect($dashboard->json('nextActions'))->pluck('kind')->all());
     }
 
     private function createTrainerApplication(User $trainer, string $status): TrainerApplication

@@ -15,6 +15,7 @@ use App\Models\TrainerTask;
 use App\Models\User;
 use App\Models\WorkflowCase;
 use App\Services\ActivityLogService;
+use App\Services\NotificationInboxService;
 use App\Services\WorkflowConfigService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -23,7 +24,10 @@ use Illuminate\Support\Facades\DB;
 
 class TrainerWorkspaceController extends Controller
 {
-    public function __construct(private readonly ActivityLogService $activityLogs)
+    public function __construct(
+        private readonly ActivityLogService $activityLogs,
+        private readonly NotificationInboxService $notifications,
+    )
     {
     }
 
@@ -106,8 +110,10 @@ class TrainerWorkspaceController extends Controller
                 'upcomingSessions' => $appointments->where('starts_at', '>=', now())->whereIn('status', ['scheduled', 'rescheduled'])->count(),
                 'activeClients' => $plans->pluck('client_user_id')->merge($appointments->pluck('client_user_id'))->unique()->count(),
                 'highPriorityAlerts' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('priority', 'high')->whereNotIn('status', ['resolved'])->count(),
+                'highRiskClients' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('priority', 'high')->whereNotIn('status', ['resolved'])->whereNotNull('client_user_id')->distinct('client_user_id')->count('client_user_id'),
                 'lowAdherenceClients' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('type', 'low_adherence')->whereNotIn('status', ['resolved'])->distinct('client_user_id')->count('client_user_id'),
             ],
+            'nextActions' => $this->nextActionsPayload($practitioner, $plans, $appointments),
             'dailySchedule' => $this->schedulePayload($practitioner, $today, $endOfDay),
             'notifications' => $this->notificationsPayload($request->user()),
             'priorityQueue' => TrainerAlert::query()
@@ -479,12 +485,9 @@ class TrainerWorkspaceController extends Controller
     {
         abort_unless($notification->user_id === $request->user()->id, 403, 'This notification is not assigned to you.');
         $validated = $request->validate(['read' => ['required', 'boolean']]);
-        $notification->update([
-            'status' => $validated['read'] ? 'read' : 'sent',
-            'read_at' => $validated['read'] ? now() : null,
-        ]);
+        $notification = $this->notifications->updateReadState($notification, (bool) $validated['read']);
 
-        return response()->json(['message' => 'Notification updated.', 'notification' => $this->notificationPayload($notification->fresh())]);
+        return response()->json(['message' => 'Notification updated.', 'notification' => $this->notifications->payload($notification)]);
     }
 
     private function practitioner(Request $request): Practitioner
@@ -632,12 +635,114 @@ class TrainerWorkspaceController extends Controller
 
     private function notificationsPayload(User $user): array
     {
-        $items = Notification::query()->where('user_id', $user->id)->latest('id')->limit(20)->get();
+        $relevantTypes = ['trainer_missed_workout', 'trainer_pain_alert', 'trainer_low_adherence', 'trainer_follow_up_due'];
+        return $this->notifications->inboxPayload($user, $relevantTypes, 20);
+    }
 
-        return [
-            'unreadCount' => $items->whereNull('read_at')->count(),
-            'items' => $items->map(fn (Notification $notification) => $this->notificationPayload($notification))->values(),
-        ];
+    private function nextActionsPayload(Practitioner $practitioner, $plans, $appointments): array
+    {
+        $actions = [];
+
+        $highRiskClients = TrainerAlert::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('priority', 'high')
+            ->whereNotIn('status', ['resolved'])
+            ->whereNotNull('client_user_id')
+            ->distinct('client_user_id')
+            ->count('client_user_id');
+        if ($highRiskClients > 0) {
+            $actions[] = [
+                'id' => 'review-high-risk',
+                'kind' => 'review_high_risk',
+                'title' => 'Review high-risk clients',
+                'description' => 'High-priority safety concerns need trainer attention.',
+                'priority' => 'high',
+                'count' => $highRiskClients,
+                'to' => '/trainer',
+                'ctaLabel' => 'Open priority queue',
+            ];
+        }
+
+        $overdueFollowUps = TrainerTask::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('type', 'follow_up')
+            ->where('status', 'scheduled')
+            ->where('ends_at', '<', now())
+            ->count();
+        $openFollowUpAlerts = TrainerAlert::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('type', 'follow_up_due')
+            ->whereNotIn('status', ['resolved'])
+            ->count();
+        $followUpCount = max($overdueFollowUps, $openFollowUpAlerts);
+        if ($followUpCount > 0) {
+            $actions[] = [
+                'id' => 'complete-follow-up',
+                'kind' => 'complete_follow_up',
+                'title' => 'Complete overdue follow-ups',
+                'description' => 'Scheduled follow-ups have passed their due time and need closure.',
+                'priority' => 'high',
+                'count' => $followUpCount,
+                'to' => '/trainer',
+                'ctaLabel' => 'Review follow-ups',
+            ];
+        }
+
+        $lowAdherenceClients = TrainerAlert::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('type', 'low_adherence')
+            ->whereNotIn('status', ['resolved'])
+            ->whereNotNull('client_user_id')
+            ->distinct('client_user_id')
+            ->count('client_user_id');
+        if ($lowAdherenceClients > 0) {
+            $actions[] = [
+                'id' => 'resolve-low-adherence',
+                'kind' => 'resolve_low_adherence',
+                'title' => 'Resolve low adherence',
+                'description' => 'Clients are slipping below target adherence and need intervention.',
+                'priority' => 'medium',
+                'count' => $lowAdherenceClients,
+                'to' => '/trainer',
+                'ctaLabel' => 'Open adherence alerts',
+            ];
+        }
+
+        $plansMissingTodayCheckIn = TrainerPlan::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('status', 'active')
+            ->whereDoesntHave('checkIns', fn ($query) => $query->whereDate('checked_in_on', today()))
+            ->count();
+        if ($plansMissingTodayCheckIn > 0) {
+            $actions[] = [
+                'id' => 'log-check-in',
+                'kind' => 'log_check_in',
+                'title' => 'Log today\'s check-ins',
+                'description' => 'Active plans are missing today\'s workout progress update.',
+                'priority' => 'medium',
+                'count' => $plansMissingTodayCheckIn,
+                'to' => '/trainer/check-ins',
+                'ctaLabel' => 'Go to check-ins',
+            ];
+        }
+
+        $bookedClientIds = $appointments->pluck('client_user_id')->filter()->unique();
+        $plannedClientIds = $plans->pluck('client_user_id')->filter()->unique();
+        $clientsNeedingPlans = $bookedClientIds->diff($plannedClientIds)->count();
+        if ($clientsNeedingPlans > 0) {
+            $actions[] = [
+                'id' => 'create-plan',
+                'kind' => 'create_plan',
+                'title' => 'Create missing workout plans',
+                'description' => 'Booked training clients still need an active plan assigned.',
+                'priority' => 'low',
+                'count' => $clientsNeedingPlans,
+                'to' => '/trainer/plans',
+                'ctaLabel' => 'Create plans',
+            ];
+        }
+
+        return array_slice($actions, 0, 3);
     }
 
     private function planPayload(TrainerPlan $plan): array
@@ -679,11 +784,6 @@ class TrainerWorkspaceController extends Controller
     private function alertPayload(TrainerAlert $alert): array
     {
         return ['id' => $alert->id, 'type' => $alert->type, 'priority' => $alert->priority, 'status' => $alert->status, 'summary' => $alert->summary, 'clientName' => optional($alert->client)->name, 'dueAt' => optional($alert->due_at)->toIso8601String()];
-    }
-
-    private function notificationPayload(Notification $notification): array
-    {
-        return ['id' => $notification->id, 'type' => $notification->type, 'message' => (string) ($notification->payload_json['message'] ?? $notification->type), 'read' => $notification->read_at !== null || $notification->status === 'read', 'createdAt' => optional($notification->created_at)->toIso8601String(), 'meta' => $notification->payload_json];
     }
 
     private function notify(User $user, string $type, string $message, array $meta): void

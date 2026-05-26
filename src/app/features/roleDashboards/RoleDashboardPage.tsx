@@ -36,13 +36,9 @@ const rolePageCopy: Record<Role, { heading: string; subtitle: string; metrics: A
   },
   trainer: {
     heading: 'Trainer Dashboard',
-    subtitle: 'Training plans, check-ins, and adherence workflow.',
-    metrics: [
-      { title: 'Active Plans', value: '18', hint: '5 updated this week' },
-      { title: 'Check-ins Due', value: '9', hint: 'Across fitness clients' },
-      { title: 'Adherence', value: '82%', hint: 'Weekly plan adherence' },
-    ],
-    actions: ['Create a workout plan', 'Log a check-in', 'Escalate pain/injury'],
+    subtitle: 'Trainer workflows now live in the dedicated trainer workspace dashboard.',
+    metrics: [],
+    actions: [],
   },
   coach: { heading: 'Coach Dashboard', subtitle: 'Goals and coaching workflows.', metrics: [], actions: [] },
   helpdesk: {

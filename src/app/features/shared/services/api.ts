@@ -40,6 +40,30 @@ export interface SlotItem {
   slot_status: 'open' | 'held' | 'booked' | 'blocked';
 }
 
+export interface AccountProfileRoleDetails {
+  roleLabel: string;
+  workspaceTitle: string;
+  client?: {
+    primaryGoal?: 'fitness' | 'mental_health' | 'both' | null;
+    timezone?: string | null;
+    preferredLanguage?: string | null;
+  };
+  trainer?: {
+    applicationStatus?: string | null;
+    applicationId?: string | null;
+    submittedAt?: string | null;
+    profilePhotoUrl?: string | null;
+    specialties?: string[];
+    location?: string | null;
+    editUrl?: string | null;
+  };
+}
+
+export interface AccountProfileResponse {
+  user: AuthUser;
+  roleDetails: AccountProfileRoleDetails;
+}
+
 async function readJson(response: Response) {
   const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('application/json')) {
@@ -67,6 +91,16 @@ function mergeUserProfile(user: AuthUser, profile?: { primary_goal?: AuthUser['p
     ...user,
     primary_goal: profile?.primary_goal ?? user.primary_goal ?? null,
     wellness_goal: profile?.primary_goal ?? user.wellness_goal ?? null,
+  };
+}
+
+function mergeAccountProfileUser(user: AuthUser, roleDetails?: AccountProfileRoleDetails | null): AuthUser {
+  const primaryGoal = roleDetails?.client?.primaryGoal ?? user.primary_goal ?? null;
+
+  return {
+    ...user,
+    primary_goal: primaryGoal,
+    wellness_goal: primaryGoal,
   };
 }
 
@@ -231,6 +265,46 @@ export async function updateProfileRequest(payload: { name: string; phone?: stri
   if (!response.ok) throw new Error(String(data?.message ?? 'Profile update failed'));
   setAuthState(token, mergeUserProfile(data.user as AuthUser, data.profile));
   return data;
+}
+
+export async function getAccountProfileRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/account/profile`, {
+    headers: authHeaders(token),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to load profile'));
+  const mergedUser = mergeAccountProfileUser(data.user as AuthUser, data.roleDetails as AccountProfileRoleDetails | undefined);
+  setAuthState(token, mergedUser);
+  return {
+    user: mergedUser,
+    roleDetails: (data.roleDetails ?? {}) as AccountProfileRoleDetails,
+  } satisfies AccountProfileResponse;
+}
+
+export async function updateAccountProfileRequest(payload: {
+  name: string;
+  phone?: string;
+  consent_to_terms: boolean;
+  primary_goal?: 'fitness' | 'mental_health' | 'both';
+  timezone?: string;
+  preferred_language?: string;
+}) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/account/profile`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Profile update failed'));
+  const mergedUser = mergeAccountProfileUser(data.user as AuthUser, data.roleDetails as AccountProfileRoleDetails | undefined);
+  setAuthState(token, mergedUser);
+  return {
+    message: String(data?.message ?? 'Profile updated.'),
+    user: mergedUser,
+    roleDetails: (data.roleDetails ?? {}) as AccountProfileRoleDetails,
+  } satisfies AccountProfileResponse & { message: string };
 }
 
 export async function createIntakeFlow(service_type: 'psychology' | 'training' | 'combined' | 'package') {

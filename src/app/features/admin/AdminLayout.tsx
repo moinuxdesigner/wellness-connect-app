@@ -4,6 +4,7 @@ import {
   Activity,
   BadgeIndianRupee,
   BarChart3,
+  Bell,
   BookOpen,
   ClipboardList,
   Gauge,
@@ -12,6 +13,7 @@ import {
   Lock,
   ShieldAlert,
   ShieldCheck,
+  UserCircle2,
   UserRoundCheck,
   UserCheck,
   UserCog,
@@ -24,6 +26,8 @@ import { hasPermission } from '../auth/permissions';
 
 export const adminNavItems = [
   { label: 'Dashboard', to: '/admin', icon: LayoutPanelTop, end: true, permission: 'admin.dashboard.view' },
+  { label: 'Notifications', to: '/admin/notifications', icon: Bell },
+  { label: 'Profile', to: '/admin/profile', icon: UserCircle2 },
   { label: 'User Management', to: '/admin/users', icon: Users, permission: 'admin.users.manage' },
   { label: 'Role Management', to: '/admin/roles', icon: UserCog, permission: 'admin.roles.manage' },
   { label: 'Permission Matrix', to: '/admin/permissions', icon: Lock, permission: 'admin.permissions.manage' },

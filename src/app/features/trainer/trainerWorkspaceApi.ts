@@ -1,4 +1,5 @@
 import { getAuthState } from '../auth/auth';
+import type { AppNotification } from '../notifications/notificationsApi';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
@@ -51,16 +52,20 @@ export type TrainerAlert = {
   clientName?: string | null;
   dueAt?: string | null;
 };
-export type TrainerNotification = {
-  id: number;
-  type: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-  meta: Record<string, unknown>;
+export type TrainerNotification = AppNotification;
+export type TrainerNextAction = {
+  id: string;
+  kind: 'review_high_risk' | 'complete_follow_up' | 'resolve_low_adherence' | 'log_check_in' | 'create_plan';
+  title: string;
+  description: string;
+  priority: 'high' | 'medium' | 'low';
+  count?: number;
+  to: '/trainer' | '/trainer/plans' | '/trainer/check-ins';
+  ctaLabel: string;
 };
 export type TrainerDashboard = {
-  snapshot: { todaySessions: number; upcomingSessions: number; activeClients: number; highPriorityAlerts: number; lowAdherenceClients: number };
+  snapshot: { todaySessions: number; upcomingSessions: number; activeClients: number; highPriorityAlerts: number; highRiskClients: number; lowAdherenceClients: number };
+  nextActions: TrainerNextAction[];
   dailySchedule: TrainerScheduleItem[];
   notifications: { unreadCount: number; items: TrainerNotification[] };
   priorityQueue: TrainerAlert[];

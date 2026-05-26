@@ -20,8 +20,8 @@ return new class extends Migration
             $table->enum('status', ['active', 'completed', 'paused', 'archived'])->default('active');
             $table->timestamps();
 
-            $table->index(['practitioner_id', 'status']);
-            $table->index(['client_user_id', 'status']);
+            $table->index(['practitioner_id', 'status'], 'trainer_plans_pract_status_idx');
+            $table->index(['client_user_id', 'status'], 'trainer_plans_client_status_idx');
         });
 
         Schema::create('trainer_plan_activities', function (Blueprint $table): void {
@@ -35,7 +35,7 @@ return new class extends Migration
             $table->timestamp('completed_at')->nullable();
             $table->timestamps();
 
-            $table->index(['trainer_plan_id', 'scheduled_for', 'status']);
+            $table->index(['trainer_plan_id', 'scheduled_for', 'status'], 'trainer_plan_activities_schedule_idx');
         });
 
         Schema::create('trainer_check_ins', function (Blueprint $table): void {
@@ -52,8 +52,8 @@ return new class extends Migration
             $table->text('pain_notes')->nullable();
             $table->timestamps();
 
-            $table->index(['practitioner_id', 'checked_in_on']);
-            $table->index(['client_user_id', 'checked_in_on']);
+            $table->index(['practitioner_id', 'checked_in_on'], 'trainer_check_ins_pract_date_idx');
+            $table->index(['client_user_id', 'checked_in_on'], 'trainer_check_ins_client_date_idx');
         });
 
         Schema::create('trainer_alerts', function (Blueprint $table): void {
@@ -72,7 +72,7 @@ return new class extends Migration
             $table->timestamp('escalated_at')->nullable();
             $table->timestamps();
 
-            $table->index(['practitioner_id', 'status', 'priority']);
+            $table->index(['practitioner_id', 'status', 'priority'], 'trainer_alerts_pract_status_priority_idx');
         });
 
         Schema::create('trainer_tasks', function (Blueprint $table): void {
@@ -89,7 +89,7 @@ return new class extends Migration
             $table->text('notes')->nullable();
             $table->timestamps();
 
-            $table->index(['practitioner_id', 'starts_at', 'status']);
+            $table->index(['practitioner_id', 'starts_at', 'status'], 'trainer_tasks_pract_start_status_idx');
         });
 
         Schema::table('notifications', function (Blueprint $table): void {

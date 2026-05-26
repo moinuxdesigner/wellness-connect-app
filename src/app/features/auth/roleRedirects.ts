@@ -17,6 +17,10 @@ export function getRoleHomePath(role: Role): string {
   return roleHomePaths[role];
 }
 
+export function getRoleNotificationsPath(role: Role): string {
+  return `${getRoleHomePath(role)}/notifications`;
+}
+
 export function getPostAuthRedirectPath(user: AuthUser): string {
   if (user.role === 'client' && user.requires_client_intake) {
     return '/client/intake';

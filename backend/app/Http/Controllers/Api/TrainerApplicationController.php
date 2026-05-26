@@ -102,7 +102,7 @@ class TrainerApplicationController extends Controller
     public function saveDraft(Request $request): JsonResponse
     {
         $application = $this->applicationForTrainer($request);
-        abort_unless(in_array($application->status, ['draft', 'needs_resubmission'], true), 409, 'Submitted applications cannot be edited.');
+        abort_unless(in_array($application->status, ['draft', 'needs_resubmission', 'submitted', 'under_review'], true), 409, 'This application can no longer be edited.');
 
         $validated = $request->validate([
             'values' => ['required', 'array'],
@@ -126,7 +126,7 @@ class TrainerApplicationController extends Controller
     public function submitCurrent(Request $request): JsonResponse
     {
         $application = $this->applicationForTrainer($request);
-        abort_unless(in_array($application->status, ['draft', 'needs_resubmission'], true), 409, 'This application has already been submitted.');
+        abort_unless(in_array($application->status, ['draft', 'needs_resubmission', 'submitted', 'under_review'], true), 409, 'This application can no longer be submitted.');
 
         $validated = $request->validate([
             'values' => ['required', 'array'],
@@ -135,7 +135,7 @@ class TrainerApplicationController extends Controller
         $this->validateCompletedValues($values);
         $summary = $this->extractSummary($values);
         $timestamp = now();
-        $wasResubmission = $application->status === 'needs_resubmission';
+        $wasResubmission = in_array($application->status, ['needs_resubmission', 'submitted', 'under_review'], true);
         $history = is_array($application->review_history_json) ? $application->review_history_json : [];
         $history[] = $this->historyItem(
             action: 'submitted',

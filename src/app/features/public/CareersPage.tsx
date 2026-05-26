@@ -182,12 +182,18 @@ export default function CareersPage() {
               </p>
 
               <div className="mt-8 flex flex-wrap gap-3">
-                <Link
-                  to="/professional-onboarding"
+                <a
+                  href="#open-roles"
                   className="inline-flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-5 py-3 text-sm font-semibold text-white shadow-sm transition-all hover:-translate-y-0.5 hover:bg-indigo-700 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
                 >
-                  Start Professional Onboarding
+                  Browse Professional Roles
                   <ArrowRight size={16} />
+                </a>
+                <Link
+                  to="/trainer/onboarding"
+                  className="inline-flex items-center justify-center rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition-colors hover:bg-slate-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-600"
+                >
+                  Personal Trainer: Get Started
                 </Link>
                 <Link
                   to="/pricing"
@@ -221,7 +227,7 @@ export default function CareersPage() {
           </div>
         </section>
 
-        <section className="mx-auto max-w-7xl px-4 py-12 lg:px-8 lg:py-16">
+        <section id="open-roles" className="mx-auto max-w-7xl scroll-mt-24 px-4 py-12 lg:px-8 lg:py-16">
           <div className="max-w-2xl">
             <p className="text-sm font-semibold uppercase tracking-[0.2em] text-indigo-600">Open Roles</p>
             <h2 className="mt-3 text-3xl font-bold tracking-tight text-slate-900">Choose the role that fits your practice</h2>

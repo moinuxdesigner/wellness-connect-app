@@ -28,7 +28,7 @@ import {
   Video,
   X,
 } from 'lucide-react';
-import { Link, useNavigate } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp';
@@ -173,20 +173,35 @@ async function readFileAsDataUrl(file: File) {
 }
 
 async function toUploadValue(file: File, kind: UploadKind, withPreview = false) {
+  const shouldGeneratePreview = withPreview || kind === 'image';
+  const previewUrl = shouldGeneratePreview
+    ? kind === 'video'
+      ? URL.createObjectURL(file)
+      : await readFileAsDataUrl(file)
+    : undefined;
+
   return {
     id: `${file.name}-${file.size}-${file.lastModified}`,
     kind,
     name: file.name,
     size: file.size,
     type: file.type,
-    previewUrl: withPreview || kind === 'image' ? await readFileAsDataUrl(file) : undefined,
+    previewUrl,
   } satisfies UploadValue;
+}
+
+function revokeUploadPreview(file: UploadValue | null | undefined) {
+  if (file?.previewUrl?.startsWith('blob:')) {
+    URL.revokeObjectURL(file.previewUrl);
+  }
 }
 
 export default function TrainerOnboardingPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const auth = getAuthState();
   const isTrainerApplicant = auth.isAuthenticated && auth.user?.role === 'trainer';
+  const editMode = searchParams.get('mode') === 'edit';
   const prefersReducedMotion = useReducedMotion();
   const restoredState = useMemo(readStoredState, []);
   const [screenIndex, setScreenIndex] = useState(restoredState.screenIndex);
@@ -218,7 +233,8 @@ export default function TrainerOnboardingPage() {
     void fetchCurrentTrainerApplicationFromApi()
       .then((application) => {
         if (!active) return;
-        if (['submitted', 'under_review', 'approved', 'rejected'].includes(application.status)) {
+        const canOpenPendingReviewForEdit = editMode && ['submitted', 'under_review'].includes(application.status);
+        if (['approved', 'rejected'].includes(application.status) || (['submitted', 'under_review'].includes(application.status) && !canOpenPendingReviewForEdit)) {
           navigate('/trainer', { replace: true });
           return;
         }
@@ -239,7 +255,7 @@ export default function TrainerOnboardingPage() {
     return () => {
       active = false;
     };
-  }, [auth.token]);
+  }, [auth.token, editMode]);
 
   useEffect(() => {
     const payload: PersistedTrainerOnboardingState = {
@@ -256,7 +272,8 @@ export default function TrainerOnboardingPage() {
   }, [applicationId, screenIndex, submitted, submittedAt, values]);
 
   useEffect(() => {
-    if (!isTrainerApplicant || !isDraftReady || submitted || !applicationId) return;
+    const canEditSubmittedProfile = editMode && ['submitted', 'under_review'].includes(applicationStatus);
+    if (!isTrainerApplicant || !isDraftReady || (!canEditSubmittedProfile && submitted) || !applicationId) return;
 
     const timeout = window.setTimeout(() => {
       void saveTrainerDraftToApi({
@@ -266,7 +283,7 @@ export default function TrainerOnboardingPage() {
     }, 650);
 
     return () => window.clearTimeout(timeout);
-  }, [applicationId, currentScreen.id, isDraftReady, isTrainerApplicant, submitted, values]);
+  }, [applicationId, applicationStatus, currentScreen.id, editMode, isDraftReady, isTrainerApplicant, submitted, values]);
 
   async function moveNext() {
     if (currentScreen.id === 'review' && applicationStatus === 'rejected') return;
@@ -294,7 +311,7 @@ export default function TrainerOnboardingPage() {
     }
 
     if (screenIndex === 0) {
-      navigate('/');
+      navigate(editMode ? '/trainer/submitted-profile' : '/');
       return;
     }
 
@@ -430,12 +447,12 @@ export default function TrainerOnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-0 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
         <OnboardingHeader
           isSuccess={currentScreen.id === 'success'}
           onBack={moveBack}
-          onClose={() => navigate(submitted ? '/trainer' : '/')}
+          onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
         />
 
         <OnboardingLayout
@@ -448,7 +465,7 @@ export default function TrainerOnboardingPage() {
           }
           content={
             <>
-              <div className="flex-1 overflow-y-auto pb-28 lg:pb-10">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto pb-28 lg:pb-10">
                 <AnimatePresence custom={direction} initial={false} mode="wait">
                   <motion.section
                     key={currentScreen.id}
@@ -721,6 +738,7 @@ function renderCurrentScreen({
             hint="Upload before and after images or progress snapshots"
             icon={ImagePlus}
             files={values.showcase.transformationPhotos}
+            previewKind="image"
             accept="image/*"
             error={findErrorMessage(errors, 'showcase.transformationPhotos')}
             onSelect={async (files) => {
@@ -745,23 +763,26 @@ function renderCurrentScreen({
             hint="Upload a coaching reel, demo set, or client story"
             icon={Video}
             files={values.showcase.videos}
+            previewKind="video"
             accept="video/*"
             error={findErrorMessage(errors, 'showcase.videos')}
             onSelect={async (files) => {
-              const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'video')));
+              const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'video', true)));
               setValue('showcase.videos', [...values.showcase.videos, ...nextItems], {
                 shouldDirty: true,
                 shouldValidate: true,
               });
               clearErrors('showcase.videos');
             }}
-            onRemove={(id) =>
+            onRemove={(id) => {
+              const item = values.showcase.videos.find((entry) => entry.id === id);
+              revokeUploadPreview(item);
               setValue(
                 'showcase.videos',
-                values.showcase.videos.filter((item) => item.id !== id),
+                values.showcase.videos.filter((entry) => entry.id !== id),
                 { shouldDirty: true, shouldValidate: true },
-              )
-            }
+              );
+            }}
           />
 
           <Button type="button" variant="outline" onClick={onSkipShowcase} className="h-12 w-full rounded-xl border-slate-300">
@@ -785,14 +806,19 @@ function renderCurrentScreen({
             hint="A short self-introduction helps the review team understand your energy and clarity"
             icon={Video}
             file={values.training.introductionVideo}
+            previewKind="video"
             accept="video/*"
             error={findErrorMessage(errors, 'training.introductionVideo')}
             onSelect={async (file) => {
-              const upload = await toUploadValue(file, 'video');
+              revokeUploadPreview(values.training.introductionVideo);
+              const upload = await toUploadValue(file, 'video', true);
               setValue('training.introductionVideo', upload, { shouldDirty: true, shouldValidate: true });
               clearErrors('training.introductionVideo');
             }}
-            onClear={() => setValue('training.introductionVideo', null, { shouldDirty: true, shouldValidate: true })}
+            onClear={() => {
+              revokeUploadPreview(values.training.introductionVideo);
+              setValue('training.introductionVideo', null, { shouldDirty: true, shouldValidate: true });
+            }}
           />
         </div>
       );
@@ -1134,7 +1160,7 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="min-h-screen bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
+    <div className="min-h-screen overflow-x-hidden bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
       <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-0 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
         <OnboardingHeader
           isSuccess={false}
@@ -1151,7 +1177,7 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
           }
           content={
             <>
-              <div className="flex-1 overflow-y-auto pb-28 lg:pb-10">
+              <div className="flex-1 overflow-x-hidden overflow-y-auto pb-28 lg:pb-10">
                 <AnimatePresence mode="wait" initial={false}>
                   <motion.section
                     key={screen}
@@ -1245,7 +1271,7 @@ function TrainerEntryFooter({
   return (
     <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 lg:static lg:mt-6 lg:px-0 lg:py-4">
       <div className="mx-auto w-full max-w-[520px]">
-        <Button type="button" onClick={onAction} disabled={loading || disabled} className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold hover:bg-[var(--ds-brand-strong)]">
+        <Button type="button" onClick={onAction} disabled={loading || disabled} className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold text-white hover:bg-[var(--ds-brand-strong)]">
           {loading ? 'Please wait...' : <span className="inline-flex items-center gap-2">{label} <ArrowRight size={18} /></span>}
         </Button>
       </div>
@@ -1255,7 +1281,7 @@ function TrainerEntryFooter({
 
 function OnboardingLayout({ animation, content }: { animation: React.ReactNode; content: React.ReactNode }) {
   return (
-    <div className="flex flex-1 flex-col lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-12">
+    <div className="flex flex-1 flex-col overflow-x-hidden lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,520px)] lg:gap-12">
       <div className="pb-2 lg:flex lg:min-h-0 lg:items-center lg:pb-0">
         {animation}
       </div>
@@ -1399,7 +1425,7 @@ function OnboardingFooter({
           type="button"
           onClick={onPrimaryAction}
           disabled={loading || disabled}
-          className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold hover:bg-[var(--ds-brand-strong)]"
+          className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold text-white hover:bg-[var(--ds-brand-strong)]"
         >
           {loading ? 'Submitting...' : <span className="inline-flex items-center gap-2">{label} <ArrowRight size={18} /></span>}
         </Button>
@@ -1562,6 +1588,7 @@ function SingleUploadField({
   label,
   hint,
   file,
+  previewKind,
   accept,
   error,
   icon: Icon,
@@ -1571,6 +1598,7 @@ function SingleUploadField({
   label: string;
   hint: string;
   file: UploadValue | null;
+  previewKind?: 'image' | 'video';
   accept: string;
   error?: string;
   icon: typeof Upload;
@@ -1622,6 +1650,16 @@ function SingleUploadField({
         </div>
       </label>
 
+      {file?.previewUrl && previewKind ? (
+        <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
+          {previewKind === 'image' ? (
+            <img src={file.previewUrl} alt={`${label} preview`} className="h-56 w-full object-cover" />
+          ) : (
+            <video src={file.previewUrl} controls preload="metadata" className="h-56 w-full bg-slate-950 object-cover" />
+          )}
+        </div>
+      ) : null}
+
       {file ? (
         <button type="button" onClick={onClear} className="text-sm font-medium text-slate-500 hover:text-slate-700">
           Remove file
@@ -1637,6 +1675,7 @@ function MultiUploadField({
   label,
   hint,
   files,
+  previewKind,
   accept,
   error,
   icon: Icon,
@@ -1646,6 +1685,7 @@ function MultiUploadField({
   label: string;
   hint: string;
   files: UploadValue[];
+  previewKind?: 'image' | 'video';
   accept: string;
   error?: string;
   icon: typeof Upload;
@@ -1692,16 +1732,24 @@ function MultiUploadField({
       </label>
 
       {files.length ? (
-        <div className="grid gap-3">
+        <div className="grid gap-3 sm:grid-cols-2">
           {files.map((file) => (
-            <div key={file.id} className="flex items-center justify-between gap-3 border-b border-slate-200 py-3">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
-                <p className="text-sm text-slate-500">{formatBytes(file.size)}</p>
+            <div key={file.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
+              {file.previewUrl && previewKind === 'image' ? (
+                <img src={file.previewUrl} alt={`${file.name} preview`} className="h-40 w-full object-cover" />
+              ) : null}
+              {file.previewUrl && previewKind === 'video' ? (
+                <video src={file.previewUrl} controls preload="metadata" className="h-40 w-full bg-slate-950 object-cover" />
+              ) : null}
+              <div className="flex items-center justify-between gap-3 p-4">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
+                  <p className="text-sm text-slate-500">{formatBytes(file.size)}</p>
+                </div>
+                <button type="button" onClick={() => onRemove(file.id)} className="text-sm font-medium text-slate-500 hover:text-slate-700">
+                  Remove
+                </button>
               </div>
-              <button type="button" onClick={() => onRemove(file.id)} className="text-sm font-medium text-slate-500 hover:text-slate-700">
-                Remove
-              </button>
             </div>
           ))}
         </div>

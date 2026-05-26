@@ -5,7 +5,7 @@ import { getAuthState } from '../auth/auth';
 import { logoutRequest } from '../auth/apiAuth';
 import AuthActionLoader from '../auth/AuthActionLoader';
 import { fetchTrainerAccessState, type TrainerAccessState } from './trainerAccess';
-import type { TrainerApplicationRecord } from './trainerOnboarding';
+import type { TrainerApplicationRecord, UploadValue } from './trainerOnboarding';
 
 export default function TrainerProtectedRoute() {
   const auth = getAuthState();
@@ -73,6 +73,7 @@ function TrainerStatusPage({ status, remarks, application }: { status: 'pending_
       tone: 'bg-indigo-50 text-indigo-600',
       title: 'Your trainer profile is under review',
       message: 'Thank you for completing onboarding. Our admin team is reviewing your profile, qualifications, and documents. You will get access to the trainer workspace after approval.',
+      statusLabel: 'Pending admin approval',
       primaryLabel: 'View submitted profile',
       primaryTo: '/trainer/submitted-profile',
     },
@@ -102,6 +103,8 @@ function TrainerStatusPage({ status, remarks, application }: { status: 'pending_
     },
   }[status];
   const Icon = content.icon;
+  const profileName = application?.values.profile.fullName || application?.applicantName || 'Trainer';
+  const profilePhotoUrl = application?.values.photo.file?.previewUrl;
 
   return (
     <main
@@ -118,15 +121,41 @@ function TrainerStatusPage({ status, remarks, application }: { status: 'pending_
       }}
     >
       <section className="w-full max-w-xl text-center">
-        <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${content.tone}`}>
-          <Icon size={30} />
-        </div>
+        {status === 'pending_review' && application ? (
+          <div className="mx-auto flex w-fit flex-col items-center">
+            <div className="relative">
+              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-indigo-200 bg-white text-3xl font-semibold text-indigo-700 shadow-[0_18px_40px_rgba(99,102,241,0.14)]">
+                {profilePhotoUrl ? (
+                  <img src={profilePhotoUrl} alt={`${profileName} avatar`} className="h-full w-full object-cover" />
+                ) : (
+                  displayInitials(profileName)
+                )}
+              </div>
+              <div className="absolute -bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full border border-indigo-200 bg-white text-indigo-600 shadow-sm">
+                <Clock3 size={20} />
+              </div>
+            </div>
+            <p className="mt-6 text-2xl font-medium text-slate-700">Hi, {profileName}</p>
+          </div>
+        ) : (
+          <div className={`mx-auto flex h-16 w-16 items-center justify-center rounded-full ${content.tone}`}>
+            <Icon size={30} />
+          </div>
+        )}
         <h1 className="mt-7 text-3xl font-semibold tracking-tight text-slate-950">{content.title}</h1>
+        {status === 'pending_review' ? (
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full bg-amber-50 px-4 py-2 text-sm font-semibold text-amber-700">
+            <Clock3 size={16} />
+            {content.statusLabel}
+          </div>
+        ) : null}
         <p className="mx-auto mt-4 max-w-lg text-base leading-7 text-slate-600">{content.message}</p>
         {status === 'pending_review' && application ? (
-          <p className="mt-4 text-sm font-medium text-slate-500">
-            Application {application.applicationId} submitted on {displayDate(application.submittedAt)}
-          </p>
+          <div className="mx-auto mt-8 max-w-md border-t border-slate-200 pt-5">
+            <p className="text-sm font-medium text-slate-500">
+              Application {application.applicationId} submitted on {displayDate(application.submittedAt)}
+            </p>
+          </div>
         ) : null}
         {(status === 'needs_resubmission' || status === 'rejected') && remarks ? (
           <div className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-left">
@@ -184,13 +213,71 @@ function displayDate(value: string) {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
+function displayInitials(value: string) {
+  const parts = value.trim().split(/\s+/).filter(Boolean);
+  if (!parts.length) return 'TP';
+  return parts
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() ?? '')
+    .join('');
+}
+
+function MediaPreviewSection({
+  label,
+  uploads,
+  kind,
+  emptyLabel,
+}: {
+  label: string;
+  uploads: UploadValue[];
+  kind: 'image' | 'video';
+  emptyLabel: string;
+}) {
+  return (
+    <div className="mt-6">
+      <h3 className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</h3>
+      {uploads.length ? (
+        <div className="mt-3 grid gap-4 sm:grid-cols-2">
+          {uploads.map((upload) => (
+            <article key={upload.id} className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+              {kind === 'image' && upload.previewUrl ? (
+                <img src={upload.previewUrl} alt={`${upload.name} preview`} className="h-44 w-full object-cover" />
+              ) : null}
+              {kind === 'video' && upload.previewUrl ? (
+                <video src={upload.previewUrl} controls preload="metadata" className="h-44 w-full bg-slate-950 object-cover" />
+              ) : null}
+              <div className="p-4">
+                <p className="truncate text-sm font-semibold text-slate-900">{upload.name}</p>
+                {!upload.previewUrl ? <p className="mt-1 text-sm text-slate-500">Preview not available for this upload.</p> : null}
+              </div>
+            </article>
+          ))}
+        </div>
+      ) : (
+        <p className="mt-2 text-sm text-slate-500">{emptyLabel}</p>
+      )}
+    </div>
+  );
+}
+
 function SubmittedTrainerProfile({ application }: { application: TrainerApplicationRecord }) {
   const values = application.values;
-  const sections: Array<{ title: string; items: Array<[string, string]> }> = [
+  const profilePhotoUrl = values.photo.file?.previewUrl;
+  const profileName = values.profile.fullName || application.applicantName;
+  const sections: Array<{
+    title: string;
+    items: Array<[string, string]>;
+    media?: Array<{
+      label: string;
+      uploads: UploadValue[];
+      kind: 'image' | 'video';
+      emptyLabel: string;
+    }>;
+  }> = [
     {
       title: 'Personal details',
       items: [
-        ['Full name', values.profile.fullName || application.applicantName],
+        ['Full name', profileName],
         ['Gender', values.profile.gender],
         ['Date of birth', values.profile.dateOfBirth ? displayDate(values.profile.dateOfBirth) : 'Not provided'],
         ['Email', values.profile.email || application.applicantEmail],
@@ -214,22 +301,41 @@ function SubmittedTrainerProfile({ application }: { application: TrainerApplicat
       title: 'Coaching and rates',
       items: [
         ['Training philosophy', values.training.philosophy || 'Not provided'],
-        ['Introduction video', values.training.introductionVideo?.name || 'Skipped for now'],
         ['Training modes', values.availability.modes.join(', ') || 'Not provided'],
         ['Available days', values.availability.days.join(', ') || 'Not provided'],
         ['Per session rate', values.availability.perSessionRateInr ? `INR ${values.availability.perSessionRateInr}` : 'Not provided'],
         ['Monthly rate', values.availability.monthlyRateInr ? `INR ${values.availability.monthlyRateInr}` : 'Not provided'],
       ],
+      media: [
+        {
+          label: 'Introduction video',
+          uploads: values.training.introductionVideo ? [values.training.introductionVideo] : [],
+          kind: 'video',
+          emptyLabel: 'Skipped for now',
+        },
+      ],
     },
     {
       title: 'Portfolio and verification',
       items: [
-        ['Transformation photos', values.showcase.transformationPhotos.map((item) => item.name).join(', ') || 'Skipped for now'],
-        ['Showcase videos', values.showcase.videos.map((item) => item.name).join(', ') || 'Skipped for now'],
         ['PAN card', values.identity.pan?.name || 'Not uploaded'],
         ['Aadhaar', values.identity.aadhaar?.name || 'Not uploaded'],
         ['Passport', values.identity.passport?.name || 'Not uploaded'],
         ['Driving licence', values.identity.drivingLicense?.name || 'Not uploaded'],
+      ],
+      media: [
+        {
+          label: 'Transformation photos',
+          uploads: values.showcase.transformationPhotos,
+          kind: 'image',
+          emptyLabel: 'Skipped for now',
+        },
+        {
+          label: 'Showcase videos',
+          uploads: values.showcase.videos,
+          kind: 'video',
+          emptyLabel: 'Skipped for now',
+        },
       ],
     },
   ];
@@ -237,22 +343,40 @@ function SubmittedTrainerProfile({ application }: { application: TrainerApplicat
   return (
     <main className="min-h-screen bg-slate-50 px-5 py-8 sm:px-8">
       <div className="mx-auto max-w-4xl">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <Link to="/trainer" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 transition hover:text-slate-900">
             <ArrowLeft size={16} />
             Back to review status
           </Link>
-          <TrainerLogoutButton />
+          <div className="flex flex-wrap items-center gap-3">
+            <Link to="/trainer/onboarding?mode=edit" className="rounded-xl border border-slate-300 bg-white px-5 py-3 text-sm font-semibold text-slate-700 transition hover:bg-slate-50">
+              Edit profile
+            </Link>
+            <TrainerLogoutButton />
+          </div>
         </div>
         <header className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Submitted profile</p>
-          <h1 className="mt-3 text-3xl font-semibold text-slate-950">{application.applicantName}</h1>
-          <p className="mt-2 text-sm text-slate-600">
-            Application {application.applicationId} submitted on {displayDate(application.submittedAt)}
-          </p>
-          <span className="mt-5 inline-flex rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
-            Under review
-          </span>
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-indigo-50 text-2xl font-semibold text-indigo-700 shadow-sm">
+                {profilePhotoUrl ? (
+                  <img src={profilePhotoUrl} alt={`${profileName} avatar`} className="h-full w-full object-cover" />
+                ) : (
+                  displayInitials(profileName)
+                )}
+              </div>
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Submitted profile</p>
+                <h1 className="mt-3 text-3xl font-semibold text-slate-950">{profileName}</h1>
+                <p className="mt-2 text-sm text-slate-600">
+                  Application {application.applicationId} submitted on {displayDate(application.submittedAt)}
+                </p>
+              </div>
+            </div>
+            <span className="inline-flex self-start rounded-full bg-indigo-50 px-3 py-1 text-sm font-semibold text-indigo-700">
+              Under review
+            </span>
+          </div>
         </header>
         <div className="mt-6 grid gap-5">
           {sections.map((section) => (
@@ -266,6 +390,15 @@ function SubmittedTrainerProfile({ application }: { application: TrainerApplicat
                   </div>
                 ))}
               </dl>
+              {section.media?.map((media) => (
+                <MediaPreviewSection
+                  key={media.label}
+                  label={media.label}
+                  uploads={media.uploads}
+                  kind={media.kind}
+                  emptyLabel={media.emptyLabel}
+                />
+              ))}
             </section>
           ))}
         </div>
