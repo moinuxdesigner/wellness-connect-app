@@ -17,6 +17,202 @@ type AdminOverview = {
   recent_escalations: TicketSummary[];
 };
 
+export type WorkflowKey =
+  | 'intake_assignment'
+  | 'session_no_show'
+  | 'critical_risk_escalation'
+  | 'cross_team_follow_up_sla';
+
+export type IntakeAssignmentWorkflowConfig = {
+  highRiskSymptoms: string[];
+  stressThreshold: number;
+  highRiskOutcome: 'under_review';
+  lowRiskOutcome: 'auto_bookable';
+  reviewEtaHours: number;
+};
+
+export type SessionNoShowWorkflowConfig = {
+  delayAfterEndMinutes: number;
+  eligibleStatuses: Array<'scheduled' | 'rescheduled'>;
+  notifyClient: boolean;
+};
+
+export type CriticalRiskEscalationWorkflowConfig = {
+  recipientRoles: Array<'admin' | 'helpdesk'>;
+  priority: 'high';
+  notificationChannel: 'in_app';
+  titleTemplate: string;
+};
+
+export type CrossTeamFollowUpSlaWorkflowConfig = {
+  supportRequestDueMinutes: number;
+  escalationDueMinutesByPriority: {
+    low: number;
+    medium: number;
+    high: number;
+  };
+  breachRecipientRoles: Array<'admin' | 'helpdesk'>;
+};
+
+type WorkflowConfigMap = {
+  intake_assignment: IntakeAssignmentWorkflowConfig;
+  session_no_show: SessionNoShowWorkflowConfig;
+  critical_risk_escalation: CriticalRiskEscalationWorkflowConfig;
+  cross_team_follow_up_sla: CrossTeamFollowUpSlaWorkflowConfig;
+};
+
+export type WorkflowConfigPayload = WorkflowConfigMap[WorkflowKey];
+
+export type WorkflowActor = {
+  id: number;
+  name: string;
+  email: string;
+};
+
+export type WorkflowRevision = {
+  id: number;
+  reason: string;
+  config: WorkflowConfigPayload;
+  createdAt: string | null;
+  actor: WorkflowActor | null;
+};
+
+export type WorkflowConfigSummary = {
+  key: WorkflowKey;
+  label: string;
+  description: string;
+  config: WorkflowConfigPayload;
+  updatedAt: string | null;
+  updatedBy: WorkflowActor | null;
+  revisions: WorkflowRevision[];
+};
+
+export type WorkflowCaseAction = 'acknowledge' | 'resolve' | 'reopen' | 'close';
+
+export type WorkflowCaseHistoryEntry = {
+  action: string;
+  actorName?: string;
+  actorEmail?: string;
+  at: string;
+  note?: string | null;
+};
+
+export type WorkflowCase = {
+  id: number;
+  workflowKey: WorkflowKey;
+  workflowLabel: string;
+  status: 'open' | 'acknowledged' | 'resolved' | 'breached' | 'closed';
+  priority: 'low' | 'medium' | 'high';
+  ownerRole: Role;
+  title: string;
+  summary: string;
+  dueAt: string | null;
+  acknowledgedAt: string | null;
+  resolvedAt: string | null;
+  breachedAt: string | null;
+  updatedAt: string | null;
+  subject: {
+    type: 'intake_flow' | 'support_request' | 'unknown';
+    id: number;
+    label: string;
+    secondaryLabel: string;
+    status: string;
+  };
+  meta: {
+    history?: WorkflowCaseHistoryEntry[];
+    [key: string]: unknown;
+  };
+};
+
+export type PerformanceWindow = '7d' | '30d' | '90d';
+
+export type PerformanceSummaryCard = {
+  key: string;
+  label: string;
+  value: number | null;
+  unit: 'percent' | 'minutes' | 'hours' | 'count';
+  deltaLabel: string;
+  tone: 'success' | 'warning' | 'danger' | 'neutral';
+};
+
+export type UtilizationMetric = {
+  label: string;
+  numerator: number;
+  denominator: number;
+  percentage: number | null;
+};
+
+export type PerformanceTrendSeries = {
+  key: string;
+  label: string;
+  data: number[];
+};
+
+export type WorkflowPerformanceSummary = {
+  labels: string[];
+  escalation: {
+    opened: number;
+    resolved: number;
+    breached: number;
+    openNow: number;
+    breachedNow: number;
+    breachRate: number | null;
+    medianResolutionMinutes: number | null;
+    openedSeries: number[];
+    resolvedSeries: number[];
+  };
+  support: {
+    opened: number;
+    acknowledged: number;
+    resolved: number;
+    openNow: number;
+    breachedNow: number;
+    medianFirstResponseMinutes: number | null;
+    openedSeries: number[];
+    resolvedSeries: number[];
+  };
+};
+
+export type TrainerApplicationPerformanceSummary = {
+  submitted: number;
+  underReview: number;
+  resolved: number;
+  medianTurnaroundHours: number | null;
+};
+
+export type PerformanceExceptionRow = {
+  id: number | string;
+  title: string;
+  secondaryLabel: string;
+  status: string;
+  priority: 'low' | 'medium' | 'high' | null;
+  ownerRole: Role | 'admin';
+  dueAt: string | null;
+  ageHours: number | null;
+};
+
+export type AdminPerformanceDashboard = {
+  window: PerformanceWindow;
+  summaryCards: PerformanceSummaryCard[];
+  utilization: {
+    counsellor: UtilizationMetric;
+    trainer: UtilizationMetric;
+  };
+  appointmentTrends: {
+    labels: string[];
+    series: PerformanceTrendSeries[];
+    completionRate: number | null;
+    noShowRate: number | null;
+  };
+  workflowPerformance: WorkflowPerformanceSummary;
+  trainerApplicationPerformance: TrainerApplicationPerformanceSummary;
+  exceptions: {
+    escalations: PerformanceExceptionRow[];
+    supportCases: PerformanceExceptionRow[];
+    trainerApplications: PerformanceExceptionRow[];
+  };
+};
+
 export type RoleChangeAudit = {
   id: string;
   actorName: string;
@@ -86,8 +282,22 @@ async function fetchAdmin<T>(path: string): Promise<T> {
   return data as T;
 }
 
+function buildQuery(params: Record<string, string | undefined>) {
+  const searchParams = new URLSearchParams();
+  Object.entries(params).forEach(([key, value]) => {
+    if (value) searchParams.set(key, value);
+  });
+
+  const query = searchParams.toString();
+  return query ? `?${query}` : '';
+}
+
 export async function getAdminOverview() {
   return fetchAdmin<AdminOverview>('overview');
+}
+
+export async function getAdminPerformance(window: PerformanceWindow = '30d') {
+  return fetchAdmin<AdminPerformanceDashboard>(`performance${buildQuery({ window })}`);
 }
 
 export async function getAdminUsers() {
@@ -175,4 +385,59 @@ export async function getAdminActivities() {
   } catch {
     return mockAppointments;
   }
+}
+
+export async function getAdminWorkflows() {
+  const data = await fetchAdmin<{ workflows: WorkflowConfigSummary[] }>('workflows');
+  return data.workflows;
+}
+
+export async function updateAdminWorkflow(workflowKey: WorkflowKey, config: WorkflowConfigPayload, reason: string) {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing admin session token.');
+
+  const response = await fetch(`${API_BASE}/admin/workflows/${workflowKey}`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify({ config, reason }),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to update workflow configuration.'));
+  return data as { message: string; workflow: WorkflowConfigSummary };
+}
+
+export async function getAdminWorkflowCases(filters: { workflowKey?: WorkflowKey; status?: WorkflowCase['status']; ownerRole?: Role } = {}) {
+  const data = await fetchAdmin<{ cases: WorkflowCase[] }>(`workflow-cases${buildQuery({
+    workflowKey: filters.workflowKey,
+    status: filters.status,
+    ownerRole: filters.ownerRole,
+  })}`);
+  return data.cases;
+}
+
+export async function getHelpdeskWorkflowCases() {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing helpdesk session token.');
+
+  const response = await fetch(`${API_BASE}/helpdesk/workflow-cases`, {
+    method: 'GET',
+    headers: authHeaders(token),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch helpdesk workflow cases.'));
+  return (data?.cases ?? []) as WorkflowCase[];
+}
+
+export async function updateWorkflowCase(caseId: number, action: WorkflowCaseAction, note?: string) {
+  const token = getAuthState().token;
+  if (!token) throw new Error('Missing session token.');
+
+  const response = await fetch(`${API_BASE}/workflow-cases/${caseId}`, {
+    method: 'PATCH',
+    headers: authHeaders(token, true),
+    body: JSON.stringify({ action, note }),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to update workflow case.'));
+  return data as { message: string; case: WorkflowCase };
 }

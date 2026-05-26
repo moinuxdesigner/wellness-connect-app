@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\WellnessPackage;
 use App\Models\WellnessPackageVersion;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -12,6 +13,10 @@ use Illuminate\Support\Str;
 
 class MembershipPlanController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
+
     public function publicIndex(): JsonResponse
     {
         $plans = WellnessPackage::query()
@@ -56,6 +61,16 @@ class MembershipPlanController extends Controller
             return $package;
         });
 
+        $this->activityLogs->record('membership_plan', 'plan_created', sprintf('%s created membership plan %s.', $request->user()->name, $package->name), [
+            'actor' => $request->user(),
+            'subject' => $package,
+            'details' => [
+                'status' => $package->status,
+                'durationWeeks' => $package->duration_weeks,
+            ],
+            'audienceRoles' => ['finance'],
+        ]);
+
         return response()->json(['message' => 'Membership plan draft created.', 'plan' => $this->adminPayload($package->load('versions.tiers'))], 201);
     }
 
@@ -79,6 +94,17 @@ class MembershipPlanController extends Controller
                 'sessions_training' => $data['credits']['training'],
             ]);
         });
+
+        $this->activityLogs->record('membership_plan', 'plan_updated', sprintf('%s updated membership plan %s.', $request->user()->name, $package->name), [
+            'actor' => $request->user(),
+            'subject' => $package,
+            'details' => [
+                'status' => $package->fresh()->status,
+                'durationWeeks' => $data['duration_weeks'],
+            ],
+            'audienceRoles' => ['finance'],
+        ]);
+
         return response()->json(['message' => 'Draft updated.', 'plan' => $this->adminPayload($package->fresh()->load('versions.tiers', 'currentPublishedVersion.tiers'))]);
     }
 
@@ -93,12 +119,28 @@ class MembershipPlanController extends Controller
             $draft->update(['status' => 'published', 'published_at' => now(), 'published_by_user_id' => $request->user()->id]);
             $package->update(['status' => 'published', 'current_published_version_id' => $draft->id, 'is_active' => true]);
         });
+
+        $this->activityLogs->record('membership_plan', 'plan_published', sprintf('%s published membership plan %s.', $request->user()->name, $package->name), [
+            'actor' => $request->user(),
+            'subject' => $package,
+            'details' => ['status' => 'published', 'versionId' => $draft->id],
+            'audienceRoles' => ['finance'],
+        ]);
+
         return response()->json(['message' => 'Membership plan published.', 'plan' => $this->adminPayload($package->fresh()->load('versions.tiers', 'currentPublishedVersion.tiers'))]);
     }
 
-    public function archive(WellnessPackage $package): JsonResponse
+    public function archive(Request $request, WellnessPackage $package): JsonResponse
     {
         $package->update(['status' => 'archived', 'is_active' => false]);
+
+        $this->activityLogs->record('membership_plan', 'plan_archived', sprintf('%s archived membership plan %s.', $request->user()->name, $package->name), [
+            'actor' => $request->user(),
+            'subject' => $package,
+            'details' => ['status' => 'archived'],
+            'audienceRoles' => ['finance'],
+        ]);
+
         return response()->json(['message' => 'Membership plan archived. Existing purchases are unaffected.']);
     }
 

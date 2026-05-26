@@ -6,15 +6,12 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['user_id', 'type', 'channel', 'payload_json', 'status', 'sent_at'])]
-class Notification extends Model
+#[Fillable(['activity_event_id', 'role', 'user_id'])]
+class ActivityEventAudience extends Model
 {
-    protected function casts(): array
+    public function event(): BelongsTo
     {
-        return [
-            'payload_json' => 'array',
-            'sent_at' => 'datetime',
-        ];
+        return $this->belongsTo(ActivityEvent::class, 'activity_event_id');
     }
 
     public function user(): BelongsTo

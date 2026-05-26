@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Permission;
 use App\Models\PermissionChangeAudit;
 use App\Models\RolePermission;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,10 @@ use Illuminate\Support\Facades\DB;
 class PermissionController extends Controller
 {
     private const ROLES = ['admin', 'client', 'counsellor', 'trainer', 'coach', 'helpdesk', 'finance', 'legal', 'content'];
+
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
 
     public function index(Request $request): JsonResponse
     {
@@ -110,6 +115,17 @@ class PermissionController extends Controller
         });
 
         $audit->load('actor:id,name,email');
+
+        $this->activityLogs->record('rbac', 'permissions_updated', sprintf('%s updated permissions for the %s role.', $request->user()->name, $role), [
+            'actor' => $request->user(),
+            'targetRole' => $role,
+            'details' => [
+                'reason' => $reason,
+                'addedPermissions' => $added,
+                'removedPermissions' => $removed,
+            ],
+            'audienceRoles' => [$role],
+        ]);
 
         return response()->json([
             'message' => "Permissions updated for {$role}.",

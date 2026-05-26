@@ -43,11 +43,11 @@ export interface UserSummary {
 
 export interface AppointmentSummary {
   id: string;
-  serviceType: 'counselling' | 'training' | 'coaching';
+  serviceType: 'psychology' | 'training' | 'combined' | 'package';
   clientName: string;
   professionalName: string;
   scheduleAt: string;
-  status: 'scheduled' | 'completed' | 'cancelled';
+  status: 'scheduled' | 'rescheduled' | 'completed' | 'cancelled' | 'no_show';
 }
 
 export interface ProgramSummary {
@@ -70,4 +70,36 @@ export interface DashboardMetric {
   label: string;
   value: string;
   delta: string;
+}
+
+export interface ActivityLogActor {
+  id: number | null;
+  name: string | null;
+  email: string | null;
+  role: Role | string | null;
+}
+
+export interface ActivityLogSubject {
+  type: string | null;
+  id: number | null;
+  label: string | null;
+}
+
+export interface ActivityLogEntry {
+  id: number;
+  category: string;
+  action: string;
+  summary: string;
+  occurredAt: string | null;
+  actor: ActivityLogActor | null;
+  subject: ActivityLogSubject;
+  target: ActivityLogActor | null;
+  details: Record<string, unknown>;
+}
+
+export interface ActivityLogPagination {
+  page: number;
+  pageSize: number;
+  total: number;
+  totalPages: number;
 }

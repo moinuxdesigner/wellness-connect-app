@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
-import { Panel, ToneBadge } from '../shared/components/Ui';
-import { getHelpdeskWorkflowCases, updateWorkflowCase, type WorkflowCase, type WorkflowCaseAction } from '../shared/services/adminApi';
+import { PageTitle } from '../AdminLayout';
+import { Panel, ToneBadge } from '../../shared/components/Ui';
+import { getAdminWorkflowCases, updateWorkflowCase, type WorkflowCase, type WorkflowCaseAction } from '../../shared/services/adminApi';
 
 function priorityTone(priority: WorkflowCase['priority']) {
   return priority === 'high' ? 'danger' : priority === 'medium' ? 'warning' : 'neutral';
@@ -20,7 +21,7 @@ function formatTimestamp(value: string | null) {
   return value ? new Date(value).toLocaleString() : 'Not set';
 }
 
-export default function HelpdeskTicketsPage() {
+export default function AdminEscalationsPage() {
   const [cases, setCases] = useState<WorkflowCase[]>([]);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState('');
@@ -33,9 +34,9 @@ export default function HelpdeskTicketsPage() {
   async function refreshCases() {
     setLoading(true);
     try {
-      setCases(await getHelpdeskWorkflowCases());
+      setCases(await getAdminWorkflowCases({ workflowKey: 'critical_risk_escalation' }));
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Unable to load helpdesk tickets.');
+      setNotice(error instanceof Error ? error.message : 'Unable to load escalation cases.');
     } finally {
       setLoading(false);
     }
@@ -52,7 +53,7 @@ export default function HelpdeskTicketsPage() {
       )));
       setNotice(result.message);
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : 'Unable to update helpdesk ticket.');
+      setNotice(error instanceof Error ? error.message : 'Unable to update escalation case.');
     } finally {
       setActingCaseId(null);
     }
@@ -60,12 +61,9 @@ export default function HelpdeskTicketsPage() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-semibold text-slate-900">Helpdesk Tickets</h1>
-        <p className="mt-1 text-sm text-slate-600">Live support requests tracked against the follow-up SLA workflow.</p>
-      </div>
+      <PageTitle title="Escalations" subtitle="High-risk intake cases that require admin acknowledgement and resolution." />
       {notice ? <p className="rounded-xl bg-indigo-50 px-4 py-3 text-sm text-indigo-700">{notice}</p> : null}
-      <Panel title="Support queue">
+      <Panel title="Escalation queue">
         <div className="space-y-4">
           {loading ? (
             Array.from({ length: 3 }).map((_, index) => <div key={index} className="h-32 animate-pulse rounded-2xl bg-slate-100" />)
@@ -126,7 +124,7 @@ export default function HelpdeskTicketsPage() {
             </article>
           )) : (
             <p className="rounded-xl border border-dashed border-slate-200 px-4 py-8 text-center text-sm text-slate-500">
-              No support workflow cases are currently assigned to helpdesk.
+              No escalation workflow cases are open right now.
             </p>
           )}
         </div>

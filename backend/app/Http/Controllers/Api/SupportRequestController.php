@@ -4,11 +4,20 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\SupportRequest;
+use App\Services\ActivityLogService;
+use App\Services\WorkflowCaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class SupportRequestController extends Controller
 {
+    public function __construct(
+        private readonly ActivityLogService $activityLogs,
+        private readonly WorkflowCaseService $workflowCases,
+    )
+    {
+    }
+
     public function store(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -26,6 +35,19 @@ class SupportRequestController extends Controller
         ]);
         $supportRequest->update([
             'ticket_number' => sprintf('WC-SUP-%06d', $supportRequest->id),
+        ]);
+
+        $this->workflowCases->createSupportRequestCase($supportRequest->fresh());
+        $requester = $request->user('sanctum');
+        $this->activityLogs->record('support', 'request_created', sprintf('Support request %s was submitted.', $supportRequest->ticket_number), [
+            'actor' => $requester,
+            'subject' => $supportRequest,
+            'details' => [
+                'topic' => $supportRequest->topic,
+                'status' => $supportRequest->status,
+            ],
+            'audienceRoles' => ['helpdesk'],
+            'audienceUsers' => array_values(array_filter([$requester])),
         ]);
 
         return response()->json([

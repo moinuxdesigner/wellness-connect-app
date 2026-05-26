@@ -52,4 +52,24 @@ class User extends Authenticatable
     {
         return $this->hasMany(MembershipSubscription::class, 'client_user_id');
     }
+
+    public function notifications(): HasMany
+    {
+        return $this->hasMany(Notification::class);
+    }
+
+    public function supportRequests(): HasMany
+    {
+        return $this->hasMany(SupportRequest::class, 'requester_user_id');
+    }
+
+    public function workflowConfigRevisions(): HasMany
+    {
+        return $this->hasMany(WorkflowConfigRevision::class, 'actor_user_id');
+    }
+
+    public function activityEvents(): HasMany
+    {
+        return $this->hasMany(ActivityEvent::class, 'actor_user_id');
+    }
 }

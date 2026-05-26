@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AppointmentController;
 use App\Http\Controllers\Api\AdminController;
+use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\IntakeFlowController;
@@ -11,9 +12,13 @@ use App\Http\Controllers\Api\MembershipPlanController;
 use App\Http\Controllers\Api\ClientMembershipController;
 use App\Http\Controllers\Api\FinanceBillingController;
 use App\Http\Controllers\Api\PaymentWebhookController;
+use App\Http\Controllers\Api\PerformanceDashboardController;
+use App\Http\Controllers\Api\ProgramManagementController;
 use App\Http\Controllers\Api\TrainerApplicationController;
 use App\Http\Controllers\Api\TrainerWorkspaceController;
 use App\Http\Controllers\Api\SupportRequestController;
+use App\Http\Controllers\Api\WorkflowCaseController;
+use App\Http\Controllers\Api\WorkflowConfigController;
 use Illuminate\Support\Facades\Route;
 
 Route::prefix('v1')->group(function (): void {
@@ -33,6 +38,9 @@ Route::prefix('v1')->group(function (): void {
     });
 
     Route::middleware(['auth:sanctum', 'account.active'])->group(function (): void {
+        Route::get('/activity-logs', [ActivityLogController::class, 'index'])
+            ->middleware('permission:admin.activity_logs.view,client.activity_logs.view,counsellor.activity_logs.view,trainer.activity_logs.view,coach.activity_logs.view,helpdesk.activity_logs.view,finance.activity_logs.view,legal.activity_logs.view,content.activity_logs.view');
+
         Route::put('/client/profile', [ClientProfileController::class, 'update'])->middleware('permission:client.profile.update');
 
         Route::middleware('permission:client.intake.manage')->group(function (): void {
@@ -66,6 +74,7 @@ Route::prefix('v1')->group(function (): void {
 
         Route::prefix('admin')->group(function (): void {
             Route::get('/overview', [AdminController::class, 'overview'])->middleware('permission:admin.dashboard.view,admin.usage.view');
+            Route::get('/performance', [PerformanceDashboardController::class, 'show'])->middleware('permission:admin.performance.view');
             Route::get('/users', [AdminController::class, 'users']);
             Route::post('/users/{user}/reset-password', [AdminController::class, 'resetUserPassword']);
             Route::patch('/users/{user}/role', [AdminController::class, 'updateUserRole']);
@@ -74,9 +83,21 @@ Route::prefix('v1')->group(function (): void {
             Route::put('/permissions/{role}', [PermissionController::class, 'update']);
             Route::get('/trainer-applications', [TrainerApplicationController::class, 'index']);
             Route::patch('/trainer-applications/{applicationId}', [TrainerApplicationController::class, 'updateStatus']);
-            Route::get('/programs', [AdminController::class, 'programs'])->middleware('permission:admin.programs.view');
+            Route::middleware('permission:admin.programs.view')->group(function (): void {
+                Route::get('/programs', [ProgramManagementController::class, 'index']);
+                Route::post('/programs', [ProgramManagementController::class, 'store']);
+                Route::put('/programs/{package}/draft', [ProgramManagementController::class, 'updateDraft']);
+                Route::post('/programs/{package}/publish', [ProgramManagementController::class, 'publish']);
+                Route::post('/programs/{package}/archive', [ProgramManagementController::class, 'archive']);
+                Route::get('/programs/{package}/versions', [ProgramManagementController::class, 'versions']);
+            });
             Route::get('/escalations', [AdminController::class, 'escalations'])->middleware('permission:admin.escalations.view');
-            Route::get('/activities', [AdminController::class, 'activities']);
+            Route::get('/activities', [ActivityLogController::class, 'index'])->middleware('permission:admin.activity_logs.view');
+            Route::middleware('permission:admin.workflows.manage')->group(function (): void {
+                Route::get('/workflows', [WorkflowConfigController::class, 'index']);
+                Route::put('/workflows/{workflowKey}', [WorkflowConfigController::class, 'update']);
+                Route::get('/workflow-cases', [WorkflowCaseController::class, 'adminIndex']);
+            });
             Route::middleware('permission:admin.memberships.manage')->group(function (): void {
                 Route::get('/membership-plans', [MembershipPlanController::class, 'adminIndex']);
                 Route::post('/membership-plans', [MembershipPlanController::class, 'store']);
@@ -96,6 +117,13 @@ Route::prefix('v1')->group(function (): void {
         });
         Route::post('/finance/billing/payments/{payment}/refunds', [FinanceBillingController::class, 'refund'])
             ->middleware('permission:finance.refunds.manage');
+
+        Route::prefix('helpdesk')->middleware('permission:helpdesk.tickets.manage')->group(function (): void {
+            Route::get('/workflow-cases', [WorkflowCaseController::class, 'helpdeskIndex']);
+        });
+
+        Route::patch('/workflow-cases/{workflowCase}', [WorkflowCaseController::class, 'update'])
+            ->middleware('permission:admin.workflows.manage,helpdesk.tickets.manage');
     });
 
     Route::get('/membership-plans', [MembershipPlanController::class, 'publicIndex']);

@@ -5,14 +5,19 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\IntakeAnswer;
 use App\Models\IntakeFlow;
+use App\Services\ActivityLogService;
 use App\Services\IntakeTriageService;
+use App\Services\WorkflowCaseService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class IntakeFlowController extends Controller
 {
-    public function __construct(private readonly IntakeTriageService $triageService)
-    {
+    public function __construct(
+        private readonly ActivityLogService $activityLogs,
+        private readonly IntakeTriageService $triageService,
+        private readonly WorkflowCaseService $workflowCases,
+    ) {
     }
 
     public function store(Request $request): JsonResponse
@@ -26,6 +31,13 @@ class IntakeFlowController extends Controller
             'service_type' => $validated['service_type'],
             'current_step' => 'service',
             'status' => 'draft',
+        ]);
+
+        $this->activityLogs->record('intake', 'intake_created', sprintf('%s started a %s intake.', $request->user()->name, $flow->service_type), [
+            'actor' => $request->user(),
+            'subject' => $flow,
+            'details' => ['serviceType' => $flow->service_type, 'status' => $flow->status],
+            'audienceUsers' => [$request->user()],
         ]);
 
         return response()->json([
@@ -56,6 +68,16 @@ class IntakeFlowController extends Controller
             'service_type' => $validated['service_type'],
             'wellness_package_id' => $validated['wellness_package_id'] ?? null,
             'current_step' => 'intake',
+        ]);
+
+        $this->activityLogs->record('intake', 'service_updated', sprintf('%s updated intake #%d to %s.', $request->user()->name, $intakeFlow->id, $validated['service_type']), [
+            'actor' => $request->user(),
+            'subject' => $intakeFlow,
+            'details' => [
+                'serviceType' => $validated['service_type'],
+                'wellnessPackageId' => $validated['wellness_package_id'] ?? null,
+            ],
+            'audienceUsers' => [$request->user()],
         ]);
 
         return response()->json($intakeFlow->fresh());
@@ -89,6 +111,13 @@ class IntakeFlowController extends Controller
 
         $intakeFlow->update(['current_step' => 'intake']);
 
+        $this->activityLogs->record('intake', 'answers_saved', sprintf('%s saved intake answers for intake #%d.', $request->user()->name, $intakeFlow->id), [
+            'actor' => $request->user(),
+            'subject' => $intakeFlow,
+            'details' => ['answerCount' => count($validated['answers'])],
+            'audienceUsers' => [$request->user()],
+        ]);
+
         return response()->json(['message' => 'Answers saved.', 'current_step' => 'intake', 'status' => $intakeFlow->status]);
     }
 
@@ -106,11 +135,39 @@ class IntakeFlowController extends Controller
             'submitted_at' => now(),
         ]);
 
+        $this->activityLogs->record('intake', 'submitted', sprintf('%s submitted intake #%d.', $request->user()->name, $intakeFlow->id), [
+            'actor' => $request->user(),
+            'subject' => $intakeFlow,
+            'details' => [
+                'status' => $intakeFlow->status,
+                'riskLevel' => $intakeFlow->risk_level,
+                'reviewEtaHours' => $decision['review_eta_hours'] ?? null,
+            ],
+            'audienceUsers' => [$request->user()],
+        ]);
+
+        $this->activityLogs->record('intake', 'routed', sprintf('Intake #%d routed to %s.', $intakeFlow->id, $intakeFlow->status), [
+            'actor' => $request->user(),
+            'subject' => $intakeFlow,
+            'details' => [
+                'status' => $intakeFlow->status,
+                'riskLevel' => $intakeFlow->risk_level,
+                'currentStep' => $intakeFlow->current_step,
+            ],
+            'audienceUsers' => [$request->user()],
+            'audienceRoles' => $intakeFlow->status === 'under_review' ? ['helpdesk'] : [],
+        ]);
+
+        if ($intakeFlow->status === 'under_review' && $intakeFlow->risk_level === 'high') {
+            $intakeFlow->load('client');
+            $this->workflowCases->createCriticalRiskCase($intakeFlow);
+        }
+
         return response()->json([
             'id' => $intakeFlow->id,
             'status' => $intakeFlow->status,
             'current_step' => $intakeFlow->current_step,
-            'review_eta_hours' => $intakeFlow->status === 'under_review' ? 24 : null,
+            'review_eta_hours' => $decision['review_eta_hours'] ?? null,
         ]);
     }
 

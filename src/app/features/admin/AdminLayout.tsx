@@ -29,15 +29,15 @@ export const adminNavItems = [
   { label: 'Permission Matrix', to: '/admin/permissions', icon: Lock, permission: 'admin.permissions.manage' },
   { label: 'Professional Approvals', to: '/admin/approvals', icon: UserCheck, permission: 'admin.approvals.manage' },
   { label: 'Trainer Applications', to: '/admin/trainer-applications', icon: UserRoundCheck, permission: 'admin.trainer_applications.manage' },
-  { label: 'Workflow Configuration', to: '/admin/workflows', icon: ListChecks },
+  { label: 'Workflow Configuration', to: '/admin/workflows', icon: ListChecks, permission: 'admin.workflows.manage' },
   { label: 'Revenue Reports', to: '/admin/revenue', icon: BadgeIndianRupee },
   { label: 'Usage Metrics', to: '/admin/usage', icon: BarChart3, permission: 'admin.usage.view' },
-  { label: 'Performance Dashboard', to: '/admin/performance', icon: Gauge },
+  { label: 'Performance Dashboard', to: '/admin/performance', icon: Gauge, permission: 'admin.performance.view' },
   { label: 'Platform Health', to: '/admin/health', icon: ShieldCheck },
   { label: 'Escalations', to: '/admin/escalations', icon: ShieldAlert, permission: 'admin.escalations.view' },
   { label: 'Program Management', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
   { label: 'Membership Plans', to: '/admin/memberships', icon: ClipboardList, permission: 'admin.memberships.manage' },
-  { label: 'Activity Logs', to: '/admin/logs', icon: Activity },
+  { label: 'Activity Logs', to: '/admin/logs', icon: Activity, permission: 'admin.activity_logs.view' },
 ];
 
 export function AdminLayout() {

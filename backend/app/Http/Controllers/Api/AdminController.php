@@ -9,6 +9,7 @@ use App\Models\RoleChangeAudit;
 use App\Models\TrainerApplication;
 use App\Models\User;
 use App\Models\WellnessPackage;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -16,6 +17,10 @@ use Illuminate\Support\Str;
 
 class AdminController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
+
     public function overview(Request $request): JsonResponse
     {
         $usersCount = User::count();
@@ -141,6 +146,14 @@ class AdminController extends Controller
 
         $user->tokens()->delete();
 
+        $this->activityLogs->record('auth', 'password_reset_forced', sprintf('%s reset the password for %s.', $request->user()->name, $user->name), [
+            'actor' => $request->user(),
+            'targetUser' => $user,
+            'subject' => $user,
+            'details' => ['reason' => 'Admin initiated password reset and revoked active sessions.'],
+            'audienceUsers' => [$user],
+        ]);
+
         return response()->json([
             'message' => "Password reset for {$user->email}. New password: password123",
             'user' => [
@@ -220,6 +233,19 @@ class AdminController extends Controller
 
         $audit->load(['actor:id,name,email', 'target:id,name,email']);
         $updatedUser = User::query()->findOrFail($user->id);
+
+        $this->activityLogs->record('rbac', 'role_changed', sprintf('%s changed %s from %s to %s.', $request->user()->name, $updatedUser->name, $audit->previous_role, $audit->new_role), [
+            'actor' => $request->user(),
+            'targetUser' => $updatedUser,
+            'subject' => $updatedUser,
+            'details' => [
+                'previousRole' => $audit->previous_role,
+                'newRole' => $audit->new_role,
+                'reason' => $audit->reason,
+            ],
+            'audienceRoles' => [$audit->previous_role, $audit->new_role],
+            'audienceUsers' => [$updatedUser],
+        ]);
 
         return response()->json([
             'message' => "Role updated for {$updatedUser->email}. Existing sessions have been signed out.",

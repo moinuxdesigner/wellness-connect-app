@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\TrainerApplication;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -15,6 +16,10 @@ use Illuminate\Support\Str;
 
 class TrainerApplicationController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
+
     public function submit(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -61,6 +66,17 @@ class TrainerApplicationController extends Controller
             'submitted_at' => $timestamp,
         ]);
         $application->save();
+
+        $this->activityLogs->record('trainer_application', $wasResubmission ? 'application_resubmitted' : 'application_submitted', sprintf('%s submitted a trainer application.', $application->applicant_name), [
+            'subject' => $application,
+            'details' => [
+                'applicationId' => $application->application_id,
+                'status' => $application->status,
+                'city' => $application->city,
+                'state' => $application->state,
+            ],
+            'audienceRoles' => ['admin'],
+        ]);
 
         return response()->json([
             'application' => $this->applicationPayload($application->fresh()),
@@ -140,6 +156,17 @@ class TrainerApplicationController extends Controller
             }
         });
 
+        $this->activityLogs->record('trainer_application', 'application_' . $status, sprintf('%s marked trainer application %s as %s.', $request->user()->name, $application->application_id, str_replace('_', ' ', $status)), [
+            'actor' => $request->user(),
+            'subject' => $application,
+            'details' => [
+                'status' => $status,
+                'adminRemarks' => $remarks,
+                'account' => $account,
+            ],
+            'audienceRoles' => ['admin'],
+        ]);
+
         return response()->json([
             'application' => $this->applicationPayload($application->fresh()),
             'account' => $account,
@@ -178,6 +205,17 @@ class TrainerApplicationController extends Controller
                 'phone' => $application->applicant_mobile ?: $user->phone,
             ])->save();
         }
+
+        $this->activityLogs->record('trainer_application', 'trainer_account_provisioned', sprintf('Trainer account %s was %s.', $user->email, $created ? 'created' : 'updated'), [
+            'targetUser' => $user,
+            'subject' => $user,
+            'details' => [
+                'created' => $created,
+                'applicationId' => $application->application_id,
+            ],
+            'audienceRoles' => ['admin'],
+            'audienceUsers' => [$user],
+        ]);
 
         return [
             'userId' => (string) $user->id,

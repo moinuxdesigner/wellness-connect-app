@@ -4,11 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\ClientProfile;
+use App\Services\ActivityLogService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class ClientProfileController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
+
     public function update(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -37,6 +42,17 @@ class ClientProfileController extends Controller
                 'preferred_language' => $validated['preferred_language'] ?? null,
             ]
         );
+
+        $this->activityLogs->record('account', 'profile_updated', sprintf('%s updated their profile.', $user->name), [
+            'actor' => $user,
+            'subject' => $user,
+            'details' => [
+                'primaryGoal' => $validated['primary_goal'] ?? null,
+                'timezone' => $validated['timezone'] ?? null,
+                'preferredLanguage' => $validated['preferred_language'] ?? null,
+            ],
+            'audienceUsers' => [$user],
+        ]);
 
         return response()->json([
             'message' => 'Profile updated.',

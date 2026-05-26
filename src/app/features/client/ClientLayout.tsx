@@ -11,6 +11,7 @@ export const clientNavItems = [
   { label: 'Progress', to: '/client/programs', icon: Activity },
   { label: 'Resources', to: '/client/profile', icon: BookOpenText, permission: 'client.profile.update' },
   { label: 'Membership', to: '/client/membership', icon: ClipboardList, permission: 'client.memberships.manage' },
+  { label: 'Activity', to: '/client/activity', icon: Activity, permission: 'client.activity_logs.view' },
 ];
 
 export function ClientLayout() {

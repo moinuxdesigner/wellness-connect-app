@@ -18,6 +18,7 @@ use RuntimeException;
 class MembershipBillingService
 {
     public function __construct(
+        private readonly ActivityLogService $activityLogs,
         private readonly PaymentGateway $gateway,
         private readonly ReceiptNumberService $receiptNumbers,
         private readonly MembershipEntitlementService $entitlements,
@@ -66,6 +67,18 @@ class MembershipBillingService
 
         $payment->update(['provider_order_id' => $provider['order_id']]);
         $subscription->update(['status' => 'payment_pending']);
+
+        $this->activityLogs->record('billing', 'checkout_initiated', sprintf('%s initiated membership checkout.', $client->name), [
+            'actor' => $client,
+            'subject' => $subscription,
+            'details' => [
+                'paymentId' => $payment->id,
+                'amountMinor' => $payment->amount_minor,
+                'currency' => $payment->currency,
+            ],
+            'audienceRoles' => ['finance'],
+            'audienceUsers' => [$client],
+        ]);
 
         return [
             'subscriptionId' => $subscription->id,
@@ -165,6 +178,20 @@ class MembershipBillingService
                     'recognized_at' => now(),
                 ]
             );
+
+            $this->activityLogs->record('billing', 'payment_captured', sprintf('%s membership payment was captured.', $subscription->client->name), [
+                'actor' => $subscription->client,
+                'subject' => $payment,
+                'details' => [
+                    'subscriptionId' => $subscription->id,
+                    'amountMinor' => $payment->amount_minor,
+                    'currency' => $payment->currency,
+                    'status' => $payment->status,
+                ],
+                'audienceRoles' => ['finance'],
+                'audienceUsers' => [$subscription->client],
+            ]);
+
             return $subscription->fresh();
         });
     }
@@ -212,6 +239,24 @@ class MembershipBillingService
             $payment->subscription->update(['status' => 'refunded', 'refunded_at' => now()]);
             $this->entitlements->expireUnused($payment->subscription, 'Voided after full membership refund.');
         }
+
+        $payment->loadMissing('subscription.client');
+        $client = $payment->subscription->client;
+        $this->activityLogs->record('billing', 'refund_processed', sprintf('%s processed a refund for %s.', $actor->name, $client->name), [
+            'actor' => $actor,
+            'subject' => $refund,
+            'targetUser' => $client,
+            'details' => [
+                'paymentId' => $payment->id,
+                'amountMinor' => $refund->amount_minor,
+                'category' => $refund->category,
+                'reason' => $refund->reason,
+                'status' => $refund->status,
+            ],
+            'audienceRoles' => ['finance'],
+            'audienceUsers' => [$client],
+        ]);
+
         return $refund->fresh();
     }
 }

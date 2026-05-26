@@ -7,6 +7,7 @@ use App\Models\Appointment;
 use App\Models\AppointmentEvent;
 use App\Models\AvailabilitySlot;
 use App\Models\MembershipSubscription;
+use App\Services\ActivityLogService;
 use App\Services\MembershipEntitlementService;
 use App\Services\SlotBookingService;
 use Illuminate\Http\JsonResponse;
@@ -16,7 +17,11 @@ use RuntimeException;
 
 class AppointmentController extends Controller
 {
-    public function __construct(private readonly SlotBookingService $slotBookingService, private readonly MembershipEntitlementService $entitlements)
+    public function __construct(
+        private readonly ActivityLogService $activityLogs,
+        private readonly SlotBookingService $slotBookingService,
+        private readonly MembershipEntitlementService $entitlements,
+    )
     {
     }
 
@@ -59,6 +64,20 @@ class AppointmentController extends Controller
         } catch (RuntimeException $exception) {
             return response()->json(['message' => $exception->getMessage()], 422);
         }
+
+        $appointment->loadMissing(['client', 'practitioner.user']);
+        $practitionerUser = optional($appointment->practitioner)->user;
+        $this->activityLogs->record('appointment', 'booked', sprintf('%s booked appointment #%d.', $request->user()->name, $appointment->id), [
+            'actor' => $request->user(),
+            'subject' => $appointment,
+            'details' => [
+                'serviceType' => $appointment->service_type,
+                'status' => $appointment->status,
+                'startsAt' => optional($appointment->starts_at)->toIso8601String(),
+            ],
+            'audienceUsers' => array_values(array_filter([$appointment->client, $practitionerUser])),
+            'audienceRoles' => $practitionerUser ? [$practitionerUser->role] : [],
+        ]);
 
         return response()->json(['appointment' => $appointment], 201);
     }
@@ -110,6 +129,19 @@ class AppointmentController extends Controller
             return response()->json(['message' => $e->getMessage()], 422);
         }
 
+        $appointment->loadMissing(['client', 'practitioner.user']);
+        $practitionerUser = optional($appointment->practitioner)->user;
+        $this->activityLogs->record('appointment', 'rescheduled', sprintf('%s rescheduled appointment #%d.', $request->user()->name, $appointment->id), [
+            'actor' => $request->user(),
+            'subject' => $appointment,
+            'details' => [
+                'status' => $appointment->status,
+                'startsAt' => optional($appointment->starts_at)->toIso8601String(),
+            ],
+            'audienceUsers' => array_values(array_filter([$appointment->client, $practitionerUser])),
+            'audienceRoles' => $practitionerUser ? [$practitionerUser->role] : [],
+        ]);
+
         return response()->json(['appointment' => $appointment->fresh()]);
     }
 
@@ -135,6 +167,16 @@ class AppointmentController extends Controller
         ]);
         $this->entitlements->handleClientCancellation($appointment, $request->user()->id);
 
+        $appointment->loadMissing(['client', 'practitioner.user']);
+        $practitionerUser = optional($appointment->practitioner)->user;
+        $this->activityLogs->record('appointment', 'cancelled', sprintf('%s cancelled appointment #%d.', $request->user()->name, $appointment->id), [
+            'actor' => $request->user(),
+            'subject' => $appointment,
+            'details' => ['reason' => $validated['reason'] ?? null],
+            'audienceUsers' => array_values(array_filter([$appointment->client, $practitionerUser])),
+            'audienceRoles' => $practitionerUser ? [$practitionerUser->role] : [],
+        ]);
+
         return response()->json(['message' => 'Appointment cancelled.', 'appointment' => $appointment->fresh()]);
     }
 
@@ -143,6 +185,16 @@ class AppointmentController extends Controller
         abort_if($appointment->status === 'cancelled', 422, 'Cancelled appointments cannot be completed.');
         $appointment->update(['status' => 'completed']);
         $this->entitlements->completeAppointment($appointment, $request->user()->id);
+
+        $appointment->loadMissing(['client', 'practitioner.user']);
+        $practitionerUser = optional($appointment->practitioner)->user;
+        $this->activityLogs->record('appointment', 'completed', sprintf('Appointment #%d was completed.', $appointment->id), [
+            'actor' => $request->user(),
+            'subject' => $appointment,
+            'details' => ['status' => $appointment->status],
+            'audienceUsers' => array_values(array_filter([$appointment->client, $practitionerUser])),
+            'audienceRoles' => $practitionerUser ? [$practitionerUser->role] : [],
+        ]);
 
         return response()->json(['message' => 'Appointment completed.', 'appointment' => $appointment->fresh()]);
     }

@@ -16,21 +16,21 @@ import ContactSupportPage from '../features/public/ContactSupportPage';
 import { AdminLayout } from '../features/admin/AdminLayout';
 import AdminDashboardPage from '../features/admin/pages/AdminDashboardPage';
 import {
-  ActivityLogsPage,
-  EscalationsPage,
   MembershipPlanManagementPage,
   PermissionMatrixPage,
-  PerformanceDashboardPage,
   PlatformHealthPage,
   ProfessionalApprovalsPage,
-  ProgramManagementPage,
   RevenueReportsPage,
   RoleManagementPage,
   TrainerApplicationsPage,
   UsageMetricsPage,
   UserManagementPage,
-  WorkflowConfigurationPage,
 } from '../features/admin/pages/AdminModulePages';
+import ProgramManagementPage from '../features/admin/pages/ProgramManagementPage';
+import PerformanceDashboardPage from '../features/admin/pages/PerformanceDashboardPage';
+import WorkflowConfigurationPage from '../features/admin/pages/WorkflowConfigurationPage';
+import AdminEscalationsPage from '../features/admin/pages/AdminEscalationsPage';
+import ActivityLogPage from '../features/activity/ActivityLogPage';
 import { ClientLayout } from '../features/client/ClientLayout';
 import ClientDashboardPage from '../features/client/pages/ClientDashboardPage';
 import ClientProfilePage from '../features/client/pages/ClientProfilePage';
@@ -82,15 +82,15 @@ export default function AppRoutes() {
           <Route path="permissions" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PermissionMatrixPage /></PermissionBoundary>} />
           <Route path="approvals" element={<PermissionBoundary anyOf={['admin.approvals.manage']}><ProfessionalApprovalsPage /></PermissionBoundary>} />
           <Route path="trainer-applications" element={<PermissionBoundary anyOf={['admin.trainer_applications.manage']}><TrainerApplicationsPage /></PermissionBoundary>} />
-          <Route path="workflows" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><WorkflowConfigurationPage /></PermissionBoundary>} />
+          <Route path="workflows" element={<PermissionBoundary anyOf={['admin.workflows.manage']}><WorkflowConfigurationPage /></PermissionBoundary>} />
           <Route path="revenue" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><RevenueReportsPage /></PermissionBoundary>} />
           <Route path="usage" element={<PermissionBoundary anyOf={['admin.usage.view']}><UsageMetricsPage /></PermissionBoundary>} />
-          <Route path="performance" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PerformanceDashboardPage /></PermissionBoundary>} />
+          <Route path="performance" element={<PermissionBoundary anyOf={['admin.performance.view']}><PerformanceDashboardPage /></PermissionBoundary>} />
           <Route path="health" element={<PermissionBoundary anyOf={['admin.permissions.manage']}><PlatformHealthPage /></PermissionBoundary>} />
-          <Route path="escalations" element={<PermissionBoundary anyOf={['admin.escalations.view']}><EscalationsPage /></PermissionBoundary>} />
+          <Route path="escalations" element={<PermissionBoundary anyOf={['admin.workflows.manage']}><AdminEscalationsPage /></PermissionBoundary>} />
           <Route path="programs" element={<PermissionBoundary anyOf={['admin.programs.view']}><ProgramManagementPage /></PermissionBoundary>} />
           <Route path="memberships" element={<PermissionBoundary anyOf={['admin.memberships.manage']}><MembershipPlanManagementPage /></PermissionBoundary>} />
-          <Route path="logs" element={<PermissionBoundary anyOf={['admin.activity_logs.view']}><ActivityLogsPage /></PermissionBoundary>} />
+          <Route path="logs" element={<PermissionBoundary anyOf={['admin.activity_logs.view']}><ActivityLogPage title="Activity Logs" subtitle="Audit and activity stream across every workspace." emptyMessage="No activity has been recorded yet." showAdminFilters /></PermissionBoundary>} />
         </Route>
 
         <Route element={<RequireRole allow={['client']} />}>
@@ -104,6 +104,7 @@ export default function AppRoutes() {
             <Route path="profile" element={<PermissionBoundary anyOf={['client.profile.update']}><ClientProfilePage /></PermissionBoundary>} />
             <Route path="membership" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientMembershipPage /></PermissionBoundary>} />
             <Route path="receipts/:receiptId" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientReceiptPage /></PermissionBoundary>} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['client.activity_logs.view']}><ActivityLogPage title="Activity" subtitle="Track your account, intake, appointments, and membership events." emptyMessage="Your activity history is empty right now." /></PermissionBoundary>} />
             </Route>
           </Route>
         </Route>
@@ -113,6 +114,7 @@ export default function AppRoutes() {
             <Route index element={<RoleDashboardPage role="counsellor" />} />
             <Route path="sessions" element={<CounsellorSessionsPage />} />
             <Route path="clients" element={<CounsellorClientsPage />} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['counsellor.activity_logs.view']}><ActivityLogPage title="Counsellor Activity" subtitle="Follow your session-related and account events." emptyMessage="Your counsellor activity feed will populate as client and care operations are recorded." /></PermissionBoundary>} />
           </Route>
         </Route>
 
@@ -124,6 +126,7 @@ export default function AppRoutes() {
               <Route index element={<RoleDashboardPage role="trainer" />} />
               <Route path="plans" element={<TrainerPlansPage />} />
               <Route path="check-ins" element={<TrainerCheckinsPage />} />
+              <Route path="activity" element={<PermissionBoundary anyOf={['trainer.activity_logs.view']}><ActivityLogPage title="Trainer Activity" subtitle="Review your onboarding, appointment, and account activity." emptyMessage="Your trainer activity feed will populate as onboarding and care workflows progress." /></PermissionBoundary>} />
             </Route>
             </Route>
           </Route>
@@ -134,14 +137,16 @@ export default function AppRoutes() {
             <Route index element={<RoleDashboardPage role="coach" />} />
             <Route path="goals" element={<RolePlaceholderPage role="coach" title="Goals" />} />
             <Route path="messages" element={<RolePlaceholderPage role="coach" title="Messages" />} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['coach.activity_logs.view']}><ActivityLogPage title="Coach Activity" subtitle="Keep an eye on the limited coach-visible audit stream." emptyMessage="Coach activity is intentionally sparse for now and will grow as coach workflows are added." /></PermissionBoundary>} />
           </Route>
         </Route>
 
         <Route element={<RequireRole allow={['helpdesk']} />}>
           <Route path="/helpdesk" element={<RoleDashboardLayout role="helpdesk" />}>
             <Route index element={<RoleDashboardPage role="helpdesk" />} />
-            <Route path="tickets" element={<HelpdeskTicketsPage />} />
+            <Route path="tickets" element={<PermissionBoundary anyOf={['helpdesk.tickets.manage']}><HelpdeskTicketsPage /></PermissionBoundary>} />
             <Route path="knowledge-base" element={<HelpdeskKnowledgeBasePage />} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['helpdesk.activity_logs.view']}><ActivityLogPage title="Helpdesk Activity" subtitle="Support requests, workflow cases, and account events visible to helpdesk." emptyMessage="Helpdesk activity will appear once support requests and workflow cases are created." /></PermissionBoundary>} />
           </Route>
         </Route>
 
@@ -150,6 +155,7 @@ export default function AppRoutes() {
             <Route index element={<RoleDashboardPage role="finance" />} />
             <Route path="revenue" element={<RolePlaceholderPage role="finance" title="Revenue" />} />
             <Route path="invoices" element={<PermissionBoundary anyOf={['finance.invoices.view']}><FinanceBillingPage /></PermissionBoundary>} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['finance.activity_logs.view']}><ActivityLogPage title="Finance Activity" subtitle="Billing, refunds, and plan-lifecycle events relevant to finance." emptyMessage="Finance activity will appear after billing and plan operations occur." /></PermissionBoundary>} />
           </Route>
         </Route>
 
@@ -158,6 +164,7 @@ export default function AppRoutes() {
             <Route index element={<RoleDashboardPage role="legal" />} />
             <Route path="reviews" element={<RolePlaceholderPage role="legal" title="Reviews" />} />
             <Route path="policies" element={<RolePlaceholderPage role="legal" title="Policies" />} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['legal.activity_logs.view']}><ActivityLogPage title="Legal Activity" subtitle="Role and policy-adjacent events visible to legal." emptyMessage="Legal activity is intentionally sparse until more legal workflows are implemented." /></PermissionBoundary>} />
           </Route>
         </Route>
 
@@ -166,6 +173,7 @@ export default function AppRoutes() {
             <Route index element={<RoleDashboardPage role="content" />} />
             <Route path="programs" element={<ContentProgramsPage />} />
             <Route path="assets" element={<ContentAssetsPage />} />
+            <Route path="activity" element={<PermissionBoundary anyOf={['content.activity_logs.view']}><ActivityLogPage title="Content Activity" subtitle="Track content-visible operational and permission events." emptyMessage="Content activity will remain light until more content workflows are writing events." /></PermissionBoundary>} />
           </Route>
         </Route>
       </Route>

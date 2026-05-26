@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Models\ClientProfile;
 use App\Models\User;
+use App\Services\ActivityLogService;
 use App\Services\PermissionService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -15,6 +16,10 @@ use Illuminate\Validation\ValidationException;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly ActivityLogService $activityLogs)
+    {
+    }
+
     public function register(Request $request): JsonResponse
     {
         $validated = $request->validate([
@@ -43,6 +48,13 @@ class AuthController extends Controller
         );
 
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        $this->activityLogs->record('account', 'registered', sprintf('%s created an account.', $user->name), [
+            'actor' => $user,
+            'subject' => $user,
+            'details' => ['role' => $user->role],
+            'audienceUsers' => [$user],
+        ]);
 
         return response()->json([
             'token' => $token,
@@ -77,6 +89,12 @@ class AuthController extends Controller
         $user->tokens()->delete();
         $token = $user->createToken('auth-token')->plainTextToken;
 
+        $this->activityLogs->record('auth', 'login', sprintf('%s signed in.', $user->name), [
+            'actor' => $user,
+            'subject' => $user,
+            'audienceUsers' => [$user],
+        ]);
+
         return response()->json([
             'token' => $token,
             'user' => $this->userPayload($user),
@@ -96,7 +114,15 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()?->currentAccessToken()?->delete();
+        $user = $request->user();
+
+        $this->activityLogs->record('auth', 'logout', sprintf('%s signed out.', (string) $user?->name), [
+            'actor' => $user,
+            'subject' => $user,
+            'audienceUsers' => array_values(array_filter([$user])),
+        ]);
+
+        $user?->currentAccessToken()?->delete();
 
         return response()->json([
             'message' => 'Logged out successfully.',
@@ -125,6 +151,12 @@ class AuthController extends Controller
 
         $user->tokens()->delete();
         $token = $user->createToken('auth-token')->plainTextToken;
+
+        $this->activityLogs->record('auth', 'password_changed', sprintf('%s changed their password.', $user->name), [
+            'actor' => $user,
+            'subject' => $user,
+            'audienceUsers' => [$user],
+        ]);
 
         return response()->json([
             'message' => 'Password updated successfully.',
@@ -163,15 +195,17 @@ class AuthController extends Controller
             'password' => ['required', 'string', 'min:8', 'max:120', 'confirmed'],
         ]);
 
+        $resetUser = null;
         $status = Password::reset(
             $validated,
-            function (User $user, string $password): void {
+            function (User $user, string $password) use (&$resetUser): void {
                 $user->forceFill([
                     'password' => $password,
                     'remember_token' => Str::random(60),
                 ])->save();
 
                 $user->tokens()->delete();
+                $resetUser = $user;
             }
         );
 
@@ -179,6 +213,14 @@ class AuthController extends Controller
             return response()->json([
                 'message' => __($status),
             ], 422);
+        }
+
+        if ($resetUser instanceof User) {
+            $this->activityLogs->record('auth', 'password_reset', sprintf('%s reset their password.', $resetUser->name), [
+                'actor' => $resetUser,
+                'subject' => $resetUser,
+                'audienceUsers' => [$resetUser],
+            ]);
         }
 
         return response()->json([

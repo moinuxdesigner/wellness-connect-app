@@ -40,6 +40,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Dashboard', to: '/counsellor', icon: LayoutPanelTop },
       { label: 'Sessions', to: '/counsellor/sessions', icon: CalendarDays },
       { label: 'Clients', to: '/counsellor/clients', icon: ClipboardCheck },
+      { label: 'Activity', to: '/counsellor/activity', icon: Activity, permission: 'counsellor.activity_logs.view' },
     ],
   },
   trainer: {
@@ -49,6 +50,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Onboarding', to: '/trainer/onboarding', icon: ClipboardList },
       { label: 'Plans', to: '/trainer/plans', icon: Dumbbell },
       { label: 'Check-ins', to: '/trainer/check-ins', icon: ClipboardCheck },
+      { label: 'Activity', to: '/trainer/activity', icon: Activity, permission: 'trainer.activity_logs.view' },
     ],
   },
   coach: {
@@ -57,14 +59,16 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Dashboard', to: '/coach', icon: LayoutPanelTop },
       { label: 'Goals', to: '/coach/goals', icon: Activity },
       { label: 'Messages', to: '/coach/messages', icon: MessageSquare },
+      { label: 'Activity', to: '/coach/activity', icon: ClipboardList, permission: 'coach.activity_logs.view' },
     ],
   },
   helpdesk: {
     title: 'Help Desk',
     navItems: [
       { label: 'Dashboard', to: '/helpdesk', icon: LayoutPanelTop },
-      { label: 'Tickets', to: '/helpdesk/tickets', icon: LifeBuoy },
+      { label: 'Tickets', to: '/helpdesk/tickets', icon: LifeBuoy, permission: 'helpdesk.tickets.manage' },
       { label: 'Knowledge Base', to: '/helpdesk/knowledge-base', icon: BookOpen },
+      { label: 'Activity', to: '/helpdesk/activity', icon: Activity, permission: 'helpdesk.activity_logs.view' },
     ],
   },
   finance: {
@@ -73,6 +77,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Dashboard', to: '/finance', icon: LayoutPanelTop },
       { label: 'Revenue', to: '/finance/revenue', icon: Store },
       { label: 'Invoices', to: '/finance/invoices', icon: FileText, permission: 'finance.invoices.view' },
+      { label: 'Activity', to: '/finance/activity', icon: Activity, permission: 'finance.activity_logs.view' },
     ],
   },
   legal: {
@@ -81,6 +86,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Dashboard', to: '/legal', icon: LayoutPanelTop },
       { label: 'Reviews', to: '/legal/reviews', icon: Scale },
       { label: 'Policies', to: '/legal/policies', icon: FileText },
+      { label: 'Activity', to: '/legal/activity', icon: Activity, permission: 'legal.activity_logs.view' },
     ],
   },
   content: {
@@ -89,6 +95,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Dashboard', to: '/content', icon: LayoutPanelTop },
       { label: 'Programs', to: '/content/programs', icon: BookOpen },
       { label: 'Assets', to: '/content/assets', icon: FileText },
+      { label: 'Activity', to: '/content/activity', icon: Activity, permission: 'content.activity_logs.view' },
     ],
   },
 };
