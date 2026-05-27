@@ -35,6 +35,7 @@ import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input
 import { Textarea } from '../../components/ui/textarea';
 import { cn } from '../../components/ui/utils';
 import {
+  buildTrainerSubmissionIssue,
   findTrainerApplication,
   mergeTrainerOnboardingValues,
   nextActionLabel,
@@ -49,6 +50,7 @@ import {
   trainerOnboardingSchemaVersion,
   trainerOnboardingScreens,
   trainerOnboardingStorageKey,
+  withoutTrainerUploadPreviews,
   type TrainerAnimationKey,
   type TrainerApplicationStatus,
   type PersistedTrainerOnboardingState,
@@ -56,6 +58,7 @@ import {
   type TrainerOnboardingFormValues,
   type TrainerOnboardingScreen,
   type TrainerOnboardingScreenId,
+  type TrainerSubmissionIssue,
   type UploadKind,
   type UploadValue,
 } from './trainerOnboarding';
@@ -67,6 +70,7 @@ import {
   resendTrainerRegistrationOtp,
   saveTrainerDraftToApi,
   submitTrainerApplicationToApi,
+  TrainerApplicationSubmissionError,
   verifyTrainerRegistrationOtp,
   type TrainerOtpChallenge,
 } from './trainerApplicationsApi';
@@ -143,6 +147,26 @@ function findErrorMessage(errors: FieldErrors<TrainerOnboardingFormValues>, path
   return undefined;
 }
 
+function collectSubmissionIssues(errors: FieldErrors<TrainerOnboardingFormValues>) {
+  const issues: TrainerSubmissionIssue[] = [];
+
+  function visit(value: unknown, path: string) {
+    if (!value || typeof value !== 'object') return;
+    if ('message' in value && typeof value.message === 'string') {
+      issues.push(buildTrainerSubmissionIssue(path, value.message));
+      return;
+    }
+
+    Object.entries(value).forEach(([key, child]) => {
+      if (key === 'ref' || key === 'type' || key === 'types') return;
+      visit(child, path ? `${path}.${key}` : key);
+    });
+  }
+
+  visit(errors, '');
+  return issues;
+}
+
 function formatBytes(size: number) {
   if (size < 1024) return `${size} B`;
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
@@ -216,6 +240,9 @@ export default function TrainerOnboardingPage() {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isDraftReady, setIsDraftReady] = useState(false);
   const [isSavingAndLeaving, setIsSavingAndLeaving] = useState(false);
+  const [draftError, setDraftError] = useState('');
+  const [submissionError, setSubmissionError] = useState('');
+  const [submissionIssues, setSubmissionIssues] = useState<TrainerSubmissionIssue[]>([]);
 
   const form = useForm<TrainerOnboardingFormValues>({
     defaultValues: restoredState.values,
@@ -261,14 +288,18 @@ export default function TrainerOnboardingPage() {
     const payload: PersistedTrainerOnboardingState = {
       version: trainerOnboardingSchemaVersion,
       screenId: trainerOnboardingScreens[screenIndex].id,
-      values: values ?? trainerOnboardingDefaultValues,
+      values: withoutTrainerUploadPreviews(values ?? trainerOnboardingDefaultValues),
       submitted,
       submittedAt,
       savedAt: new Date().toISOString(),
       applicationId,
     };
 
-    localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
+    try {
+      localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
+    } catch {
+      // The server draft is authoritative when browser storage is unavailable.
+    }
   }, [applicationId, screenIndex, submitted, submittedAt, values]);
 
   useEffect(() => {
@@ -279,7 +310,12 @@ export default function TrainerOnboardingPage() {
       void saveTrainerDraftToApi({
         values: values ?? trainerOnboardingDefaultValues,
         currentScreen: currentScreen.id === 'success' ? 'review' : currentScreen.id,
-      }).then((application) => setSavedAt(application.updatedAt));
+      })
+        .then((application) => {
+          setSavedAt(application.updatedAt);
+          setDraftError('');
+        })
+        .catch((error) => setDraftError(error instanceof Error ? error.message : 'Unable to autosave your trainer application.'));
     }, 650);
 
     return () => window.clearTimeout(timeout);
@@ -289,7 +325,7 @@ export default function TrainerOnboardingPage() {
     if (currentScreen.id === 'review' && applicationStatus === 'rejected') return;
 
     if (currentScreen.id === 'review') {
-      void form.handleSubmit(submitApplication)();
+      void form.handleSubmit(submitApplication, showSubmissionValidationErrors)();
       return;
     }
 
@@ -319,24 +355,31 @@ export default function TrainerOnboardingPage() {
     setScreenIndex((index) => Math.max(index - 1, 0));
   }
 
+  function showSubmissionValidationErrors(errors: FieldErrors<TrainerOnboardingFormValues>) {
+    setSubmissionError('');
+    setSubmissionIssues(collectSubmissionIssues(errors));
+  }
+
   async function submitApplication(allValues: TrainerOnboardingFormValues) {
     setIsSubmitting(true);
+    setSubmissionError('');
+    setSubmissionIssues([]);
+    const compactValues = withoutTrainerUploadPreviews(allValues);
     try {
       const application = await submitTrainerApplicationToApi({
-        values: allValues,
+        values: compactValues,
       });
 
       const payload: PersistedTrainerOnboardingState = {
         version: trainerOnboardingSchemaVersion,
         screenId: 'success',
-        values: allValues,
+        values: compactValues,
         submitted: true,
         submittedAt: application.submittedAt,
         savedAt: application.updatedAt,
         applicationId: application.applicationId,
       };
 
-      localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
       setApplicationId(application.applicationId);
       setApplicationStatus(application.status);
       setAdminRemarks(application.adminRemarks);
@@ -344,7 +387,21 @@ export default function TrainerOnboardingPage() {
       setSubmitted(true);
       setSubmittedAt(application.submittedAt);
       setSavedAt(application.updatedAt);
+      try {
+        localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
+      } catch {
+        // Submission has already succeeded on the server; local cache is optional.
+      }
       navigate('/trainer', { replace: true });
+    } catch (error) {
+      if (error instanceof TrainerApplicationSubmissionError && error.issues.length) {
+        error.issues.forEach((issue) => {
+          form.setError(issue.path as FieldPath<TrainerOnboardingFormValues>, { type: 'server', message: issue.message });
+        });
+        setSubmissionIssues(error.issues.map((issue) => buildTrainerSubmissionIssue(issue.path, issue.message)));
+      } else {
+        setSubmissionError(error instanceof Error ? error.message : 'Unable to submit your trainer application.');
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -424,6 +481,7 @@ export default function TrainerOnboardingPage() {
 
   async function saveAndLogout() {
     setIsSavingAndLeaving(true);
+    setDraftError('');
     try {
       if (applicationId) {
         await saveTrainerDraftToApi({
@@ -433,6 +491,8 @@ export default function TrainerOnboardingPage() {
       }
       await logoutRequest();
       navigate('/login', { replace: true, state: { authNotice: 'Your trainer application has been saved. Sign in to continue.' } });
+    } catch (error) {
+      setDraftError(error instanceof Error ? error.message : 'Unable to save your trainer application.');
     } finally {
       setIsSavingAndLeaving(false);
     }
@@ -487,6 +547,8 @@ export default function TrainerOnboardingPage() {
                         reviewHistory,
                         submitted,
                         submittedAt,
+                        submissionError,
+                        submissionIssues,
                         onSkipShowcase: () => {
                           setDirection(1);
                           setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
@@ -507,6 +569,7 @@ export default function TrainerOnboardingPage() {
                 <OnboardingFooter
                   label={footerLabel}
                   savedLabel={formatSavedTime(savedAt)}
+                  error={draftError}
                   onPrimaryAction={moveNext}
                   onSaveAndLogout={() => void saveAndLogout()}
                   loading={isSubmitting || isSavingAndLeaving}
@@ -531,6 +594,8 @@ function renderCurrentScreen({
   reviewHistory,
   submitted,
   submittedAt,
+  submissionError,
+  submissionIssues,
   onSkipShowcase,
   onJumpToScreen,
 }: {
@@ -543,6 +608,8 @@ function renderCurrentScreen({
   reviewHistory: TrainerApplicationHistoryItem[];
   submitted: boolean;
   submittedAt: string | null;
+  submissionError: string;
+  submissionIssues: TrainerSubmissionIssue[];
   onSkipShowcase: () => void;
   onJumpToScreen: (screenId: TrainerOnboardingScreenId) => void;
 }) {
@@ -605,14 +672,12 @@ function renderCurrentScreen({
           <FormInput
             label="Mobile number"
             type="tel"
-            value={values.profile.mobile}
-            inputProps={{ readOnly: true }}
+            inputMode="tel"
+            placeholder="+91 98765 43210"
+            inputProps={register('profile.mobile')}
             error={findErrorMessage(errors, 'profile.mobile')}
           />
-          <p className="inline-flex items-center gap-2 text-sm font-medium text-emerald-700">
-            <ShieldCheck size={16} />
-            Verified during account setup
-          </p>
+          <p className="text-sm text-slate-500">Use the mobile number where clients and the Aura team can reach you.</p>
         </div>
       );
 
@@ -980,8 +1045,47 @@ function renderCurrentScreen({
       );
 
     case 'review':
+      const issueGroups = submissionIssues.reduce<Array<{ screen: TrainerOnboardingScreen; issues: TrainerSubmissionIssue[] }>>((groups, issue) => {
+        const screenForIssue = trainerOnboardingScreens.find((item) => item.id === issue.screenId) ?? trainerOnboardingScreens[reviewScreenIndex];
+        const existingGroup = groups.find((group) => group.screen.id === screenForIssue.id);
+        if (existingGroup) {
+          existingGroup.issues.push(issue);
+        } else {
+          groups.push({ screen: screenForIssue, issues: [issue] });
+        }
+        return groups;
+      }, []);
+
       return (
         <div className="space-y-4">
+          {submissionIssues.length ? (
+            <section role="alert" className="rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+              <h3 className="font-semibold">Complete these items before submitting</h3>
+              <p className="mt-1 text-amber-800">Your application is saved as a draft. Update the highlighted information, then submit again.</p>
+              <div className="mt-4 space-y-3">
+                {issueGroups.map((group) => (
+                  <div key={group.screen.id} className="rounded-lg border border-amber-100 bg-white/70 p-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <p className="font-semibold text-slate-900">{group.screen.title}</p>
+                      {group.screen.id !== 'review' ? (
+                        <button type="button" onClick={() => onJumpToScreen(group.screen.id)} className="font-semibold text-[var(--ds-brand)] hover:underline">
+                          Edit
+                        </button>
+                      ) : null}
+                    </div>
+                    <ul className="mt-2 list-disc space-y-1 pl-5 text-amber-900">
+                      {group.issues.map((issue) => <li key={`${issue.path}-${issue.message}`}>{issue.message}</li>)}
+                    </ul>
+                  </div>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {submissionError ? (
+            <p role="alert" className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm font-medium text-rose-700">{submissionError}</p>
+          ) : null}
+
           {adminRemarks ? (
             <div className={cn(
               'border-l-2 pl-4 text-sm',
@@ -1405,6 +1509,7 @@ function QuestionScreen({ screen, children }: { screen: TrainerOnboardingScreen;
 function OnboardingFooter({
   label,
   savedLabel,
+  error,
   loading,
   disabled,
   onPrimaryAction,
@@ -1412,6 +1517,7 @@ function OnboardingFooter({
 }: {
   label: string;
   savedLabel: string;
+  error?: string;
   loading: boolean;
   disabled?: boolean;
   onPrimaryAction: () => void;
@@ -1421,6 +1527,7 @@ function OnboardingFooter({
     <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 lg:static lg:mt-6 lg:px-0 lg:py-4">
       <div className="mx-auto flex w-full max-w-[520px] flex-col items-center gap-3">
         <p className="text-xs font-medium text-slate-500">{savedLabel}</p>
+        {error ? <p role="alert" className="text-center text-sm font-medium text-rose-600">{error}</p> : null}
         <Button
           type="button"
           onClick={onPrimaryAction}
@@ -1467,9 +1574,9 @@ function FormInput({
           'h-14 rounded-xl border-slate-300 bg-white px-4 text-base transition focus-visible:ring-[3px] focus-visible:ring-[rgba(47,79,136,0.12)]',
           error && 'border-rose-300 focus-visible:ring-[rgba(244,63,94,0.12)]',
         )}
-        {...inputProps}
-        value={value}
+        value={onChange || value !== undefined ? (value ?? '') : undefined}
         onChange={onChange}
+        {...inputProps}
       />
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
     </label>

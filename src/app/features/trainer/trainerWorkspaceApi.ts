@@ -41,6 +41,7 @@ export type TrainerScheduleItem = {
   startsAt: string;
   endsAt: string;
   status: string;
+  locationMode?: 'online' | 'in_person' | 'hybrid' | null;
   notes?: string | null;
 };
 export type TrainerAlert = {
@@ -64,7 +65,7 @@ export type TrainerNextAction = {
   ctaLabel: string;
 };
 export type TrainerDashboard = {
-  snapshot: { todaySessions: number; upcomingSessions: number; activeClients: number; highPriorityAlerts: number; highRiskClients: number; lowAdherenceClients: number };
+  snapshot: { todaySessions: number; upcomingSessions: number; activeClients: number; pendingFollowUps: number; highPriorityAlerts: number; highRiskClients: number; lowAdherenceClients: number };
   nextActions: TrainerNextAction[];
   dailySchedule: TrainerScheduleItem[];
   notifications: { unreadCount: number; items: TrainerNotification[] };
@@ -75,6 +76,11 @@ export type TrainerDashboard = {
     adherence: Array<number | null>;
     goalProgress: Array<number | null>;
     weightSeries: Array<{ clientId: number; clientName: string; points: Array<{ date: string; weightKg: number }> }>;
+    weeklyPerformance: {
+      completedSessions: { current: number; previous: number };
+      averageAdherence: { current: number | null; previous: number | null };
+      clientHours: { current: number; previous: number };
+    };
   };
 };
 

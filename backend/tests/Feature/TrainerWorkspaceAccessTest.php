@@ -87,9 +87,36 @@ class TrainerWorkspaceAccessTest extends TestCase
         $this->getJson('/api/v1/trainer/access-status')->assertOk()->assertJsonPath('status', 'pending_review');
     }
 
+    public function test_incomplete_trainer_application_submit_returns_field_validation_errors(): void
+    {
+        $trainer = User::factory()->create(['email' => 'incomplete-submit@example.com', 'role' => 'trainer', 'status' => 'active']);
+        $application = TrainerApplication::query()->create([
+            'application_id' => 'TRN-INCOMPLETE',
+            'applicant_user_id' => $trainer->id,
+            'applicant_name' => $trainer->name,
+            'applicant_email' => $trainer->email,
+            'values_json' => [],
+            'status' => 'draft',
+        ]);
+        Sanctum::actingAs($trainer);
+
+        $values = $this->completeApplicationValues();
+        $values['profile']['mobile'] = '';
+        $values['identity']['pan'] = null;
+
+        $this->postJson('/api/v1/trainer/application/submit', ['values' => $values])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['profile.mobile', 'identity.pan']);
+
+        $this->assertDatabaseHas('trainer_applications', [
+            'id' => $application->id,
+            'status' => 'draft',
+        ]);
+    }
+
     public function test_pending_review_trainer_can_edit_and_resubmit_application(): void
     {
-        $trainer = User::factory()->create(['email' => 'review-edit@example.com', 'role' => 'trainer', 'status' => 'active']);
+        $trainer = User::factory()->create(['email' => 'review-edit@example.com', 'role' => 'trainer', 'status' => 'active', 'phone' => '+91 9000000000']);
         $application = TrainerApplication::query()->create([
             'application_id' => 'TRN-EDIT',
             'applicant_user_id' => $trainer->id,
@@ -107,6 +134,7 @@ class TrainerWorkspaceAccessTest extends TestCase
 
         $editedValues = $this->completeApplicationValues();
         $editedValues['profile']['city'] = 'Bengaluru';
+        $editedValues['profile']['mobile'] = '+91 9888877777';
         $editedValues['training']['philosophy'] = 'I coach with a calm, sustainable structure that keeps progress practical and measurable.';
 
         $this->putJson('/api/v1/trainer/application/draft', [
@@ -115,19 +143,22 @@ class TrainerWorkspaceAccessTest extends TestCase
         ])->assertOk()
             ->assertJsonPath('application.status', 'submitted')
             ->assertJsonPath('application.currentScreen', 'training')
-            ->assertJsonPath('application.values.profile.city', 'Bengaluru');
+            ->assertJsonPath('application.values.profile.city', 'Bengaluru')
+            ->assertJsonPath('application.values.profile.mobile', '+91 9888877777');
 
         $this->postJson('/api/v1/trainer/application/submit', [
             'values' => $editedValues,
         ])->assertOk()
             ->assertJsonPath('application.status', 'submitted')
             ->assertJsonPath('application.currentScreen', 'review')
+            ->assertJsonPath('application.applicantMobile', '+91 9888877777')
             ->assertJsonPath('application.values.training.philosophy', $editedValues['training']['philosophy']);
 
         $this->assertDatabaseHas('trainer_applications', [
             'id' => $application->id,
             'status' => 'submitted',
             'city' => 'Bengaluru',
+            'applicant_mobile' => '+91 9888877777',
             'current_screen' => 'review',
         ]);
     }
@@ -284,15 +315,51 @@ class TrainerWorkspaceAccessTest extends TestCase
             'planId' => $planId,
             'type' => 'follow_up',
             'title' => 'Review first session',
-            'startsAt' => now()->addHours(3)->toIso8601String(),
-            'endsAt' => now()->addHours(4)->toIso8601String(),
+            'startsAt' => today()->addHours(9)->toIso8601String(),
+            'endsAt' => today()->addHours(10)->toIso8601String(),
         ])->assertCreated();
 
         $this->getJson('/api/v1/trainer/dashboard')
             ->assertOk()
             ->assertJsonPath('snapshot.upcomingSessions', 1)
             ->assertJsonPath('snapshot.activeClients', 1)
+            ->assertJsonPath('snapshot.pendingFollowUps', 1)
+            ->assertJsonFragment(['locationMode' => 'online'])
+            ->assertJsonPath('analytics.weeklyPerformance.completedSessions.current', 0)
             ->assertJsonCount(2, 'dailySchedule');
+    }
+
+    public function test_dashboard_exposes_real_weekly_session_performance(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $client = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $client->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'in_person',
+            'starts_at' => today()->subDay()->addHours(9),
+            'ends_at' => today()->subDay()->addHours(10),
+            'status' => 'completed',
+        ]);
+        Appointment::query()->create([
+            'client_user_id' => $client->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'hybrid',
+            'starts_at' => today()->subDays(8)->addHours(9),
+            'ends_at' => today()->subDays(8)->addHours(11),
+            'status' => 'completed',
+        ]);
+        Sanctum::actingAs($trainer);
+
+        $this->getJson('/api/v1/trainer/dashboard')
+            ->assertOk()
+            ->assertJsonPath('analytics.weeklyPerformance.completedSessions.current', 1)
+            ->assertJsonPath('analytics.weeklyPerformance.completedSessions.previous', 1)
+            ->assertJsonPath('analytics.weeklyPerformance.clientHours.current', 1)
+            ->assertJsonPath('analytics.weeklyPerformance.clientHours.previous', 2);
     }
 
     public function test_check_in_generates_pain_and_low_adherence_alerts_with_notifications(): void

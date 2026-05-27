@@ -4,6 +4,7 @@ import {
   mergeTrainerOnboardingValues,
   readTrainerApplications,
   upsertTrainerApplication,
+  withoutTrainerUploadPreviews,
   type TrainerApplicationRecord,
   type TrainerApplicationStatus,
   type TrainerOnboardingFormValues,
@@ -49,6 +50,26 @@ export type TrainerOtpChallenge = {
   message: string;
 };
 
+type ApiErrorResponse = {
+  message?: string;
+  errors?: Record<string, string[]>;
+};
+
+export type TrainerApplicationApiIssue = {
+  path: string;
+  message: string;
+};
+
+export class TrainerApplicationSubmissionError extends Error {
+  issues: TrainerApplicationApiIssue[];
+
+  constructor(message: string, issues: TrainerApplicationApiIssue[] = []) {
+    super(message);
+    this.name = 'TrainerApplicationSubmissionError';
+    this.issues = issues;
+  }
+}
+
 function readJson(response: Response) {
   const contentType = response.headers.get('content-type') ?? '';
   return contentType.includes('application/json') ? response.json() : Promise.resolve(null);
@@ -73,7 +94,7 @@ function normalizeTrainerApplicationRecord(application: TrainerApplicationRespon
     city: application.city,
     state: application.state,
     expertise: application.expertise ?? [],
-    values: mergeTrainerOnboardingValues(application.values),
+    values: withoutTrainerUploadPreviews(mergeTrainerOnboardingValues(application.values)),
     submittedAt: application.submittedAt,
     updatedAt: application.updatedAt,
     adminRemarks: application.adminRemarks ?? '',
@@ -139,10 +160,11 @@ export async function fetchCurrentTrainerApplicationFromApi() {
 }
 
 export async function saveTrainerDraftToApi(input: { values: TrainerOnboardingFormValues; currentScreen: TrainerApplicationRecord['currentScreen'] }) {
+  const compactInput = { ...input, values: withoutTrainerUploadPreviews(input.values) };
   const response = await fetch(`${API_BASE}/trainer/application/draft`, {
     method: 'PUT',
     headers: authHeaders(true),
-    body: JSON.stringify(input),
+    body: JSON.stringify(compactInput),
   });
   const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
   if (!response.ok || !data || !('application' in data)) {
@@ -154,14 +176,21 @@ export async function saveTrainerDraftToApi(input: { values: TrainerOnboardingFo
 }
 
 export async function submitTrainerApplicationToApi(input: { values: TrainerOnboardingFormValues }) {
+  const compactValues = withoutTrainerUploadPreviews(input.values);
   const response = await fetch(`${API_BASE}/trainer/application/submit`, {
     method: 'POST',
     headers: authHeaders(true),
-    body: JSON.stringify({ values: input.values }),
+    body: JSON.stringify({ values: compactValues }),
   });
-  const data = (await readJson(response)) as TrainerApplicationResponse | { message?: string } | null;
+  const data = (await readJson(response)) as TrainerApplicationResponse | ApiErrorResponse | null;
   if (!response.ok || !data || !('application' in data)) {
-    throw new Error(String(data && 'message' in data ? data.message : 'Unable to submit trainer onboarding.'));
+    const issues = data && 'errors' in data && data.errors
+      ? Object.entries(data.errors).flatMap(([path, messages]) => messages.map((message) => ({ path, message })))
+      : [];
+    throw new TrainerApplicationSubmissionError(
+      String(data && 'message' in data && data.message ? data.message : 'Unable to submit your trainer application.'),
+      issues,
+    );
   }
   const application = normalizeTrainerApplicationRecord(data.application);
   upsertTrainerApplication(application);

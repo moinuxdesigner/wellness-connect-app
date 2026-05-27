@@ -47,6 +47,9 @@ import TrainerOnboardingPage from '../features/trainer/TrainerOnboardingPage';
 import CounsellorSessionsPage from '../features/counsellor/CounsellorSessionsPage';
 import CounsellorClientsPage from '../features/counsellor/CounsellorClientsPage';
 import TrainerProtectedRoute from '../features/trainer/TrainerProtectedRoute';
+import TrainerCommandCenterLayout from '../features/trainer/TrainerCommandCenterLayout';
+import TrainerDashboardDetailPage from '../features/trainer/TrainerDashboardDetailPage';
+import TrainerNewSessionComingSoonPage from '../features/trainer/TrainerNewSessionComingSoonPage';
 import HelpdeskTicketsPage from '../features/helpdesk/HelpdeskTicketsPage';
 import HelpdeskKnowledgeBasePage from '../features/helpdesk/HelpdeskKnowledgeBasePage';
 import ContentProgramsPage from '../features/content/ContentProgramsPage';
@@ -55,6 +58,7 @@ import FinanceBillingPage from '../features/finance/FinanceBillingPage';
 import ProfilePage from '../features/profile/ProfilePage';
 
 const TrainerDashboardPage = lazy(() => import('../features/trainer/TrainerDashboardPage'));
+const LiveSessionPage = lazy(() => import('../features/trainer/LiveSessionPage'));
 const TrainerPlansPage = lazy(() => import('../features/trainer/TrainerPlansPage'));
 const TrainerCheckinsPage = lazy(() => import('../features/trainer/TrainerCheckinsPage'));
 
@@ -135,8 +139,12 @@ export default function AppRoutes() {
           <Route element={<RequirePermission anyOf={['trainer.dashboard.view']} />}>
             <Route element={<TrainerProtectedRoute />}>
             <Route path="/trainer/submitted-profile" element={<Navigate to="/trainer" replace />} />
-            <Route path="/trainer" element={<RoleDashboardLayout role="trainer" />}>
+            <Route path="/trainer" element={<TrainerCommandCenterLayout />}>
               <Route index element={<TrainerPageLoader><TrainerDashboardPage /></TrainerPageLoader>} />
+              <Route path="sessions/new" element={<TrainerNewSessionComingSoonPage />} />
+              <Route path="sessions/live" element={<TrainerPageLoader><LiveSessionPage /></TrainerPageLoader>} />
+              <Route path="schedule/:itemId" element={<TrainerDashboardDetailPage kind="schedule" />} />
+              <Route path="alerts/:alertId" element={<TrainerDashboardDetailPage kind="alert" />} />
               <Route path="notifications" element={<NotificationsPage role="trainer" />} />
               <Route path="profile" element={<ProfilePage role="trainer" />} />
               <Route path="plans" element={<TrainerPageLoader><TrainerPlansPage /></TrainerPageLoader>} />

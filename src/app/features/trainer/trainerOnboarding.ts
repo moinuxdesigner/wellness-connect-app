@@ -155,6 +155,16 @@ export const trainerOnboardingSchema = z
 
 export type TrainerOnboardingFormValues = z.infer<typeof trainerOnboardingSchema>;
 
+function textValue(value: unknown, fallback = ''): string {
+  return typeof value === 'string' ? value : fallback;
+}
+
+function withoutPreview(file: UploadValue | null | undefined): UploadValue | null {
+  if (!file) return null;
+  const { previewUrl: _previewUrl, ...metadata } = file;
+  return metadata;
+}
+
 export const trainerOnboardingDefaultValues: TrainerOnboardingFormValues = {
   profile: {
     fullName: '',
@@ -423,6 +433,22 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
 
 export const trainerReviewScreenCount = trainerOnboardingScreens.findIndex((screen) => screen.id === 'success');
 
+export interface TrainerSubmissionIssue {
+  path: string;
+  message: string;
+  screenId: TrainerOnboardingScreenId;
+}
+
+export function buildTrainerSubmissionIssue(path: string, message: string): TrainerSubmissionIssue {
+  const screen = trainerOnboardingScreens.find((item) => item.fields.some((field) => path === field || path.startsWith(`${field}.`)));
+
+  return {
+    path,
+    message,
+    screenId: screen?.id ?? 'review',
+  };
+}
+
 export type TrainerApplicationDecision = 'submitted' | 'under_review' | 'needs_resubmission' | 'approved' | 'rejected';
 
 export interface TrainerApplicationHistoryItem {
@@ -462,26 +488,63 @@ export interface PersistedTrainerOnboardingState {
 
 export function mergeTrainerOnboardingValues(values?: Partial<TrainerOnboardingFormValues>): TrainerOnboardingFormValues {
   return {
-    profile: { ...trainerOnboardingDefaultValues.profile, ...values?.profile },
+    profile: {
+      fullName: textValue(values?.profile?.fullName),
+      gender: values?.profile?.gender ?? trainerOnboardingDefaultValues.profile.gender,
+      dateOfBirth: textValue(values?.profile?.dateOfBirth),
+      email: textValue(values?.profile?.email),
+      mobile: textValue(values?.profile?.mobile),
+      city: textValue(values?.profile?.city),
+      state: textValue(values?.profile?.state),
+    },
     photo: { ...trainerOnboardingDefaultValues.photo, ...values?.photo },
     certification: { ...trainerOnboardingDefaultValues.certification, ...values?.certification },
     expertise: values?.expertise ?? trainerOnboardingDefaultValues.expertise,
-    experience: { ...trainerOnboardingDefaultValues.experience, ...values?.experience },
-    clientPitch: values?.clientPitch ?? trainerOnboardingDefaultValues.clientPitch,
+    experience: {
+      yearsExperience: textValue(values?.experience?.yearsExperience),
+      clientsTrained: textValue(values?.experience?.clientsTrained),
+    },
+    clientPitch: textValue(values?.clientPitch),
     showcase: {
       transformationPhotos: values?.showcase?.transformationPhotos ?? trainerOnboardingDefaultValues.showcase.transformationPhotos,
       videos: values?.showcase?.videos ?? trainerOnboardingDefaultValues.showcase.videos,
     },
-    training: { ...trainerOnboardingDefaultValues.training, ...values?.training },
+    training: {
+      philosophy: textValue(values?.training?.philosophy),
+      introductionVideo: values?.training?.introductionVideo ?? null,
+    },
     availability: {
       modes: values?.availability?.modes ?? trainerOnboardingDefaultValues.availability.modes,
       days: values?.availability?.days ?? trainerOnboardingDefaultValues.availability.days,
-      perSessionRateInr: values?.availability?.perSessionRateInr ?? trainerOnboardingDefaultValues.availability.perSessionRateInr,
-      monthlyRateInr: values?.availability?.monthlyRateInr ?? trainerOnboardingDefaultValues.availability.monthlyRateInr,
-      pricingPlans: values?.availability?.pricingPlans ?? trainerOnboardingDefaultValues.availability.pricingPlans,
+      perSessionRateInr: textValue(values?.availability?.perSessionRateInr),
+      monthlyRateInr: textValue(values?.availability?.monthlyRateInr),
+      pricingPlans: textValue(values?.availability?.pricingPlans),
     },
     identity: { ...trainerOnboardingDefaultValues.identity, ...values?.identity },
-    payout: { ...trainerOnboardingDefaultValues.payout, ...values?.payout },
+    payout: {
+      bankName: textValue(values?.payout?.bankName),
+      accountNumber: textValue(values?.payout?.accountNumber),
+      ifsc: textValue(values?.payout?.ifsc),
+    },
+  };
+}
+
+export function withoutTrainerUploadPreviews(values: TrainerOnboardingFormValues): TrainerOnboardingFormValues {
+  return {
+    ...values,
+    photo: { ...values.photo, file: withoutPreview(values.photo.file) },
+    certification: { ...values.certification, certificate: withoutPreview(values.certification.certificate) },
+    showcase: {
+      transformationPhotos: values.showcase.transformationPhotos.map((file) => withoutPreview(file)!),
+      videos: values.showcase.videos.map((file) => withoutPreview(file)!),
+    },
+    training: { ...values.training, introductionVideo: withoutPreview(values.training.introductionVideo) },
+    identity: {
+      aadhaar: withoutPreview(values.identity.aadhaar),
+      pan: withoutPreview(values.identity.pan),
+      passport: withoutPreview(values.identity.passport),
+      drivingLicense: withoutPreview(values.identity.drivingLicense),
+    },
   };
 }
 
@@ -499,7 +562,11 @@ export function readTrainerApplications() {
 }
 
 export function writeTrainerApplications(applications: TrainerApplicationRecord[]) {
-  localStorage.setItem(trainerApplicationsStorageKey, JSON.stringify(applications));
+  try {
+    localStorage.setItem(trainerApplicationsStorageKey, JSON.stringify(applications));
+  } catch {
+    // Local cache is optional; API-backed application state remains authoritative.
+  }
 }
 
 export function upsertTrainerApplication(record: TrainerApplicationRecord) {

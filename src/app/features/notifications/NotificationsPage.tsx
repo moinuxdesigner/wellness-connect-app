@@ -138,7 +138,7 @@ export default function NotificationsPage({ role }: { role: Role }) {
                   : 'border-indigo-100 bg-indigo-50/70'
               }`}
             >
-              <div className="flex items-start justify-between gap-4">
+              <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
                     {notificationCategoryLabel(notification.type)}

@@ -109,6 +109,7 @@ class TrainerWorkspaceController extends Controller
                 'todaySessions' => $appointments->whereBetween('starts_at', [$today, $endOfDay])->whereIn('status', ['scheduled', 'rescheduled'])->count(),
                 'upcomingSessions' => $appointments->where('starts_at', '>=', now())->whereIn('status', ['scheduled', 'rescheduled'])->count(),
                 'activeClients' => $plans->pluck('client_user_id')->merge($appointments->pluck('client_user_id'))->unique()->count(),
+                'pendingFollowUps' => TrainerTask::query()->where('practitioner_id', $practitioner->id)->where('type', 'follow_up')->where('status', 'scheduled')->whereBetween('starts_at', [$today, $endOfDay])->count(),
                 'highPriorityAlerts' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('priority', 'high')->whereNotIn('status', ['resolved'])->count(),
                 'highRiskClients' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('priority', 'high')->whereNotIn('status', ['resolved'])->whereNotNull('client_user_id')->distinct('client_user_id')->count('client_user_id'),
                 'lowAdherenceClients' => TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('type', 'low_adherence')->whereNotIn('status', ['resolved'])->distinct('client_user_id')->count('client_user_id'),
@@ -590,6 +591,7 @@ class TrainerWorkspaceController extends Controller
             'startsAt' => optional($appointment->starts_at)->toIso8601String(),
             'endsAt' => optional($appointment->ends_at)->toIso8601String(),
             'status' => $appointment->status,
+            'locationMode' => $appointment->mode,
         ]);
         $tasks = TrainerTask::query()->where('practitioner_id', $practitioner->id)->whereBetween('starts_at', [$from, $to])->with('client:id,name,email')->get()->map(fn (TrainerTask $task) => $this->taskPayload($task));
 
@@ -600,13 +602,20 @@ class TrainerWorkspaceController extends Controller
     {
         $labels = collect(range(6, 0))->map(fn (int $offset) => today()->subDays($offset)->format('d M'));
         $dateKeys = collect(range(6, 0))->map(fn (int $offset) => today()->subDays($offset)->toDateString());
+        $currentWeekStart = today()->subDays(6);
+        $previousWeekStart = today()->subDays(13);
+        $previousWeekEnd = today()->subDays(7)->endOfDay();
         $attendance = $dateKeys->map(function (string $date) use ($appointments): array {
             $items = $appointments->filter(fn (Appointment $appointment) => optional($appointment->starts_at)->toDateString() === $date);
             return ['completed' => $items->where('status', 'completed')->count(), 'missed' => $items->where('status', 'no_show')->count()];
         });
-        $activities = TrainerPlanActivity::query()->whereHas('plan', fn ($query) => $query->where('practitioner_id', $practitioner->id))->whereDate('scheduled_for', '>=', today()->subDays(6))->get();
+        $activities = TrainerPlanActivity::query()->whereHas('plan', fn ($query) => $query->where('practitioner_id', $practitioner->id))->whereDate('scheduled_for', '>=', $previousWeekStart)->get();
         $checkIns = TrainerCheckIn::query()->where('practitioner_id', $practitioner->id)->whereDate('checked_in_on', '>=', today()->subDays(6))->with('client:id,name')->get();
         $weightCheckIns = TrainerCheckIn::query()->where('practitioner_id', $practitioner->id)->whereNotNull('weight_kg')->with('client:id,name')->orderBy('checked_in_on')->get();
+        $currentAppointments = $appointments->filter(fn (Appointment $appointment) => $appointment->status === 'completed' && optional($appointment->starts_at)?->between($currentWeekStart, today()->endOfDay()));
+        $previousAppointments = $appointments->filter(fn (Appointment $appointment) => $appointment->status === 'completed' && optional($appointment->starts_at)?->between($previousWeekStart, $previousWeekEnd));
+        $currentActivities = $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($currentWeekStart, today()->endOfDay()) && in_array($activity->status, ['completed', 'missed'], true));
+        $previousActivities = $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($previousWeekStart, $previousWeekEnd) && in_array($activity->status, ['completed', 'missed'], true));
 
         return [
             'labels' => $labels->all(),
@@ -630,6 +639,17 @@ class TrainerWorkspaceController extends Controller
                     'weightKg' => (float) $checkIn->weight_kg,
                 ])->values()->all(),
             ])->values()->all(),
+            'weeklyPerformance' => [
+                'completedSessions' => ['current' => $currentAppointments->count(), 'previous' => $previousAppointments->count()],
+                'averageAdherence' => [
+                    'current' => $currentActivities->isEmpty() ? null : round(($currentActivities->where('status', 'completed')->count() / $currentActivities->count()) * 100, 1),
+                    'previous' => $previousActivities->isEmpty() ? null : round(($previousActivities->where('status', 'completed')->count() / $previousActivities->count()) * 100, 1),
+                ],
+                'clientHours' => [
+                    'current' => round((float) $currentAppointments->sum(fn (Appointment $appointment) => optional($appointment->starts_at)->diffInMinutes($appointment->ends_at) / 60), 1),
+                    'previous' => round((float) $previousAppointments->sum(fn (Appointment $appointment) => optional($appointment->starts_at)->diffInMinutes($appointment->ends_at) / 60), 1),
+                ],
+            ],
         ];
     }
 
