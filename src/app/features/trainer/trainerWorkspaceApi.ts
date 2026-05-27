@@ -54,6 +54,59 @@ export type TrainerAlert = {
   dueAt?: string | null;
 };
 export type TrainerNotification = AppNotification;
+export type ProgressReviewLanding = { clientId: number | null };
+export type ProgressReviewClient = {
+  id: number;
+  name: string;
+  email: string;
+  status: string;
+  age: number | null;
+  gender: string | null;
+};
+export type ProgressOverview = {
+  overallProgressPercent: number;
+  overallTrendPercent: number;
+  weightChangeKg: number | null;
+  attendanceCompleted: number;
+  attendanceTotal: number;
+  workoutAdherencePercent: number | null;
+  workoutAdherenceTrendPercent: number;
+};
+export type ProgressTrendPoint = {
+  label: string;
+  date: string;
+  performanceScore: number | null;
+};
+export type BodyMetricWeight = {
+  start: number | null;
+  current: number | null;
+  change: number | null;
+};
+export type CompletedWorkoutPoint = {
+  label: string;
+  count: number;
+};
+export type ProgressReviewPayload = {
+  client: ProgressReviewClient;
+  overview: ProgressOverview;
+  progressTrend: ProgressTrendPoint[];
+  bodyMetrics: { weight: BodyMetricWeight };
+  completedWorkouts: CompletedWorkoutPoint[];
+  activePlan: { id: number; goalTitle: string; status: TrainerPlan['status'] } | null;
+  notificationUnreadCount: number;
+};
+export type MessageAttachment = {
+  name: string;
+  type: string;
+  sizeBytes: number;
+};
+export type ProgressThreadMessage = {
+  id: number;
+  body: string;
+  createdAt: string;
+  sender: { id: number; name: string; role: string };
+  attachment: MessageAttachment | null;
+};
 export type TrainerNextAction = {
   id: string;
   kind: 'review_high_risk' | 'complete_follow_up' | 'resolve_low_adherence' | 'log_check_in' | 'create_plan';
@@ -99,6 +152,19 @@ async function request<T>(path: string, options?: RequestInit): Promise<T> {
 
 export async function getTrainerDashboard() { return request<TrainerDashboard>('dashboard'); }
 export async function getTrainerClients() { return (await request<{ clients: TrainerClient[] }>('clients')).clients; }
+export async function getTrainerProgressReviewLanding() { return request<ProgressReviewLanding>('progress-review'); }
+export async function getTrainerProgressReview(clientId: number) { return request<ProgressReviewPayload>(`clients/${clientId}/progress-review`); }
+export async function getTrainerProgressMessages(clientId: number) { return (await request<{ threadId: number | null; messages: ProgressThreadMessage[] }>(`clients/${clientId}/messages`)); }
+export async function sendTrainerProgressMessage(clientId: number, payload: { body?: string; attachment?: MessageAttachment | null }) {
+  return (await request<{ threadMessage: ProgressThreadMessage }>(`clients/${clientId}/messages`, {
+    method: 'POST',
+    headers: headers(true),
+    body: JSON.stringify({
+      body: payload.body ?? '',
+      attachment: payload.attachment ?? undefined,
+    }),
+  })).threadMessage;
+}
 export async function getTrainerPlans() { return (await request<{ plans: TrainerPlan[] }>('plans')).plans; }
 export async function createTrainerPlan(payload: { clientUserId: number; goalTitle: string; goalDescription?: string; startsOn: string; targetDate?: string }) {
   return (await request<{ plan: TrainerPlan }>('plans', { method: 'POST', headers: headers(true), body: JSON.stringify(payload) })).plan;

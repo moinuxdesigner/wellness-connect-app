@@ -55,7 +55,7 @@ export function LiveSessionTopbar({ timer, messageCount, ended }: { timer: strin
     <>
       <header className="relative hidden h-[78px] items-center border-b border-indigo-100 bg-white/95 px-8 lg:flex">
         <Link to="/trainer" className="inline-flex items-center gap-3 text-sm font-medium text-slate-600 transition hover:text-indigo-700">
-          <ArrowLeft size={19} /> Back to Clients
+          <ArrowLeft size={19} /> Back to Dashboard
         </Link>
         <div className="absolute left-1/2 flex -translate-x-1/2 items-center gap-4">
           <h1 className="text-xl font-semibold text-[#111941]">Live Session</h1>
@@ -72,7 +72,7 @@ export function LiveSessionTopbar({ timer, messageCount, ended }: { timer: strin
       </header>
       <section className="mx-5 mb-4 rounded-2xl border border-indigo-100 bg-white px-4 py-3 shadow-sm sm:mx-7 lg:hidden">
         <div className="flex items-center justify-between">
-          <Link to="/trainer" className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700"><ArrowLeft size={17} /> Clients</Link>
+          <Link to="/trainer" className="inline-flex items-center gap-1.5 text-sm font-medium text-indigo-700"><ArrowLeft size={17} /> Dashboard</Link>
           <span className="inline-flex items-center gap-2 text-sm font-semibold text-[#111941]">
             <span className={`h-2.5 w-2.5 rounded-full ${ended ? 'bg-slate-400' : 'bg-emerald-500'}`} /> Live Session
           </span>

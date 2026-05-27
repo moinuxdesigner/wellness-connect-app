@@ -580,6 +580,144 @@ class TrainerWorkspaceAccessTest extends TestCase
         $this->assertContains('create_plan', collect($dashboard->json('nextActions'))->pluck('kind')->all());
     }
 
+    public function test_progress_review_landing_returns_first_accessible_client(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $alphaClient = User::factory()->create(['name' => 'Alpha Client', 'role' => 'client', 'status' => 'active']);
+        $betaClient = User::factory()->create(['name' => 'Beta Client', 'role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $betaClient->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->subDay()->addHour(),
+            'status' => 'completed',
+        ]);
+        Appointment::query()->create([
+            'client_user_id' => $alphaClient->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDays(2),
+            'ends_at' => now()->subDays(2)->addHour(),
+            'status' => 'completed',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $this->getJson('/api/v1/trainer/progress-review')
+            ->assertOk()
+            ->assertJsonPath('clientId', $alphaClient->id);
+    }
+
+    public function test_progress_review_requires_connected_client_and_returns_real_analytics_payload(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $connectedClient = User::factory()->create(['role' => 'client', 'status' => 'active']);
+        $otherClient = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $connectedClient->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDays(20),
+            'ends_at' => now()->subDays(20)->addHour(),
+            'status' => 'completed',
+        ]);
+        Appointment::query()->create([
+            'client_user_id' => $connectedClient->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDays(10),
+            'ends_at' => now()->subDays(10)->addHour(),
+            'status' => 'completed',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $planId = $this->postJson('/api/v1/trainer/plans', [
+            'clientUserId' => $connectedClient->id,
+            'goalTitle' => 'Build consistency',
+            'startsOn' => today()->subDays(25)->format('Y-m-d'),
+        ])->assertCreated()->json('plan.id');
+        $activityId = $this->postJson("/api/v1/trainer/plans/{$planId}/activities", [
+            'title' => 'Strength block',
+            'scheduledFor' => today()->subDays(7)->format('Y-m-d'),
+        ])->assertCreated()->json('activity.id');
+        $this->postJson('/api/v1/trainer/check-ins', [
+            'planId' => $planId,
+            'checkedInOn' => today()->subDays(6)->format('Y-m-d'),
+            'weightKg' => 62.4,
+            'goalProgressPercent' => 64,
+            'painReported' => false,
+            'activityUpdates' => [['id' => $activityId, 'status' => 'completed']],
+        ])->assertCreated();
+        $this->postJson('/api/v1/trainer/check-ins', [
+            'planId' => $planId,
+            'checkedInOn' => today()->format('Y-m-d'),
+            'weightKg' => 59.6,
+            'goalProgressPercent' => 78,
+            'painReported' => false,
+        ])->assertCreated();
+
+        $this->getJson("/api/v1/trainer/clients/{$otherClient->id}/progress-review")->assertForbidden();
+
+        $this->getJson("/api/v1/trainer/clients/{$connectedClient->id}/progress-review")
+            ->assertOk()
+            ->assertJsonPath('client.id', $connectedClient->id)
+            ->assertJsonPath('overview.attendanceCompleted', 2)
+            ->assertJsonPath('overview.attendanceTotal', 2)
+            ->assertJsonPath('overview.weightChangeKg', -2.8)
+            ->assertJsonPath('bodyMetrics.weight.start', 62.4)
+            ->assertJsonPath('bodyMetrics.weight.current', 59.6)
+            ->assertJsonCount(6, 'progressTrend')
+            ->assertJsonCount(4, 'completedWorkouts');
+    }
+
+    public function test_trainer_can_list_and_send_progress_review_messages_with_attachment_metadata_validation(): void
+    {
+        [$trainer, $practitioner] = $this->approvedTrainerWorkspace();
+        $client = User::factory()->create(['role' => 'client', 'status' => 'active']);
+
+        Appointment::query()->create([
+            'client_user_id' => $client->id,
+            'practitioner_id' => $practitioner->id,
+            'service_type' => 'training',
+            'mode' => 'online',
+            'starts_at' => now()->subDay(),
+            'ends_at' => now()->subDay()->addHour(),
+            'status' => 'completed',
+        ]);
+
+        Sanctum::actingAs($trainer);
+        $this->getJson("/api/v1/trainer/clients/{$client->id}/messages")
+            ->assertOk()
+            ->assertJsonCount(0, 'messages');
+
+        $this->postJson("/api/v1/trainer/clients/{$client->id}/messages", [
+            'body' => '',
+        ])->assertStatus(422);
+
+        $this->postJson("/api/v1/trainer/clients/{$client->id}/messages", [
+            'body' => 'Updated plan is ready.',
+            'attachment' => [
+                'name' => 'Neha_Week6_Plan.pdf',
+                'type' => 'PDF',
+                'sizeBytes' => 1258291,
+            ],
+        ])->assertCreated()
+            ->assertJsonPath('threadMessage.body', 'Updated plan is ready.')
+            ->assertJsonPath('threadMessage.attachment.name', 'Neha_Week6_Plan.pdf')
+            ->assertJsonPath('threadMessage.sender.id', $trainer->id);
+
+        $this->getJson("/api/v1/trainer/clients/{$client->id}/messages")
+            ->assertOk()
+            ->assertJsonCount(1, 'messages')
+            ->assertJsonPath('messages.0.attachment.sizeBytes', 1258291);
+    }
+
     private function createTrainerApplication(User $trainer, string $status): TrainerApplication
     {
         return TrainerApplication::query()->create([

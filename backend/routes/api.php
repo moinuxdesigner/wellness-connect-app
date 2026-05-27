@@ -82,6 +82,8 @@ Route::prefix('v1')->group(function (): void {
         Route::post('/trainer/application/submit', [TrainerApplicationController::class, 'submitCurrent']);
         Route::middleware('trainer.approved')->prefix('trainer')->group(function (): void {
             Route::get('/dashboard', [TrainerWorkspaceController::class, 'dashboard'])->middleware('permission:trainer.dashboard.view');
+            Route::get('/progress-review', [TrainerWorkspaceController::class, 'progressReviewLanding'])->middleware('permission:trainer.checkins.view');
+            Route::get('/clients/{client}/progress-review', [TrainerWorkspaceController::class, 'progressReview'])->middleware('permission:trainer.checkins.view');
             Route::middleware('permission:trainer.plans.manage')->group(function (): void {
                 Route::get('/clients', [TrainerWorkspaceController::class, 'clients']);
                 Route::get('/plans', [TrainerWorkspaceController::class, 'plans']);
@@ -93,6 +95,10 @@ Route::prefix('v1')->group(function (): void {
             Route::middleware('permission:trainer.checkins.view')->group(function (): void {
                 Route::get('/check-ins', [TrainerWorkspaceController::class, 'checkIns']);
                 Route::post('/check-ins', [TrainerWorkspaceController::class, 'storeCheckIn']);
+            });
+            Route::middleware('permission:trainer.messages.manage')->group(function (): void {
+                Route::get('/clients/{client}/messages', [TrainerWorkspaceController::class, 'messages']);
+                Route::post('/clients/{client}/messages', [TrainerWorkspaceController::class, 'storeMessage']);
             });
             Route::middleware('permission:trainer.tasks.manage')->group(function (): void {
                 Route::get('/tasks', [TrainerWorkspaceController::class, 'tasks']);

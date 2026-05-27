@@ -61,6 +61,8 @@ const TrainerDashboardPage = lazy(() => import('../features/trainer/TrainerDashb
 const LiveSessionPage = lazy(() => import('../features/trainer/LiveSessionPage'));
 const TrainerPlansPage = lazy(() => import('../features/trainer/TrainerPlansPage'));
 const TrainerCheckinsPage = lazy(() => import('../features/trainer/TrainerCheckinsPage'));
+const ProgressReviewLandingPage = lazy(() => import('../features/trainer/ProgressReviewLandingPage'));
+const ProgressReviewPage = lazy(() => import('../features/trainer/ProgressReviewPage'));
 
 function TrainerPageLoader({ children }: { children: ReactNode }) {
   return <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading trainer workspace...</div>}>{children}</Suspense>;
@@ -148,6 +150,8 @@ export default function AppRoutes() {
               <Route path="notifications" element={<NotificationsPage role="trainer" />} />
               <Route path="profile" element={<ProfilePage role="trainer" />} />
               <Route path="plans" element={<TrainerPageLoader><TrainerPlansPage /></TrainerPageLoader>} />
+              <Route path="progress-review" element={<TrainerPageLoader><ProgressReviewLandingPage /></TrainerPageLoader>} />
+              <Route path="clients/:clientId/progress-review" element={<TrainerPageLoader><ProgressReviewPage /></TrainerPageLoader>} />
               <Route path="check-ins" element={<TrainerPageLoader><TrainerCheckinsPage /></TrainerPageLoader>} />
               <Route path="activity" element={<PermissionBoundary anyOf={['trainer.activity_logs.view']}><ActivityLogPage title="Trainer Activity" subtitle="Review your onboarding, appointment, and account activity." emptyMessage="Your trainer activity feed will populate as onboarding and care workflows progress." /></PermissionBoundary>} />
             </Route>

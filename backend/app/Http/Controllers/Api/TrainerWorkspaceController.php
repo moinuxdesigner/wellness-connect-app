@@ -9,6 +9,8 @@ use App\Models\Practitioner;
 use App\Models\TrainerAlert;
 use App\Models\TrainerApplication;
 use App\Models\TrainerCheckIn;
+use App\Models\TrainerClientMessage;
+use App\Models\TrainerClientThread;
 use App\Models\TrainerPlan;
 use App\Models\TrainerPlanActivity;
 use App\Models\TrainerTask;
@@ -135,30 +137,42 @@ class TrainerWorkspaceController extends Controller
     public function clients(Request $request): JsonResponse
     {
         $practitioner = $this->practitioner($request);
-        $bookedClients = Appointment::query()
-            ->where('practitioner_id', $practitioner->id)
-            ->where('service_type', 'training')
-            ->with('client:id,name,email')
-            ->get()
-            ->pluck('client')
-            ->filter()
-            ->keyBy('id');
-        $assignedClients = TrainerPlan::query()
-            ->where('practitioner_id', $practitioner->id)
-            ->with('client:id,name,email')
-            ->get()
-            ->pluck('client')
-            ->filter()
-            ->keyBy('id');
 
         return response()->json([
-            'clients' => $bookedClients->merge($assignedClients)->values()->map(fn (User $client) => [
+            'clients' => $this->accessibleClients($practitioner)->values()->map(fn (User $client) => [
                 'id' => $client->id,
                 'name' => $client->name,
                 'email' => $client->email,
-                'eligibleForPlan' => $bookedClients->has($client->id),
+                'eligibleForPlan' => Appointment::query()
+                    ->where('practitioner_id', $practitioner->id)
+                    ->where('client_user_id', $client->id)
+                    ->where('service_type', 'training')
+                    ->exists(),
             ]),
         ]);
+    }
+
+    public function progressReviewLanding(Request $request): JsonResponse
+    {
+        $practitioner = $this->practitioner($request);
+        $client = $this->accessibleClients($practitioner)
+            ->sortBy('name', SORT_NATURAL | SORT_FLAG_CASE)
+            ->first();
+
+        return response()->json([
+            'clientId' => $client?->id,
+        ]);
+    }
+
+    public function progressReview(Request $request, User $client): JsonResponse
+    {
+        $practitioner = $this->practitioner($request);
+        abort_unless($client->role === 'client', 404);
+        abort_unless($this->trainerCanAccessClient($practitioner, $client->id), 403, 'This client is not connected to your trainer workspace.');
+        $this->synchronizeSignals($practitioner);
+        $client->loadMissing('clientProfile');
+
+        return response()->json($this->progressReviewPayload($request->user(), $practitioner, $client));
     }
 
     public function plans(Request $request): JsonResponse
@@ -491,6 +505,62 @@ class TrainerWorkspaceController extends Controller
         return response()->json(['message' => 'Notification updated.', 'notification' => $this->notifications->payload($notification)]);
     }
 
+    public function messages(Request $request, User $client): JsonResponse
+    {
+        $practitioner = $this->practitioner($request);
+        abort_unless($client->role === 'client', 404);
+        abort_unless($this->trainerCanAccessClient($practitioner, $client->id), 403, 'This client is not connected to your trainer workspace.');
+
+        $thread = TrainerClientThread::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('client_user_id', $client->id)
+            ->first();
+
+        return response()->json([
+            'threadId' => $thread?->id,
+            'messages' => $thread
+                ? $thread->messages()->with('sender:id,name,role')->orderBy('created_at')->get()->map(fn (TrainerClientMessage $message) => $this->messagePayload($message))->values()
+                : [],
+        ]);
+    }
+
+    public function storeMessage(Request $request, User $client): JsonResponse
+    {
+        $practitioner = $this->practitioner($request);
+        abort_unless($client->role === 'client', 404);
+        abort_unless($this->trainerCanAccessClient($practitioner, $client->id), 403, 'This client is not connected to your trainer workspace.');
+        $validated = $request->validate([
+            'body' => ['nullable', 'string', 'max:4000'],
+            'attachment' => ['nullable', 'array'],
+            'attachment.name' => ['required_with:attachment', 'string', 'max:255'],
+            'attachment.type' => ['required_with:attachment', 'string', 'max:80'],
+            'attachment.sizeBytes' => ['required_with:attachment', 'integer', 'min:1', 'max:104857600'],
+        ]);
+        $messageBody = trim((string) ($validated['body'] ?? ''));
+        abort_unless($messageBody !== '' || !empty($validated['attachment']), 422, 'Add a message or attachment before sending.');
+
+        $thread = TrainerClientThread::query()->firstOrCreate([
+            'practitioner_id' => $practitioner->id,
+            'client_user_id' => $client->id,
+        ]);
+
+        $message = $thread->messages()->create([
+            'sender_user_id' => $request->user()->id,
+            'body' => $messageBody,
+            'attachment_name' => $validated['attachment']['name'] ?? null,
+            'attachment_type' => $validated['attachment']['type'] ?? null,
+            'attachment_size_bytes' => $validated['attachment']['sizeBytes'] ?? null,
+        ]);
+        $thread->touch();
+        $message->load('sender:id,name,role');
+        $this->record($request, 'trainer_progress_message_sent', sprintf('%s sent a progress follow-up message to %s.', $request->user()->name, $client->name), $message);
+
+        return response()->json([
+            'message' => 'Message sent.',
+            'threadMessage' => $this->messagePayload($message),
+        ], 201);
+    }
+
     private function practitioner(Request $request): Practitioner
     {
         $practitioner = Practitioner::query()->where('user_id', $request->user()->id)->where('practitioner_type', 'trainer')->first();
@@ -507,6 +577,27 @@ class TrainerWorkspaceController extends Controller
         return $practitioner;
     }
 
+    private function accessibleClients(Practitioner $practitioner)
+    {
+        $bookedClients = Appointment::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('service_type', 'training')
+            ->with('client:id,name,email,status')
+            ->get()
+            ->pluck('client')
+            ->filter()
+            ->keyBy('id');
+        $assignedClients = TrainerPlan::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->with('client:id,name,email,status')
+            ->get()
+            ->pluck('client')
+            ->filter()
+            ->keyBy('id');
+
+        return $bookedClients->merge($assignedClients);
+    }
+
     private function trainerCanAccessClient(Practitioner $practitioner, int $clientId): bool
     {
         return Appointment::query()
@@ -518,6 +609,122 @@ class TrainerWorkspaceController extends Controller
                 ->where('practitioner_id', $practitioner->id)
                 ->where('client_user_id', $clientId)
                 ->exists();
+    }
+
+    private function progressReviewPayload(User $trainerUser, Practitioner $practitioner, User $client): array
+    {
+        $windowEnd = now()->endOfDay();
+        $windowStart = now()->subDays(30)->startOfDay();
+        $previousWindowStart = (clone $windowStart)->subDays(30);
+        $previousWindowEnd = (clone $windowStart)->subSecond();
+
+        $appointments = Appointment::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('client_user_id', $client->id)
+            ->where('service_type', 'training')
+            ->orderBy('starts_at')
+            ->get();
+        $plans = TrainerPlan::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('client_user_id', $client->id)
+            ->with(['activities' => fn ($query) => $query->orderBy('scheduled_for'), 'checkIns' => fn ($query) => $query->orderBy('checked_in_on')])
+            ->get();
+        $activities = TrainerPlanActivity::query()
+            ->whereHas('plan', fn ($query) => $query->where('practitioner_id', $practitioner->id)->where('client_user_id', $client->id))
+            ->orderBy('scheduled_for')
+            ->get();
+        $checkIns = TrainerCheckIn::query()
+            ->where('practitioner_id', $practitioner->id)
+            ->where('client_user_id', $client->id)
+            ->orderBy('checked_in_on')
+            ->get();
+        $windowAppointments = $appointments->filter(fn (Appointment $appointment) => optional($appointment->starts_at)?->between($windowStart, $windowEnd));
+        $previousAppointments = $appointments->filter(fn (Appointment $appointment) => optional($appointment->starts_at)?->between($previousWindowStart, $previousWindowEnd));
+        $windowActivities = $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($windowStart, $windowEnd) && in_array($activity->status, ['completed', 'missed'], true));
+        $previousActivities = $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($previousWindowStart, $previousWindowEnd) && in_array($activity->status, ['completed', 'missed'], true));
+        $windowCheckIns = $checkIns->filter(fn (TrainerCheckIn $checkIn) => optional($checkIn->checked_in_on)?->between($windowStart, $windowEnd));
+        $previousCheckIns = $checkIns->filter(fn (TrainerCheckIn $checkIn) => optional($checkIn->checked_in_on)?->between($previousWindowStart, $previousWindowEnd));
+
+        $attendanceCompleted = $windowAppointments->where('status', 'completed')->count();
+        $attendanceTotal = $windowAppointments->whereIn('status', ['scheduled', 'rescheduled', 'completed', 'no_show', 'cancelled'])->count();
+        $adherence = $windowActivities->isEmpty() ? null : round(($windowActivities->where('status', 'completed')->count() / $windowActivities->count()) * 100, 1);
+        $previousAdherence = $previousActivities->isEmpty() ? null : round(($previousActivities->where('status', 'completed')->count() / $previousActivities->count()) * 100, 1);
+        $latestProgress = $windowCheckIns->last()?->goal_progress_percent ?? $checkIns->last()?->goal_progress_percent;
+        $previousProgress = $previousCheckIns->last()?->goal_progress_percent;
+        $overallProgress = (int) round(collect([$latestProgress, $adherence])->filter(static fn ($value) => $value !== null)->avg() ?? 0);
+        $overallBaseline = collect([$previousProgress, $previousAdherence])->filter(static fn ($value) => $value !== null)->avg();
+        $overallTrendPercent = $overallBaseline === null ? 0 : (int) round($overallProgress - $overallBaseline);
+        $weightSeries = $checkIns->filter(fn (TrainerCheckIn $checkIn) => $checkIn->weight_kg !== null)->values();
+        $startingWeight = $weightSeries->first(fn (TrainerCheckIn $checkIn) => optional($checkIn->checked_in_on)?->gte($windowStart))?->weight_kg ?? $weightSeries->first()?->weight_kg;
+        $currentWeight = $weightSeries->last()?->weight_kg;
+        $weightChangeKg = ($startingWeight !== null && $currentWeight !== null) ? round((float) $currentWeight - (float) $startingWeight, 1) : null;
+
+        $progressTrend = collect([30, 23, 16, 9, 3, 0])->map(function (int $offset) use ($checkIns): array {
+            $anchor = today()->subDays($offset);
+            $score = $checkIns
+                ->filter(fn (TrainerCheckIn $checkIn) => optional($checkIn->checked_in_on)?->lte($anchor))
+                ->last()?->goal_progress_percent;
+
+            return [
+                'label' => $anchor->format('M d'),
+                'date' => $anchor->toDateString(),
+                'performanceScore' => $score,
+            ];
+        })->values();
+
+        $completedWorkouts = collect([3, 2, 1])->map(function (int $offset) use ($activities): array {
+            $start = today()->subWeeks($offset)->startOfWeek();
+            $end = today()->subWeeks($offset)->endOfWeek();
+
+            return [
+                'label' => sprintf('%s-%s', $start->format('M j'), $end->format('M j')),
+                'count' => $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($start, $end) && $activity->status === 'completed')->count(),
+            ];
+        })->values();
+        $currentWeekStart = today()->startOfWeek();
+        $completedWorkouts->push([
+            'label' => sprintf('%s-%s', $currentWeekStart->format('M j'), today()->format('M j')),
+            'count' => $activities->filter(fn (TrainerPlanActivity $activity) => optional($activity->scheduled_for)?->between($currentWeekStart, today()->endOfDay()) && $activity->status === 'completed')->count(),
+        ]);
+        $activePlan = $plans->sortByDesc('starts_on')->first();
+
+        $profile = $client->clientProfile;
+        $age = $profile?->dob ? Carbon::parse($profile->dob)->age : null;
+
+        return [
+            'client' => [
+                'id' => $client->id,
+                'name' => $client->name,
+                'email' => $client->email,
+                'status' => ucfirst((string) $client->status),
+                'age' => $age,
+                'gender' => $profile?->gender,
+            ],
+            'overview' => [
+                'overallProgressPercent' => $overallProgress,
+                'overallTrendPercent' => $overallTrendPercent,
+                'weightChangeKg' => $weightChangeKg,
+                'attendanceCompleted' => $attendanceCompleted,
+                'attendanceTotal' => $attendanceTotal,
+                'workoutAdherencePercent' => $adherence,
+                'workoutAdherenceTrendPercent' => $previousAdherence === null || $adherence === null ? 0 : (int) round($adherence - $previousAdherence),
+            ],
+            'progressTrend' => $progressTrend,
+            'bodyMetrics' => [
+                'weight' => [
+                    'start' => $startingWeight === null ? null : round((float) $startingWeight, 1),
+                    'current' => $currentWeight === null ? null : round((float) $currentWeight, 1),
+                    'change' => $weightChangeKg,
+                ],
+            ],
+            'completedWorkouts' => $completedWorkouts->values(),
+            'activePlan' => $activePlan ? [
+                'id' => $activePlan->id,
+                'goalTitle' => $activePlan->goal_title,
+                'status' => $activePlan->status,
+            ] : null,
+            'notificationUnreadCount' => (int) ($this->notificationsPayload($trainerUser)['unreadCount'] ?? 0),
+        ];
     }
 
     private function synchronizeSignals(Practitioner $practitioner): void
@@ -804,6 +1011,25 @@ class TrainerWorkspaceController extends Controller
     private function alertPayload(TrainerAlert $alert): array
     {
         return ['id' => $alert->id, 'type' => $alert->type, 'priority' => $alert->priority, 'status' => $alert->status, 'summary' => $alert->summary, 'clientName' => optional($alert->client)->name, 'dueAt' => optional($alert->due_at)->toIso8601String()];
+    }
+
+    private function messagePayload(TrainerClientMessage $message): array
+    {
+        return [
+            'id' => $message->id,
+            'body' => $message->body,
+            'createdAt' => optional($message->created_at)->toIso8601String(),
+            'sender' => [
+                'id' => $message->sender_user_id,
+                'name' => optional($message->sender)->name,
+                'role' => optional($message->sender)->role,
+            ],
+            'attachment' => $message->attachment_name ? [
+                'name' => $message->attachment_name,
+                'type' => $message->attachment_type,
+                'sizeBytes' => $message->attachment_size_bytes,
+            ] : null,
+        ];
     }
 
     private function notify(User $user, string $type, string $message, array $meta): void

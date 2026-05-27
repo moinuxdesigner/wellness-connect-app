@@ -1,5 +1,5 @@
 import { useEffect, useState, type ComponentType } from 'react';
-import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router';
+import { Link, Outlet, useLocation, useNavigate } from 'react-router';
 import {
   BarChart3,
   Bell,
@@ -8,6 +8,7 @@ import {
   ClipboardList,
   Dumbbell,
   LayoutGrid,
+  LogOut,
   Menu,
   MessageCircle,
   Plus,
@@ -16,7 +17,9 @@ import {
   UsersRound,
 } from 'lucide-react';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '../../components/ui/sheet';
+import AuthActionLoader from '../auth/AuthActionLoader';
 import { getAuthState } from '../auth/auth';
+import { logoutRequest } from '../auth/apiAuth';
 import { getNotifications } from '../notifications/notificationsApi';
 import { liveSessionMockData } from './mockLiveSessionData';
 import { avatarForName } from './mockTrainerDashboardData';
@@ -29,7 +32,7 @@ const trainerNav: TrainerNavItem[] = [
   { label: 'Clients', icon: UsersRound },
   { label: 'Sessions', to: '/trainer/sessions/live', icon: CalendarDays },
   { label: 'Workout Plans', to: '/trainer/plans', icon: Dumbbell },
-  { label: 'Progress', to: '/trainer/check-ins', icon: BarChart3 },
+  { label: 'Progress', to: '/trainer/progress-review', icon: BarChart3 },
   { label: 'Messages', icon: MessageCircle },
   { label: 'Calendar', icon: CalendarDays },
   { label: 'Resources', icon: ClipboardList },
@@ -40,15 +43,30 @@ const bottomNav: Array<{ label: string; to: string; icon: ComponentType<{ size?:
   { label: 'Dashboard', to: '/trainer', icon: LayoutGrid },
   { label: 'Plans', to: '/trainer/plans', icon: Dumbbell },
   { label: 'New', to: '/trainer/sessions/new', icon: Plus, center: true },
-  { label: 'Progress', to: '/trainer/check-ins', icon: BarChart3 },
+  { label: 'Progress', to: '/trainer/progress-review', icon: BarChart3 },
   { label: 'Alerts', to: '/trainer/notifications', icon: Bell },
 ];
+
+function isProgressReviewPath(pathname: string): boolean {
+  return pathname === '/trainer/progress-review' || /^\/trainer\/clients\/[^/]+\/progress-review$/.test(pathname);
+}
+
+function matchesNavLabel(label: string, pathname: string): boolean {
+  if (label === 'Dashboard') return pathname === '/trainer';
+  if (label === 'Sessions') return pathname.startsWith('/trainer/sessions/live');
+  if (label === 'Workout Plans' || label === 'Plans') return pathname.startsWith('/trainer/plans');
+  if (label === 'Progress') return isProgressReviewPath(pathname) || pathname.startsWith('/trainer/check-ins');
+  if (label === 'Settings') return pathname.startsWith('/trainer/profile');
+  if (label === 'Alerts') return pathname.startsWith('/trainer/notifications');
+  return false;
+}
 
 export default function TrainerCommandCenterLayout() {
   const auth = getAuthState();
   const navigate = useNavigate();
   const location = useLocation();
   const isLiveSession = location.pathname === '/trainer/sessions/live';
+  const isProgressReview = isProgressReviewPath(location.pathname);
   const trainerName = auth.user?.name ?? 'Coach Arjun';
   const greetingName = coachGreetingName(trainerName);
   const visibleTrainerName = isLiveSession ? liveSessionMockData.trainer.name : trainerName;
@@ -57,6 +75,7 @@ export default function TrainerCommandCenterLayout() {
     : avatarForName(greetingName === 'Coach' ? 'Coach Arjun' : auth.user?.name ?? trainerName);
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -72,12 +91,25 @@ export default function TrainerCommandCenterLayout() {
     };
   }, []);
 
+  async function handleLogout() {
+    if (isLoggingOut) return;
+    setIsLoggingOut(true);
+    try {
+      await logoutRequest();
+      setDrawerOpen(false);
+      navigate('/login');
+    } finally {
+      setIsLoggingOut(false);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white text-slate-900 lg:bg-[radial-gradient(circle_at_top_right,#f1efff_0%,#fbfbff_32%,#f8fafc_68%)]">
+      {isLoggingOut ? <AuthActionLoader action="logout" /> : null}
       <aside className="fixed inset-y-0 left-0 z-30 hidden w-[280px] flex-col border-r border-indigo-100 bg-white/95 lg:flex">
         <Brand />
-        <TrainerNavigation activeItem={isLiveSession ? 'Clients' : undefined} />
-        <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} />
+        <TrainerNavigation pathname={location.pathname} />
+        <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} onLogout={handleLogout} isLoggingOut={isLoggingOut} />
       </aside>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -87,13 +119,13 @@ export default function TrainerCommandCenterLayout() {
             <SheetDescription>Navigate within your trainer workspace.</SheetDescription>
           </SheetHeader>
           <Brand onNavigate={() => setDrawerOpen(false)} />
-          <TrainerNavigation activeItem={isLiveSession ? 'Clients' : undefined} onNavigate={() => setDrawerOpen(false)} />
-          <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} onNavigate={() => setDrawerOpen(false)} />
+          <TrainerNavigation pathname={location.pathname} onNavigate={() => setDrawerOpen(false)} />
+          <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} isLoggingOut={isLoggingOut} />
         </SheetContent>
       </Sheet>
 
       <div className="lg:pl-[280px]">
-        {!isLiveSession ? <header className="sticky top-0 z-20 hidden h-[78px] items-center gap-8 border-b border-indigo-100 bg-white/85 px-8 backdrop-blur lg:flex">
+        {!isLiveSession && !isProgressReview ? <header className="sticky top-0 z-20 hidden h-[78px] items-center gap-8 border-b border-indigo-100 bg-white/85 px-8 backdrop-blur lg:flex">
           <h1 className="shrink-0 text-2xl font-semibold tracking-tight text-[#101842]">Trainer Command Center</h1>
           <label className="ml-auto flex h-12 w-[390px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-slate-400 shadow-sm">
             <Search size={18} />
@@ -133,16 +165,16 @@ export default function TrainerCommandCenterLayout() {
       <nav className="fixed inset-x-0 bottom-0 z-30 flex h-[76px] items-center justify-around border-t border-indigo-50 bg-white/98 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_22px_rgba(51,65,85,0.06)] backdrop-blur lg:hidden">
         {bottomNav.map((item) => {
           const Icon = item.icon;
+          const isActive = matchesNavLabel(item.label, location.pathname) || location.pathname === item.to;
           return (
-            <NavLink
+            <Link
               key={item.to}
               to={item.to}
-              end={item.to === '/trainer'}
-              className={({ isActive }) => item.center
+              className={item.center
                 ? 'relative -top-4 flex flex-col items-center gap-1 text-[11px] font-medium text-slate-600'
                 : `flex min-w-[54px] flex-col items-center gap-1 rounded-xl px-2 py-2 text-[11px] font-medium transition ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}
             >
-              {({ isActive }) => item.center ? (
+              {item.center ? (
                 <>
                   <span className="flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-[0_10px_22px_rgba(79,70,229,0.32)]">
                     <Icon size={28} />
@@ -155,7 +187,7 @@ export default function TrainerCommandCenterLayout() {
                   <span>{item.label}</span>
                 </>
               )}
-            </NavLink>
+            </Link>
           );
         })}
       </nav>
@@ -177,11 +209,12 @@ function Brand({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-function TrainerNavigation({ activeItem, onNavigate }: { activeItem?: string; onNavigate?: () => void }) {
+function TrainerNavigation({ activeItem, onNavigate, pathname }: { activeItem?: string; onNavigate?: () => void; pathname: string }) {
   return (
     <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-7">
       {trainerNav.map((item) => {
         const Icon = item.icon;
+        const isActive = activeItem ? activeItem === item.label : matchesNavLabel(item.label, pathname) || pathname === item.to;
         if (!item.to) {
           return (
             <button
@@ -190,7 +223,7 @@ function TrainerNavigation({ activeItem, onNavigate }: { activeItem?: string; on
               disabled
               title="Coming soon"
               className={`flex w-full cursor-not-allowed items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium ${
-                activeItem === item.label ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 opacity-100' : 'text-slate-400'
+                isActive ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 opacity-100' : 'text-slate-400'
               }`}
             >
               <Icon size={20} /> {item.label}
@@ -198,38 +231,62 @@ function TrainerNavigation({ activeItem, onNavigate }: { activeItem?: string; on
           );
         }
         return (
-          <NavLink
+          <Link
             key={item.label}
             to={item.to}
-            end={item.to === '/trainer'}
             onClick={onNavigate}
-            className={({ isActive }) => `flex items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium transition ${
-              (activeItem ? activeItem === item.label : isActive) ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
+            className={`flex items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium transition ${
+              isActive ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
             }`}
           >
             <Icon size={20} /> {item.label}
-          </NavLink>
+          </Link>
         );
       })}
     </nav>
   );
 }
 
-function TrainerProfileCard({ trainerName, avatar, onNavigate }: { trainerName: string; avatar: string; onNavigate?: () => void }) {
+function TrainerProfileCard({
+  trainerName,
+  avatar,
+  onNavigate,
+  onLogout,
+  isLoggingOut,
+}: {
+  trainerName: string;
+  avatar: string;
+  onNavigate?: () => void;
+  onLogout: () => void;
+  isLoggingOut: boolean;
+}) {
   return (
-    <Link to="/trainer/profile" onClick={onNavigate} className="mx-4 mb-6 mt-auto rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_14px_rgba(30,41,59,0.06)] transition hover:border-indigo-100">
-      <div className="flex items-center gap-3">
-        <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
-        <span className="min-w-0 flex-1">
-          <strong className="block truncate text-sm font-semibold text-slate-900">{trainerName}</strong>
-          <span className="block text-xs text-slate-500">Personal Trainer</span>
+    <div className="mx-4 mb-6 mt-auto rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_14px_rgba(30,41,59,0.06)]">
+      <Link to="/trainer/profile" onClick={onNavigate} className="block rounded-xl transition hover:bg-slate-50">
+        <div className="flex items-center gap-3">
+          <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+          <span className="min-w-0 flex-1">
+            <strong className="block truncate text-sm font-semibold text-slate-900">{trainerName}</strong>
+            <span className="block text-xs text-slate-500">Personal Trainer</span>
+          </span>
+          <ChevronDown size={16} className="text-indigo-600" />
+        </div>
+      </Link>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <span className="flex items-center gap-2 text-xs text-slate-500">
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Online
         </span>
-        <ChevronDown size={16} className="text-indigo-600" />
+        <button
+          type="button"
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <LogOut size={15} />
+          Logout
+        </button>
       </div>
-      <span className="mt-3 flex items-center gap-2 text-xs text-slate-500">
-        <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Online
-      </span>
-    </Link>
+    </div>
   );
 }
 
