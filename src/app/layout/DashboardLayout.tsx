@@ -11,7 +11,7 @@ export default function DashboardLayout({ navItems, title, children }: { navItem
   const sidebarWidth = collapsed ? 80 : 288;
 
   return (
-    <div className="min-h-screen bg-slate-50">
+    <div className="min-h-screen overflow-x-clip bg-slate-50">
       <Sidebar
         items={navItems}
         collapsed={collapsed}
@@ -26,14 +26,14 @@ export default function DashboardLayout({ navItems, title, children }: { navItem
         style={{ '--sidebar-offset': '288px' } as CSSProperties}
         animate={{ '--sidebar-offset': `${sidebarWidth}px` } as CSSProperties}
         transition={{ type: 'spring', stiffness: 240, damping: 28 }}
-        className="dashboard-content min-w-0"
+        className="dashboard-content min-w-0 max-w-full overflow-x-clip"
       >
         <Topbar
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
           onToggleSidebar={() => setCollapsed((prev) => !prev)}
           sidebarCollapsed={collapsed}
         />
-        <main className="mx-auto w-full max-w-[1600px] p-4 pb-24 lg:p-6">{children ?? <Outlet />}</main>
+        <main className="mx-auto w-full max-w-[1600px] overflow-x-clip px-3 py-4 pb-24 sm:p-4 sm:pb-24 lg:p-6">{children ?? <Outlet />}</main>
       </motion.div>
       <BottomNav items={navItems} onOpenMenu={() => setMobileSidebarOpen(true)} />
     </div>

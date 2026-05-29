@@ -156,23 +156,36 @@ function isActionable(appointment: ClientAppointment) {
   return appointment.status === 'scheduled' || appointment.status === 'rescheduled';
 }
 
+function scheduleAnchorDate(records: ClientAppointment[]) {
+  const sorted = [...records].sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+  const today = startOfDay(new Date());
+  const nextUpcoming = sorted.find((appointment) => isActionable(appointment) && new Date(appointment.starts_at) >= today);
+  const firstActive = sorted.find(isActionable);
+  const firstRecord = sorted[0];
+
+  if (nextUpcoming) return new Date(nextUpcoming.starts_at);
+  if (firstActive) return new Date(firstActive.starts_at);
+  if (firstRecord) return new Date(firstRecord.starts_at);
+  return new Date();
+}
+
 export default function ClientAppointmentsPage() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [notice, setNotice] = useState('');
   const [activeTab, setActiveTab] = useState<EventTab>('today');
-  const [selectedDate, setSelectedDate] = useState(() => new Date(2026, 4, 13));
-  const [visibleMonth, setVisibleMonth] = useState(() => new Date(2026, 4, 1));
+  const [selectedDate, setSelectedDate] = useState(() => new Date());
+  const [visibleMonth, setVisibleMonth] = useState(() => {
+    const today = new Date();
+    return new Date(today.getFullYear(), today.getMonth(), 1);
+  });
 
   async function refresh() {
     const records = await listAppointmentsAdapter();
     setAppointments(records);
-    const firstRecord = [...records].sort((a, b) => (a.starts_at ?? '').localeCompare(b.starts_at ?? ''))[0];
-    if (firstRecord) {
-      const firstDate = new Date(firstRecord.starts_at);
-      setSelectedDate(firstDate);
-      setVisibleMonth(new Date(firstDate.getFullYear(), firstDate.getMonth(), 1));
-    }
+    const anchorDate = scheduleAnchorDate(records);
+    setSelectedDate(anchorDate);
+    setVisibleMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
   }
 
   useEffect(() => {
@@ -198,10 +211,10 @@ export default function ClientAppointmentsPage() {
   const monthDays = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] space-y-4 pb-0 lg:space-y-5 lg:pb-2">
+    <div className="mx-auto w-full max-w-[1480px] space-y-4 overflow-x-clip pb-0 lg:space-y-5 lg:pb-2">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-[32px] font-semibold leading-[1.12] tracking-tight text-slate-950 lg:text-4xl">My Schedule</h1>
+          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-tight text-slate-950 sm:text-[32px] lg:text-4xl">My Schedule</h1>
           {/* <p className="mt-4 max-w-[330px] text-[18px] leading-[1.55] text-slate-500 sm:max-w-xl sm:text-base sm:leading-7">
             View and manage both training and counselling sessions already on your calendar.
           </p> */}
@@ -219,23 +232,23 @@ export default function ClientAppointmentsPage() {
 
       {notice ? <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-sm text-violet-700">{notice}</p> : null}
 
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(520px,1.06fr)]">
-        <section className="rounded-[14px] border border-slate-200 bg-white p-[14px] shadow-[0_2px_8px_rgba(15,23,42,0.12)] sm:p-5 lg:p-7">
-          <div className="mb-6 grid grid-cols-[46px_1fr_46px] items-center gap-2 sm:grid-cols-[44px_1fr_96px] sm:gap-3 lg:mb-5">
+      <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(520px,1.06fr)]">
+        <section className="min-w-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-3 shadow-[0_2px_8px_rgba(15,23,42,0.12)] sm:p-5 lg:p-7">
+          <div className="mb-5 grid grid-cols-[42px_1fr_42px] items-center gap-2 sm:grid-cols-[44px_1fr_96px] sm:gap-3 lg:mb-5">
             <button
               type="button"
               onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="flex h-[46px] w-[46px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
+              className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
               aria-label="Previous month"
             >
               <ChevronLeft size={20} />
             </button>
-            <h2 className="text-center text-[25px] font-semibold leading-none text-slate-950 sm:text-xl lg:text-2xl">{monthLabel(visibleMonth)}</h2>
+            <h2 className="text-center text-[23px] font-semibold leading-none text-slate-950 sm:text-xl lg:text-2xl">{monthLabel(visibleMonth)}</h2>
             <div className="flex justify-end gap-2 sm:gap-3">
               <button
                 type="button"
                 onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-                className="flex h-[46px] w-[46px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
+                className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
                 aria-label="Next month"
               >
                 <ChevronRight size={20} />
@@ -243,8 +256,9 @@ export default function ClientAppointmentsPage() {
               <button
                 type="button"
                 onClick={() => {
-                  setSelectedDate(new Date(2026, 4, 13));
-                  setVisibleMonth(new Date(2026, 4, 1));
+                  const anchorDate = scheduleAnchorDate(appointments);
+                  setSelectedDate(anchorDate);
+                  setVisibleMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
                 }}
                 className="hidden h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:flex"
                 aria-label="Jump to selected schedule"
@@ -254,9 +268,9 @@ export default function ClientAppointmentsPage() {
             </div>
           </div>
 
-          <div className="grid grid-cols-7 gap-y-[13px] border-b border-slate-200 pb-[22px] sm:gap-y-4 sm:pb-6">
+          <div className="grid min-w-0 grid-cols-7 gap-y-3 border-b border-slate-200 pb-5 sm:gap-y-4 sm:pb-6">
             {weekdayLabels.map((day) => (
-              <div key={day} className="pb-1 text-center text-[15px] font-semibold text-slate-950 sm:pb-0 sm:text-sm">{day}</div>
+              <div key={day} className="pb-1 text-center text-[14px] font-semibold text-slate-950 sm:pb-0 sm:text-sm">{day}</div>
             ))}
             {monthDays.map((day) => {
               const key = dateKey(day);
@@ -275,10 +289,10 @@ export default function ClientAppointmentsPage() {
                     setSelectedDate(day);
                     setActiveTab('today');
                   }}
-                  className="group flex h-[43px] min-w-0 flex-col items-center justify-start gap-0.5 rounded-lg text-[17px] font-medium text-slate-950 transition hover:bg-slate-50 sm:h-12 sm:gap-1 sm:text-sm lg:h-14 lg:text-base"
+                  className="group flex h-[43px] min-w-0 flex-col items-center justify-start gap-0.5 rounded-lg text-[16px] font-medium text-slate-950 transition hover:bg-slate-50 sm:h-12 sm:gap-1 sm:text-sm lg:h-14 lg:text-base"
                   aria-label={`Select ${longDateLabel(day)}`}
                 >
-                  <span className={`grid h-9 w-9 place-items-center rounded-full sm:h-9 sm:w-9 lg:h-10 lg:w-10 ${isSelected ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : isCurrentMonth ? 'text-slate-950' : 'text-slate-300'}`}>
+                  <span className={`grid h-8 w-8 place-items-center rounded-full sm:h-9 sm:w-9 lg:h-10 lg:w-10 ${isSelected ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : isCurrentMonth ? 'text-slate-950' : 'text-slate-300'}`}>
                     {day.getDate()}
                   </span>
                   <span className="flex h-2 items-center justify-center gap-1 sm:hidden">
@@ -298,17 +312,17 @@ export default function ClientAppointmentsPage() {
             })}
           </div>
 
-          <div className="mt-5 grid grid-cols-3 items-center gap-x-4 gap-y-3 text-[17px] text-slate-500 sm:text-sm lg:flex lg:flex-wrap lg:justify-center lg:gap-x-6">
+          <div className="mt-5 grid grid-cols-2 items-center gap-x-3 gap-y-3 text-sm text-slate-500 min-[380px]:grid-cols-3 sm:text-sm lg:flex lg:flex-wrap lg:justify-center lg:gap-x-6">
             {legendItems.map((item) => (
-              <span key={item.label} className={`inline-flex items-center justify-center gap-2 ${item.label === 'Mindfulness' ? 'col-span-3' : ''}`}>
+              <span key={item.label} className="inline-flex min-w-0 items-center justify-center gap-2">
                 <span className={`h-3 w-3 rounded-full sm:h-2.5 sm:w-2.5 ${toneStyles[item.tone].dot}`} />
-                {item.label}
+                <span className="truncate">{item.label}</span>
               </span>
             ))}
           </div>
         </section>
 
-        <section className="rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
+        <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
           <div className="grid grid-cols-2 border-b border-slate-200 text-xs font-semibold sm:text-sm">
             <button
               type="button"
@@ -390,18 +404,21 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
   return (
     <article className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)] transition hover:border-slate-300 hover:shadow-[0_16px_34px_-26px_rgba(15,23,42,0.42)] sm:p-3.5">
       <span className={`absolute inset-y-0 left-0 w-1 ${styles.rail}`} />
-      <div className="grid grid-cols-[68px_42px_minmax(0,1fr)_auto] items-center gap-3">
-        <div className="pl-1">
+      <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-3 pl-1 sm:grid-cols-[68px_42px_minmax(0,1fr)_auto] sm:items-center sm:pl-0">
+        <div className="pl-1 sm:pl-1">
           <p className="text-sm font-semibold leading-none text-slate-950">{timeLabel(appointment.starts_at)}</p>
           <p className="mt-1.5 text-xs font-medium text-slate-400">{durationLabel(appointment)}</p>
         </div>
 
-        <div className={`grid h-10 w-10 place-items-center rounded-lg ${styles.iconWrap}`}>
+        <div className={`hidden h-10 w-10 place-items-center rounded-lg sm:grid ${styles.iconWrap}`}>
           <Icon size={21} className={styles.icon} />
         </div>
 
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
+            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg sm:hidden ${styles.iconWrap}`}>
+              <Icon size={19} className={styles.icon} />
+            </span>
             <h3 className="truncate text-sm font-semibold leading-5 text-slate-950 sm:text-base">{presentation.title}</h3>
             <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${styles.pill}`}>{statusLabel(appointment)}</span>
           </div>
@@ -412,7 +429,7 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
           </p>
         </div>
 
-        <div className="flex shrink-0 items-center gap-1.5">
+        <div className="col-span-2 flex min-w-0 shrink-0 items-center justify-end gap-1.5 sm:col-span-1">
           {canJoin ? (
             <button
               type="button"

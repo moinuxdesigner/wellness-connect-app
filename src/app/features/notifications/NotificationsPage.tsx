@@ -1,5 +1,24 @@
-import { useEffect, useMemo, useState } from 'react';
-import { ArrowUpDown, Bell, Check, CheckCheck, ChevronRight, MoreVertical, Search } from 'lucide-react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
+import {
+  ArrowRight,
+  ArrowUpDown,
+  Bell,
+  Calendar,
+  Check,
+  CheckCheck,
+  ChevronRight,
+  Clock3,
+  FileText,
+  Headphones,
+  Mail,
+  MessageCircle,
+  Moon,
+  MoreVertical,
+  Search,
+  Settings,
+  Sparkles,
+  UserCircle2,
+} from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Role } from '../../types';
 import {
@@ -135,118 +154,466 @@ function NoticeBanner({ notice }: { notice: NoticeState }) {
   );
 }
 
+type ClientNotificationCategory = 'all' | 'appointments' | 'messages' | 'membership' | 'billing' | 'reminders';
+type ClientNotificationSort = 'newest' | 'oldest';
+
+type ClientNotificationViewModel = {
+  notification: AppNotification;
+  title: string;
+  message: string;
+  category: ClientNotificationCategory;
+  label: string;
+  read: boolean;
+  group: 'today' | 'earlier';
+  dateLabel: string;
+  timeLabel: string;
+  Icon: typeof Bell;
+  dotClass: string;
+  iconClass: string;
+  badgeClass: string;
+  actionClass: string;
+  ctaLabel: string;
+};
+
+const clientFilterTabs: Array<{ key: ClientNotificationCategory | 'unread' | 'read'; label: string; icon?: ReactNode }> = [
+  { key: 'all', label: 'All' },
+  { key: 'unread', label: 'Unread' },
+  { key: 'read', label: 'Read' },
+  { key: 'appointments', label: 'Appointments', icon: <Calendar size={17} /> },
+  { key: 'messages', label: 'Messages', icon: <MessageCircle size={17} /> },
+  { key: 'membership', label: 'Membership', icon: <UserCircle2 size={17} /> },
+  { key: 'billing', label: 'Billing', icon: <FileText size={17} /> },
+  { key: 'reminders', label: 'Reminders', icon: <Bell size={17} /> },
+];
+
+function clientCategoryForType(type: string): ClientNotificationCategory {
+  const normalized = type.toLowerCase();
+  if (normalized.includes('appointment') || normalized.includes('session') || normalized.includes('booking')) return 'appointments';
+  if (normalized.includes('message') || normalized.includes('chat')) return 'messages';
+  if (normalized.includes('member') || normalized.includes('plan') || normalized.includes('subscription')) return 'membership';
+  if (normalized.includes('billing') || normalized.includes('payment') || normalized.includes('receipt') || normalized.includes('invoice')) return 'billing';
+  if (normalized.includes('reminder') || normalized.includes('check') || normalized.includes('follow')) return 'reminders';
+  return 'reminders';
+}
+
+function clientNotificationVisual(category: ClientNotificationCategory) {
+  if (category === 'appointments') {
+    return {
+      Icon: Calendar,
+      dotClass: 'bg-violet-600',
+      iconClass: 'bg-violet-100 text-violet-600',
+      badgeClass: 'bg-violet-100 text-violet-700',
+      actionClass: 'border-violet-300 text-violet-700 hover:bg-violet-50',
+      ctaLabel: 'View Details',
+    };
+  }
+  if (category === 'messages') {
+    return {
+      Icon: MessageCircle,
+      dotClass: 'bg-blue-600',
+      iconClass: 'bg-blue-100 text-blue-600',
+      badgeClass: 'bg-blue-100 text-blue-700',
+      actionClass: 'border-blue-300 text-blue-700 hover:bg-blue-50',
+      ctaLabel: 'Reply',
+    };
+  }
+  if (category === 'membership') {
+    return {
+      Icon: UserCircle2,
+      dotClass: 'bg-emerald-600',
+      iconClass: 'bg-emerald-100 text-emerald-600',
+      badgeClass: 'bg-emerald-100 text-emerald-700',
+      actionClass: 'border-emerald-300 text-emerald-700 hover:bg-emerald-50',
+      ctaLabel: 'View Details',
+    };
+  }
+  if (category === 'billing') {
+    return {
+      Icon: FileText,
+      dotClass: 'bg-orange-500',
+      iconClass: 'bg-orange-100 text-orange-600',
+      badgeClass: 'bg-orange-100 text-orange-700',
+      actionClass: 'border-orange-300 text-orange-700 hover:bg-orange-50',
+      ctaLabel: 'View Receipt',
+    };
+  }
+
+  return {
+    Icon: Bell,
+    dotClass: 'bg-amber-500',
+    iconClass: 'bg-amber-100 text-amber-600',
+    badgeClass: 'bg-amber-100 text-amber-700',
+    actionClass: 'border-amber-300 text-amber-700 hover:bg-amber-50',
+    ctaLabel: 'Check In',
+  };
+}
+
+function notificationTitleForClient(notification: AppNotification, category: ClientNotificationCategory) {
+  const label = notificationCategoryLabel(notification.type);
+  const message = notification.message.trim();
+  if (message.includes(':')) return message.split(':')[0].trim();
+  if (category === 'appointments') return label.toLowerCase().includes('no-show') ? 'Appointment update' : 'Booking confirmed';
+  if (category === 'messages') return 'New message received';
+  if (category === 'membership') return 'Membership renewal reminder';
+  if (category === 'billing') return 'Payment receipt available';
+  return label;
+}
+
+function formatClientNotificationDate(value: string | null) {
+  if (!value) return { dateLabel: 'Date unavailable', timeLabel: '' };
+  const date = new Date(value);
+  const now = new Date();
+  const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startOfDate = new Date(date.getFullYear(), date.getMonth(), date.getDate()).getTime();
+  const timeLabel = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (startOfDate === startOfToday) return { dateLabel: 'Today', timeLabel };
+  if (startOfDate === startOfToday - 24 * 60 * 60 * 1000) return { dateLabel: 'Yesterday', timeLabel };
+  return {
+    dateLabel: date.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' }),
+    timeLabel,
+  };
+}
+
+function buildClientNotificationViewModel(notification: AppNotification): ClientNotificationViewModel {
+  const category = clientCategoryForType(notification.type);
+  const visual = clientNotificationVisual(category);
+  const date = formatClientNotificationDate(notification.createdAt);
+  const message = notification.message.includes(':')
+    ? notification.message.split(':').slice(1).join(':').trim() || notification.message
+    : notification.message;
+
+  return {
+    notification,
+    title: notificationTitleForClient(notification, category),
+    message,
+    category,
+    label: notificationCategoryLabel(notification.type),
+    read: notification.read,
+    group: date.dateLabel === 'Today' ? 'today' : 'earlier',
+    dateLabel: date.dateLabel,
+    timeLabel: date.timeLabel,
+    ...visual,
+  };
+}
+
 function StandardNotificationsPage({
   data,
   loading,
   notice,
   filter,
+  sort,
+  search,
+  markAllPending,
   onFilterChange,
+  onSortChange,
+  onSearchChange,
+  onMarkAllRead,
   onToggleRead,
   role,
 }: {
   data: NotificationData | null;
   loading: boolean;
   notice: NoticeState;
-  filter: StandardFilterKey;
-  onFilterChange: (filter: StandardFilterKey) => void;
+  filter: StandardFilterKey | ClientNotificationCategory;
+  sort: ClientNotificationSort;
+  search: string;
+  markAllPending: boolean;
+  onFilterChange: (filter: StandardFilterKey | ClientNotificationCategory) => void;
+  onSortChange: (sort: ClientNotificationSort) => void;
+  onSearchChange: (value: string) => void;
+  onMarkAllRead: () => Promise<void>;
   onToggleRead: (notification: AppNotification) => Promise<void>;
   role: Role;
 }) {
   const copy = roleCopy[role];
-  const filteredItems = useMemo(() => {
-    if (!data) return [];
-    if (filter === 'unread') return data.items.filter((item) => !item.read);
-    if (filter === 'read') return data.items.filter((item) => item.read);
-    return data.items;
-  }, [data, filter]);
+  const items = useMemo(() => (data?.items ?? []).map(buildClientNotificationViewModel), [data]);
+  const filteredItems = useMemo(
+    () => items
+      .filter((item) => {
+        if (filter === 'unread' && item.read) return false;
+        if (filter === 'read' && !item.read) return false;
+        if (!['all', 'unread', 'read'].includes(filter) && item.category !== filter) return false;
+        if (search.trim()) {
+          const text = `${item.title} ${item.message} ${item.label}`.toLowerCase();
+          if (!text.includes(search.trim().toLowerCase())) return false;
+        }
+        return true;
+      })
+      .sort((a, b) => {
+        const aTime = a.notification.createdAt ? new Date(a.notification.createdAt).getTime() : 0;
+        const bTime = b.notification.createdAt ? new Date(b.notification.createdAt).getTime() : 0;
+        return sort === 'newest' ? bTime - aTime : aTime - bTime;
+      }),
+    [filter, items, search, sort],
+  );
+
+  const unreadCount = data?.unreadCount ?? items.filter((item) => !item.read).length;
+  const counts = {
+    all: items.length,
+    unread: unreadCount,
+    read: items.filter((item) => item.read).length,
+    appointments: items.filter((item) => item.category === 'appointments').length,
+    messages: items.filter((item) => item.category === 'messages').length,
+    membership: items.filter((item) => item.category === 'membership').length,
+    billing: items.filter((item) => item.category === 'billing').length,
+    reminders: items.filter((item) => item.category === 'reminders').length,
+  };
+
+  const overviewCards = [
+    { label: 'Total', value: counts.all, Icon: Bell, tone: 'bg-violet-100 text-violet-600' },
+    { label: 'Unread', value: counts.unread, Icon: Mail, tone: 'bg-purple-100 text-purple-600' },
+    { label: 'Messages', value: counts.messages, Icon: MessageCircle, tone: 'bg-emerald-100 text-emerald-600' },
+    { label: 'Appointments', value: counts.appointments, Icon: Calendar, tone: 'bg-blue-100 text-blue-600' },
+  ];
+
+  const todayItems = filteredItems.filter((item) => item.group === 'today');
+  const earlierItems = filteredItems.filter((item) => item.group === 'earlier');
 
   return (
-    <div className="space-y-6">
-      <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-indigo-600">Workspace Inbox</p>
-          <h1 className="mt-1 text-2xl font-semibold text-slate-900">{copy.title}</h1>
-          <p className="mt-1 text-sm text-slate-600">{copy.description}</p>
-        </div>
-        <div className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-sm text-slate-600">
-          <Bell size={16} className="text-indigo-600" />
-          <span>{data?.unreadCount ?? 0} unread</span>
-        </div>
+    <div className="mx-auto w-full max-w-[1500px] space-y-6 pb-6">
+      <header>
+        <p className="text-xs font-semibold uppercase tracking-wide text-violet-600">Workspace Inbox</p>
+        <h1 className="mt-1 text-[30px] font-semibold leading-tight text-slate-950">{copy.title}</h1>
+        <p className="mt-2 text-base font-medium text-slate-500">{copy.description}</p>
       </header>
 
       <NoticeBanner notice={notice} />
 
-      <section className="flex flex-wrap gap-2">
-        {([
-          ['all', 'All'],
-          ['unread', 'Unread'],
-          ['read', 'Read'],
-        ] as Array<[StandardFilterKey, string]>).map(([value, label]) => (
-          <button
-            key={value}
-            type="button"
-            onClick={() => onFilterChange(value)}
-            className={`rounded-full border px-4 py-2 text-sm font-semibold transition ${
-              filter === value
-                ? 'border-indigo-200 bg-indigo-50 text-indigo-700'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
-          >
-            {label}
-          </button>
-        ))}
-      </section>
+      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div>
+          <section className="mb-6 flex flex-wrap gap-3">
+            {clientFilterTabs.map((tab) => (
+              <button
+                key={tab.key}
+                type="button"
+                onClick={() => onFilterChange(tab.key)}
+                className={`inline-flex min-h-11 items-center gap-2 rounded-[16px] border px-4 text-sm font-semibold transition ${
+                  filter === tab.key
+                    ? 'border-violet-300 bg-violet-50 text-violet-700 shadow-[0_16px_36px_-30px_rgba(109,40,217,0.9)]'
+                    : 'border-slate-200 bg-white text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                {tab.icon}
+                <span>{tab.label}</span>
+                {(tab.key === 'unread' && counts.unread > 0) ? (
+                  <span className="ml-1 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-600">{counts.unread}</span>
+                ) : null}
+              </button>
+            ))}
+          </section>
 
-      {loading && !data ? (
-        <div className="space-y-3">
-          {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-24 animate-pulse rounded-xl bg-slate-100" />
-          ))}
-        </div>
-      ) : filteredItems.length ? (
-        <div className="space-y-3">
-          {filteredItems.map((notification) => (
-            <article
-              key={notification.id}
-              className={`rounded-xl border p-4 transition ${
-                notification.read
-                  ? 'border-slate-200 bg-white'
-                  : 'border-indigo-100 bg-indigo-50/70'
-              }`}
+          <section className="mb-6 grid gap-3 lg:grid-cols-[minmax(0,1fr)_180px_180px]">
+            <label className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 shadow-sm focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+              <Search size={17} className="text-slate-400" />
+              <input
+                value={search}
+                onChange={(event) => onSearchChange(event.target.value)}
+                placeholder="Search notifications..."
+                className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
+              />
+            </label>
+            <label className="relative flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white px-4 text-slate-700 shadow-sm">
+              <ArrowUpDown size={17} className="text-slate-400" />
+              <span className="min-w-0 flex-1 truncate text-sm font-semibold">{sort === 'newest' ? 'Newest first' : 'Oldest first'}</span>
+              <ChevronRight size={16} className="rotate-90 text-slate-400" />
+              <select
+                value={sort}
+                onChange={(event) => onSortChange(event.target.value as ClientNotificationSort)}
+                className="absolute inset-0 cursor-pointer opacity-0"
+                aria-label="Sort notifications"
+              >
+                <option value="newest">Newest first</option>
+                <option value="oldest">Oldest first</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              onClick={() => void onMarkAllRead()}
+              disabled={markAllPending || !unreadCount}
+              className="inline-flex min-h-12 items-center justify-center gap-2 rounded-lg bg-violet-600 px-5 text-sm font-semibold text-white shadow-[0_18px_42px_-24px_rgba(109,40,217,0.85)] transition hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-55"
             >
-              <div className="flex flex-col items-start justify-between gap-4 sm:flex-row">
-                <div className="min-w-0">
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                    {notificationCategoryLabel(notification.type)}
-                  </p>
-                  <p className="mt-2 text-sm leading-6 text-slate-900">{notification.message}</p>
-                  <p className="mt-3 text-xs text-slate-400">
-                    {notification.createdAt ? new Date(notification.createdAt).toLocaleString() : 'Date unavailable'}
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void onToggleRead(notification)}
-                  className={`inline-flex shrink-0 items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold transition ${
-                    notification.read
-                      ? 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-                      : 'border-indigo-200 bg-white text-indigo-700 hover:bg-indigo-50'
-                  }`}
-                >
-                  {notification.read ? <Check size={14} /> : <CheckCheck size={14} />}
-                  {notification.read ? 'Mark unread' : 'Mark read'}
+              <CheckCircleIcon />
+              {markAllPending ? 'Updating...' : 'Mark all as read'}
+            </button>
+          </section>
+
+          {loading && !data ? (
+            <div className="space-y-3">
+              {Array.from({ length: 6 }).map((_, index) => (
+                <div key={index} className="h-24 animate-pulse rounded-[14px] border border-slate-200 bg-white" />
+              ))}
+            </div>
+          ) : null}
+
+          {!loading && !filteredItems.length ? (
+            <div className="rounded-[18px] border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+              <Bell size={26} className="mx-auto text-slate-400" />
+              <h2 className="mt-4 text-lg font-semibold text-slate-950">No notifications found</h2>
+              <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{items.length ? 'Try clearing the search or choosing a broader inbox filter.' : copy.empty}</p>
+            </div>
+          ) : null}
+
+          {!loading && filteredItems.length ? (
+            <div className="space-y-5">
+              <NotificationGroup
+                title="Today"
+                countLabel={todayItems.filter((item) => !item.read).length ? `${todayItems.filter((item) => !item.read).length} unread` : undefined}
+                items={todayItems}
+                onToggleRead={onToggleRead}
+              />
+              <NotificationGroup
+                title="Earlier"
+                items={earlierItems}
+                onToggleRead={onToggleRead}
+              />
+              <div className="flex justify-center pt-1">
+                <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-full border border-slate-200 bg-white px-6 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                  Load more
+                  <ChevronRight size={16} className="rotate-90" />
                 </button>
               </div>
-            </article>
-          ))}
+            </div>
+          ) : null}
         </div>
-      ) : (
-        <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-10 text-center">
-          <Bell size={24} className="mx-auto text-slate-400" />
-          <p className="mt-4 text-sm text-slate-600">{copy.empty}</p>
-        </div>
-      )}
+
+        <aside className="space-y-5">
+          <section className="rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.35)]">
+            <h2 className="text-lg font-semibold text-slate-950">Notification Overview</h2>
+            <div className="mt-5 grid grid-cols-2 gap-3">
+              {overviewCards.map(({ label, value, Icon, tone }) => (
+                <article key={label} className="rounded-lg border border-slate-200 bg-white p-4">
+                  <span className={`grid h-9 w-9 place-items-center rounded-full ${tone}`}>
+                    <Icon size={18} />
+                  </span>
+                  <p className="mt-4 text-2xl font-semibold leading-none text-slate-950">{value}</p>
+                  <p className="mt-2 text-sm font-medium text-slate-600">{label}</p>
+                </article>
+              ))}
+            </div>
+          </section>
+
+          <section className="rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_18px_48px_-36px_rgba(15,23,42,0.35)]">
+            <h2 className="text-lg font-semibold text-slate-950">Quick Actions</h2>
+            <div className="mt-5 space-y-1">
+              <QuickAction icon={<Settings size={18} />} label="Manage notification preferences" />
+              <QuickAction icon={<Clock3 size={18} />} label="Notification history" />
+              <QuickAction icon={<Moon size={18} />} label="Do not disturb" detail="Off" />
+              <QuickAction icon={<Headphones size={18} />} label="Contact support" />
+            </div>
+          </section>
+
+          <section className="rounded-[14px] border border-violet-200 bg-[linear-gradient(135deg,#fbfaff_0%,#f1eaff_100%)] p-5 shadow-[0_18px_48px_-36px_rgba(109,40,217,0.45)]">
+            <div className="flex gap-4">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white text-violet-600 shadow-sm">
+                <Sparkles size={22} />
+              </span>
+              <div>
+                <h2 className="text-base font-semibold text-violet-800">Stay in the loop</h2>
+                <p className="mt-2 text-sm leading-6 text-violet-700/80">Enable push notifications to get real-time updates on your appointments and messages.</p>
+                <button type="button" className="mt-5 inline-flex items-center gap-2 text-sm font-semibold text-violet-700">
+                  Enable now
+                  <ArrowRight size={16} />
+                </button>
+              </div>
+            </div>
+          </section>
+        </aside>
+      </div>
     </div>
+  );
+}
+
+function CheckCircleIcon() {
+  return (
+    <span className="grid h-5 w-5 place-items-center rounded-full border border-white/70">
+      <Check size={13} />
+    </span>
+  );
+}
+
+function NotificationGroup({
+  title,
+  countLabel,
+  items,
+  onToggleRead,
+}: {
+  title: string;
+  countLabel?: string;
+  items: ClientNotificationViewModel[];
+  onToggleRead: (notification: AppNotification) => Promise<void>;
+}) {
+  if (!items.length) return null;
+
+  return (
+    <section>
+      <div className="mb-3 flex items-center gap-3 px-1">
+        <h2 className="text-lg font-semibold text-slate-950">{title}</h2>
+        {countLabel ? <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-semibold text-violet-700">{countLabel}</span> : null}
+      </div>
+      <div className="space-y-0">
+        {items.map((item) => (
+          <article
+            key={item.notification.id}
+            className={`grid gap-4 border border-slate-200 bg-white px-4 py-4 shadow-[0_16px_42px_-36px_rgba(15,23,42,0.4)] first:rounded-t-[14px] last:rounded-b-[14px] lg:grid-cols-[minmax(0,1fr)_132px] lg:items-center ${
+              item.read ? '' : 'border-violet-300 ring-1 ring-violet-200'
+            }`}
+          >
+            <div className="flex min-w-0 items-center gap-4">
+              <span className={`hidden h-2.5 w-2.5 shrink-0 rounded-full ${item.read ? 'bg-slate-300' : item.dotClass} sm:block`} />
+              <span className={`grid h-14 w-14 shrink-0 place-items-center rounded-full ${item.iconClass}`}>
+                <item.Icon size={24} />
+              </span>
+              <div className="min-w-0">
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <h3 className="truncate text-base font-semibold text-slate-950">{item.title}</h3>
+                  <span className="text-sm font-medium text-slate-500 sm:ml-auto lg:hidden">{item.dateLabel === 'Today' ? item.timeLabel : `${item.dateLabel}, ${item.timeLabel}`}</span>
+                </div>
+                <p className="mt-1 line-clamp-2 text-sm leading-5 text-slate-600">{item.message}</p>
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <span className={`rounded-full px-3 py-1 text-xs font-semibold ${item.badgeClass}`}>{item.label}</span>
+                  <span className="hidden items-center gap-1 text-sm font-medium text-slate-500 sm:inline-flex">
+                    <Clock3 size={15} />
+                    {item.dateLabel === 'Today' ? item.timeLabel : `${item.dateLabel}, ${item.timeLabel}`}
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 lg:justify-end">
+              <button
+                type="button"
+                onClick={() => void onToggleRead(item.notification)}
+                className={`inline-flex min-h-10 flex-1 items-center justify-center rounded-lg border bg-white px-4 text-sm font-semibold transition lg:flex-none ${item.actionClass}`}
+              >
+                {item.read ? 'Mark Unread' : item.ctaLabel}
+              </button>
+              {!item.read ? (
+                <button
+                  type="button"
+                  onClick={() => void onToggleRead(item.notification)}
+                  className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition hover:bg-slate-50"
+                  aria-label="Mark notification as read"
+                >
+                  <CheckCheck size={17} />
+                </button>
+              ) : null}
+            </div>
+          </article>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+function QuickAction({ icon, label, detail }: { icon: ReactNode; label: string; detail?: string }) {
+  return (
+    <button type="button" className="flex min-h-12 w-full items-center gap-3 rounded-lg px-1 text-left transition hover:bg-slate-50">
+      <span className="shrink-0 text-slate-600">{icon}</span>
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-sm font-medium text-slate-700">{label}</span>
+        {detail ? <span className="block text-xs text-slate-400">{detail}</span> : null}
+      </span>
+      <ChevronRight size={16} className="text-slate-500" />
+    </button>
   );
 }
 
@@ -634,7 +1001,9 @@ export default function NotificationsPage({ role }: { role: Role }) {
   const [data, setData] = useState<NotificationData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<NoticeState>(null);
-  const [standardFilter, setStandardFilter] = useState<StandardFilterKey>('all');
+  const [standardFilter, setStandardFilter] = useState<StandardFilterKey | ClientNotificationCategory>('all');
+  const [standardSort, setStandardSort] = useState<ClientNotificationSort>('newest');
+  const [standardSearch, setStandardSearch] = useState('');
   const [adminFilter, setAdminFilter] = useState<AdminNotificationFilter>('all');
   const [adminSort, setAdminSort] = useState<AdminNotificationSort>('newest');
   const [adminSearch, setAdminSearch] = useState('');
@@ -733,7 +1102,13 @@ export default function NotificationsPage({ role }: { role: Role }) {
         loading={loading}
         notice={notice}
         filter={standardFilter}
+        sort={standardSort}
+        search={standardSearch}
+        markAllPending={markAllPending}
         onFilterChange={setStandardFilter}
+        onSortChange={setStandardSort}
+        onSearchChange={setStandardSearch}
+        onMarkAllRead={handleMarkAllRead}
         onToggleRead={handleToggleRead}
         role={role}
       />

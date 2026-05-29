@@ -1,16 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ChangeEventHandler, type ReactNode } from 'react';
 import {
   AlertCircle,
+  ArrowUpDown,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
   CircleHelp,
+  Clock3,
+  CreditCard,
   Download,
   FilterX,
   MoreVertical,
   Search,
   ShieldAlert,
   ShieldCheck,
+  SlidersHorizontal,
   UserCircle2,
   Users,
   Waves,
@@ -138,6 +142,62 @@ function summaryCardTone(index: number) {
   ];
 
   return tones[index] ?? tones[0];
+}
+
+function clientSummaryTone(index: number) {
+  const tones = [
+    'border-violet-100 bg-violet-50/55 text-violet-600 shadow-violet-100/70',
+    'border-blue-100 bg-blue-50/50 text-blue-600 shadow-blue-100/60',
+    'border-emerald-100 bg-emerald-50/50 text-emerald-600 shadow-emerald-100/60',
+    'border-purple-100 bg-purple-50/50 text-purple-600 shadow-purple-100/60',
+    'border-amber-100 bg-amber-50/55 text-amber-600 shadow-amber-100/60',
+  ];
+
+  return tones[index] ?? tones[0];
+}
+
+function clientValueTone(index: number) {
+  const tones = ['text-violet-600', 'text-blue-600', 'text-emerald-600', 'text-purple-600', 'text-amber-600'];
+  return tones[index] ?? tones[0];
+}
+
+function clientActivityType(actionKey: string) {
+  if (['booked', 'rescheduled', 'cancelled', 'completed', 'no_show'].includes(actionKey)) return 'Appointments';
+  if (['profile_updated', 'password_changed', 'password_reset', 'password_reset_forced', 'login', 'logout', 'registered'].includes(actionKey)) return 'Profile';
+  if (['plan_created', 'plan_updated', 'plan_published', 'plan_archived', 'checkout_initiated'].includes(actionKey)) return 'Membership';
+  if (['payment_captured', 'refund_processed'].includes(actionKey)) return 'Payments';
+  return 'All Activities';
+}
+
+function clientStatusLabel(presentation: ActivityPresentation) {
+  const statusByAction: Record<string, string> = {
+    booked: 'Confirmed',
+    rescheduled: 'Rescheduled',
+    cancelled: 'Cancelled',
+    completed: 'Completed',
+    no_show: 'Missed',
+    profile_updated: 'Success',
+    password_changed: 'Success',
+    password_reset: 'Completed',
+    login: 'Success',
+    logout: 'Saved',
+    plan_created: 'Saved',
+    plan_updated: 'Saved',
+    plan_published: 'Active',
+    checkout_initiated: 'Started',
+    payment_captured: 'Completed',
+    refund_processed: 'Refunded',
+  };
+
+  return statusByAction[presentation.actionKey] ?? (presentation.severity === 'high' ? 'Attention' : presentation.severity === 'medium' ? 'Updated' : 'Saved');
+}
+
+function clientStatusTone(status: string) {
+  if (['Success', 'Confirmed', 'Active', 'Submitted'].includes(status)) return 'bg-emerald-100 text-emerald-700';
+  if (['Completed', 'New'].includes(status)) return 'bg-blue-100 text-blue-700';
+  if (['Rescheduled', 'Started', 'Updated'].includes(status)) return 'bg-amber-100 text-amber-700';
+  if (['Cancelled', 'Missed', 'Attention', 'Refunded'].includes(status)) return 'bg-rose-100 text-rose-700';
+  return 'bg-slate-100 text-slate-600';
 }
 
 function downloadFile(fileName: string, content: string, contentType: string) {
@@ -285,6 +345,7 @@ function StandardFeed({
   emptyMessage,
   entries,
   pagination,
+  summary,
   loading,
   error,
   onPageChange,
@@ -294,87 +355,293 @@ function StandardFeed({
   emptyMessage: string;
   entries: Array<{ entry: ActivityLogEntry; presentation: ActivityPresentation }>;
   pagination: ActivityLogPagination;
+  summary: ActivityLogSummary;
   loading: boolean;
   error: string;
   onPageChange: (page: number) => void;
 }) {
+  const [query, setQuery] = useState('');
+  const [typeFilter, setTypeFilter] = useState('All Activities');
+  const [statusFilter, setStatusFilter] = useState('All Statuses');
+  const [sortOrder, setSortOrder] = useState<'newest' | 'oldest'>('newest');
+
+  const typedEntries = entries.map((item) => ({
+    ...item,
+    activityType: clientActivityType(item.presentation.actionKey),
+    status: clientStatusLabel(item.presentation),
+  }));
+
+  const typeOptions = ['All Activities', ...Array.from(new Set(typedEntries.map((item) => item.activityType).filter((type) => type !== 'All Activities')))];
+  const statusOptions = ['All Statuses', ...Array.from(new Set(typedEntries.map((item) => item.status)))];
+  const visibleEntries = typedEntries
+    .filter((item) => {
+      const searchText = `${item.presentation.summary} ${item.presentation.actionLabel} ${item.presentation.performerName} ${item.status}`.toLowerCase();
+      if (query.trim() && !searchText.includes(query.trim().toLowerCase())) return false;
+      if (typeFilter !== 'All Activities' && item.activityType !== typeFilter) return false;
+      if (statusFilter !== 'All Statuses' && item.status !== statusFilter) return false;
+      return true;
+    })
+    .sort((a, b) => {
+      const aTime = a.entry.occurredAt ? new Date(a.entry.occurredAt).getTime() : 0;
+      const bTime = b.entry.occurredAt ? new Date(b.entry.occurredAt).getTime() : 0;
+      return sortOrder === 'newest' ? bTime - aTime : aTime - bTime;
+    });
+
+  const dateLabel = (() => {
+    const dated = entries
+      .map(({ entry }) => entry.occurredAt ? new Date(entry.occurredAt) : null)
+      .filter((date): date is Date => Boolean(date))
+      .sort((a, b) => a.getTime() - b.getTime());
+    if (!dated.length) return 'All time';
+    const first = dated[0].toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    const last = dated[dated.length - 1].toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+    return first === last ? first : `${first} - ${last}`;
+  })();
+
+  const counts = typedEntries.reduce<Record<string, number>>((acc, item) => {
+    acc[item.activityType] = (acc[item.activityType] ?? 0) + 1;
+    return acc;
+  }, {});
+
+  const summaryCards = [
+    { label: 'All Activities', value: summary.totalActivities || pagination.total || entries.length, Icon: Waves },
+    { label: 'Appointments', value: counts.Appointments ?? 0, Icon: CalendarRange },
+    { label: 'Profile', value: counts.Profile ?? 0, Icon: UserCircle2 },
+    { label: 'Membership', value: counts.Membership ?? 0, Icon: ShieldCheck },
+    { label: 'Payments', value: counts.Payments ?? 0, Icon: CreditCard },
+  ];
+
+  function clearClientFilters() {
+    setQuery('');
+    setTypeFilter('All Activities');
+    setStatusFilter('All Statuses');
+    setSortOrder('newest');
+  }
+
   return (
-    <div className="space-y-6">
+    <div className="mx-auto w-full max-w-[1500px] space-y-4 pb-5">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{title}</h1>
-        <p className="mt-1 text-sm text-slate-600">{subtitle}</p>
+        <h1 className="text-[26px] font-semibold leading-tight text-slate-950">{title}</h1>
+        <p className="mt-1 text-sm font-medium text-slate-500">{subtitle}</p>
       </div>
 
-      <section className="rounded-[28px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_-35px_rgba(15,23,42,0.2)]">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <h2 className="text-lg font-semibold text-slate-950">Recent Activity</h2>
-            <p className="text-sm text-slate-500">{pagination.total} visible events</p>
-          </div>
-          <div className="text-sm text-slate-500">Page {pagination.page} of {pagination.totalPages}</div>
-        </div>
+      <section className="rounded-[14px] border border-slate-200 bg-white p-4 shadow-[0_16px_45px_-34px_rgba(15,23,42,0.34)]">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-[minmax(230px,1.15fr)_minmax(210px,0.9fr)_minmax(190px,0.8fr)_minmax(190px,0.8fr)_minmax(220px,0.9fr)_auto]">
+          <label className="flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 text-slate-600 shadow-sm focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+            <Search size={18} className="shrink-0 text-slate-500" />
+            <input
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search activity..."
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-800 outline-none placeholder:text-slate-400"
+              aria-label="Search activity"
+            />
+          </label>
 
-        {error ? <p className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">{error}</p> : null}
+          <FilterSelect icon={<CalendarRange size={18} />} label={dateLabel} ariaLabel="Activity date range">
+            <option>{dateLabel}</option>
+          </FilterSelect>
 
-        <div className="space-y-3">
-          {loading ? Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="rounded-2xl border border-slate-200 bg-slate-50 p-5">
-              <div className="h-5 w-40 animate-pulse rounded bg-slate-200" />
-              <div className="mt-3 h-4 w-2/3 animate-pulse rounded bg-slate-200" />
-            </div>
-          )) : null}
+          <FilterSelect
+            icon={<SlidersHorizontal size={18} />}
+            label={typeFilter}
+            value={typeFilter}
+            onChange={(event) => setTypeFilter(event.target.value)}
+            ariaLabel="Activity type"
+          >
+            {typeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </FilterSelect>
 
-          {!loading && !error && !entries.length ? (
-            <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 px-5 py-10 text-center">
-              <p className="text-sm font-medium text-slate-700">{emptyMessage}</p>
-              <p className="mt-2 text-sm text-slate-500">Logs will appear here as activity is recorded.</p>
-            </div>
-          ) : null}
+          <FilterSelect
+            icon={<Clock3 size={18} />}
+            label={statusFilter === 'All Statuses' ? 'Status' : statusFilter}
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value)}
+            ariaLabel="Status"
+          >
+            {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
+          </FilterSelect>
 
-          {!loading && !error ? entries.map(({ entry, presentation }) => (
-            <article key={entry.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-              <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className={`inline-flex items-center gap-2 rounded-full px-3 py-1.5 text-xs font-semibold ${presentation.actionTone}`}>
-                      <presentation.actionIcon size={14} />
-                      {presentation.actionLabel}
-                    </span>
-                    <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold ${severityStyles(presentation.severity)}`}>
-                      {titleCase(presentation.severity)}
-                    </span>
-                  </div>
-                  <h3 className="mt-3 text-base font-semibold text-slate-950">{presentation.summary}</h3>
-                  <p className="mt-1 text-sm text-slate-500">{formatDateLabel(entry.occurredAt).day} at {formatDateLabel(entry.occurredAt).time}</p>
-                </div>
-                <div className="min-w-[220px]">
-                  <PersonPill name={presentation.performerName} subtitle={presentation.performerRole} />
-                </div>
-              </div>
-            </article>
-          )) : null}
-        </div>
+          <FilterSelect
+            icon={<ArrowUpDown size={18} />}
+            label={sortOrder === 'newest' ? 'Sort by: Newest First' : 'Sort by: Oldest First'}
+            value={sortOrder}
+            onChange={(event) => setSortOrder(event.target.value as 'newest' | 'oldest')}
+            ariaLabel="Sort activity"
+          >
+            <option value="newest">Sort by: Newest First</option>
+            <option value="oldest">Sort by: Oldest First</option>
+          </FilterSelect>
 
-        <div className="mt-6 flex items-center justify-end gap-2">
           <button
             type="button"
-            onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
-            disabled={loading || pagination.page <= 1}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
+            onClick={clearClientFilters}
+            className="inline-flex min-h-12 items-center justify-center whitespace-nowrap rounded-lg px-4 text-sm font-semibold text-violet-600 transition hover:bg-violet-50"
           >
-            Previous
-          </button>
-          <button
-            type="button"
-            onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))}
-            disabled={loading || pagination.page >= pagination.totalPages}
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            Next
+            Clear filters
           </button>
         </div>
       </section>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        {summaryCards.map(({ label, value, Icon }, index) => (
+          <button
+            key={label}
+            type="button"
+            onClick={() => setTypeFilter(label)}
+            className={`group flex min-h-[92px] items-center gap-4 rounded-[14px] border bg-white px-5 py-4 text-left shadow-[0_16px_42px_-35px_rgba(15,23,42,0.45)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_50px_-36px_rgba(15,23,42,0.5)] ${typeFilter === label ? clientSummaryTone(index) : 'border-slate-200'}`}
+          >
+            <span className={`grid h-12 w-12 shrink-0 place-items-center rounded-full ${clientSummaryTone(index).split(' ').slice(1, 3).join(' ')}`}>
+              <Icon size={25} />
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold text-slate-600">{label}</span>
+              <span className={`mt-1 block text-2xl font-semibold leading-none ${clientValueTone(index)}`}>{value}</span>
+            </span>
+          </button>
+        ))}
+      </section>
+
+      <section className="overflow-hidden rounded-[14px] border border-slate-200 bg-white shadow-[0_18px_48px_-34px_rgba(15,23,42,0.36)]">
+        <div className="border-b border-slate-200 px-5 py-4">
+          <h2 className="text-lg font-semibold text-slate-950">Recent Activity</h2>
+          <p className="mt-0.5 text-sm font-medium text-slate-500">
+            {loading ? 'Loading recent events' : `Showing ${visibleEntries.length} recent ${visibleEntries.length === 1 ? 'event' : 'events'}`}
+          </p>
+        </div>
+
+        {error ? <p className="m-4 rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</p> : null}
+
+        <div className="p-4">
+          <div className="overflow-hidden rounded-[12px] border border-slate-200">
+            {loading ? Array.from({ length: 8 }).map((_, index) => (
+              <div key={index} className="grid gap-3 border-b border-slate-200 px-4 py-3 last:border-b-0 lg:grid-cols-[minmax(0,1.65fr)_130px_150px_210px] lg:items-center">
+                <div className="flex items-center gap-3">
+                  <div className="h-11 w-11 animate-pulse rounded-full bg-slate-100" />
+                  <div className="min-w-0 flex-1">
+                    <div className="h-4 w-48 animate-pulse rounded bg-slate-100" />
+                    <div className="mt-2 h-3 w-72 max-w-full animate-pulse rounded bg-slate-100" />
+                  </div>
+                </div>
+                <div className="h-6 w-20 animate-pulse rounded-full bg-slate-100" />
+                <div className="h-4 w-28 animate-pulse rounded bg-slate-100" />
+                <div className="h-9 w-44 animate-pulse rounded bg-slate-100" />
+              </div>
+            )) : null}
+
+            {!loading && !error && !visibleEntries.length ? (
+              <div className="px-5 py-12 text-center">
+                <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-violet-50 text-violet-600">
+                  <AlertCircle size={24} />
+                </div>
+                <h3 className="mt-4 text-lg font-semibold text-slate-950">No activity found</h3>
+                <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{entries.length ? 'Try clearing filters to see more activity.' : emptyMessage}</p>
+                <button
+                  type="button"
+                  onClick={clearClientFilters}
+                  className="mt-5 rounded-lg border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-700 transition hover:bg-slate-50"
+                >
+                  Clear filters
+                </button>
+              </div>
+            ) : null}
+
+            {!loading && !error ? visibleEntries.map(({ entry, presentation, status }) => {
+              const Icon = presentation.actionIcon;
+              const time = formatDateLabel(entry.occurredAt);
+              return (
+                <article
+                  key={entry.id}
+                  className="grid gap-3 border-b border-slate-200 px-4 py-3 transition last:border-b-0 hover:bg-slate-50/70 lg:grid-cols-[minmax(0,1.65fr)_130px_150px_210px] lg:items-center"
+                >
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${presentation.iconTone}`}>
+                      <Icon size={21} />
+                    </span>
+                    <div className="min-w-0">
+                      <h3 className="truncate text-sm font-semibold text-slate-950">{presentation.actionLabel}</h3>
+                      <p className="mt-0.5 line-clamp-2 text-sm leading-5 text-slate-500">{presentation.summary}</p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center lg:justify-center">
+                    <span className={`inline-flex min-w-[84px] justify-center rounded-full px-3 py-1 text-xs font-semibold ${clientStatusTone(status)}`}>
+                      {status}
+                    </span>
+                  </div>
+
+                  <div className="flex items-start gap-2 text-sm font-medium text-slate-600">
+                    <Clock3 size={16} className="mt-0.5 shrink-0 text-slate-500" />
+                    <div>
+                      <p>{time.day}</p>
+                      <p className="text-xs text-slate-500">{time.time}</p>
+                    </div>
+                  </div>
+
+                  <PersonPill name={presentation.performerName} subtitle={presentation.performerRole} />
+                </article>
+              );
+            }) : null}
+          </div>
+
+          <div className="mt-4 flex flex-col items-center justify-between gap-3 sm:flex-row">
+            <p className="text-sm font-medium text-slate-500">Page {pagination.page} of {pagination.totalPages}</p>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onPageChange(Math.max(1, pagination.page - 1))}
+                disabled={loading || pagination.page <= 1}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label="Previous page"
+              >
+                <ChevronLeft size={17} />
+              </button>
+              <button
+                type="button"
+                onClick={() => onPageChange(Math.min(pagination.totalPages, pagination.page + 1))}
+                disabled={loading || pagination.page >= pagination.totalPages}
+                className="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 text-slate-600 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-45"
+                aria-label="Next page"
+              >
+                <ChevronRight size={17} />
+              </button>
+            </div>
+          </div>
+        </div>
+      </section>
     </div>
+  );
+}
+
+function FilterSelect({
+  icon,
+  label,
+  children,
+  value,
+  onChange,
+  ariaLabel,
+}: {
+  icon: ReactNode;
+  label: string;
+  children: ReactNode;
+  value?: string;
+  onChange?: ChangeEventHandler<HTMLSelectElement>;
+  ariaLabel: string;
+}) {
+  return (
+    <label className="relative flex min-h-12 items-center gap-3 rounded-lg border border-slate-200 bg-white px-3 text-slate-700 shadow-sm focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+      <span className="shrink-0 text-slate-500">{icon}</span>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold">{label}</span>
+      <ChevronRight size={16} className="rotate-90 text-slate-500" />
+      <select
+        value={value}
+        onChange={onChange}
+        aria-label={ariaLabel}
+        className="absolute inset-0 cursor-pointer opacity-0"
+      >
+        {children}
+      </select>
+    </label>
   );
 }
 
@@ -518,6 +785,7 @@ export default function ActivityLogPage({ title, subtitle, emptyMessage, showAdm
         emptyMessage={emptyMessage}
         entries={presentedEntries}
         pagination={pagination}
+        summary={summary}
         loading={loading}
         error={error}
         onPageChange={updatePage}
