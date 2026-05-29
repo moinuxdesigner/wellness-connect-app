@@ -316,10 +316,10 @@ export function ProgressReviewTopbar({
 
 export function ClientWorkspaceSummary({
   payload,
-  onOpenThread,
+  messageTo,
 }: {
   payload: ProgressReviewWorkspaceData;
-  onOpenThread: () => void;
+  messageTo: string;
 }) {
   return (
     <Card className="p-5 xl:hidden">
@@ -336,13 +336,9 @@ export function ClientWorkspaceSummary({
           <Link to="/trainer/check-ins" className="inline-flex items-center justify-center rounded-2xl border border-indigo-100 bg-white px-4 py-2 font-semibold text-indigo-600 transition hover:bg-indigo-50">
             Open Check-ins
           </Link>
-          <button
-            type="button"
-            onClick={onOpenThread}
-            className="inline-flex items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2 font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:col-span-2"
-          >
+          <Link to={messageTo} className="inline-flex items-center justify-center rounded-2xl border border-indigo-100 bg-indigo-50 px-4 py-2 font-semibold text-indigo-700 transition hover:bg-indigo-100 sm:col-span-2">
             Open Message Thread
-          </button>
+          </Link>
         </div>
       </div>
     </Card>
@@ -528,6 +524,7 @@ export function MessageThreadCard({
   isSending,
   onDraftChange,
   onSubmit,
+  className = '',
 }: {
   payload: ProgressReviewWorkspaceData;
   searchValue: string;
@@ -535,6 +532,7 @@ export function MessageThreadCard({
   isSending: boolean;
   onDraftChange: (value: string) => void;
   onSubmit: () => void;
+  className?: string;
 }) {
   const filteredMessages = payload.messages.filter((message) => {
     if (!searchValue.trim()) return true;
@@ -543,7 +541,7 @@ export function MessageThreadCard({
   });
 
   return (
-    <Card className="flex min-h-[820px] flex-col overflow-hidden p-5 xl:sticky xl:top-6">
+    <Card className={`flex min-h-[820px] flex-col overflow-hidden p-5 ${className}`.trim()}>
       <div className="flex items-center justify-between border-b border-slate-100 pb-4">
         <h2 className="text-xl font-semibold text-[#111941]">Message Thread</h2>
       </div>

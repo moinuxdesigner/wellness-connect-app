@@ -5,8 +5,6 @@ import {
   ClientWorkspaceSummary,
   CompletedWorkoutsCard,
   EmptyProgressReviewState,
-  MessageThreadCard,
-  MobileMessageThreadDrawer,
   MuscleGroupFocusCard,
   ProgressOverviewCard,
   ProgressReviewSkeleton,
@@ -42,27 +40,7 @@ export default function ProgressReviewPage() {
   const clientId = Number(clientIdParam);
   const resolvedClientId = Number.isFinite(clientId) && clientId > 0 ? clientId : null;
   const [searchValue, setSearchValue] = useState('');
-  const [draftMessage, setDraftMessage] = useState('');
-  const [submitError, setSubmitError] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [mobileThreadOpen, setMobileThreadOpen] = useState(false);
-  const { payload, loading, error, sendMessage } = useProgressReviewData(resolvedClientId);
-
-  async function handleSubmit() {
-    const nextMessage = draftMessage.trim();
-    if (!nextMessage || isSending) return;
-
-    setIsSending(true);
-    setSubmitError('');
-    try {
-      await sendMessage({ body: nextMessage });
-      setDraftMessage('');
-    } catch (reason) {
-      setSubmitError(reason instanceof Error ? reason.message : 'Unable to send the follow-up message right now.');
-    } finally {
-      setIsSending(false);
-    }
-  }
+  const { payload, loading, error } = useProgressReviewData(resolvedClientId);
 
   if (!resolvedClientId) {
     return <NoticeCard title="Invalid progress review route" body="A client id is required to open this progress review workspace." tone="error" />;
@@ -91,12 +69,10 @@ export default function ProgressReviewPage() {
       />
 
       <div className="mx-5 sm:mx-7 lg:mx-0">
-        <ClientWorkspaceSummary payload={payload} onOpenThread={() => setMobileThreadOpen(true)} />
+        <ClientWorkspaceSummary payload={payload} messageTo={`/trainer/clients/${payload.client.id}/messages`} />
       </div>
 
-      {submitError ? <NoticeCard title="Message not sent" body={submitError} tone="error" /> : null}
-
-      <div className="grid gap-5 px-5 pb-3 sm:px-7 lg:px-0 xl:grid-cols-[minmax(0,1fr)_390px] xl:items-start 2xl:grid-cols-[minmax(0,1fr)_420px]">
+      <div className="grid gap-5 px-5 pb-3 sm:px-7 lg:px-0">
         <div className="space-y-4">
           <ProgressOverviewCard payload={payload} />
           <div className="grid gap-4 xl:grid-cols-2 2xl:grid-cols-3">
@@ -106,29 +82,7 @@ export default function ProgressReviewPage() {
           </div>
           <RecommendationCards items={payload.recommendations} />
         </div>
-
-        <div className="hidden xl:block">
-          <MessageThreadCard
-            payload={payload}
-            searchValue={searchValue}
-            draftMessage={draftMessage}
-            isSending={isSending}
-            onDraftChange={setDraftMessage}
-            onSubmit={handleSubmit}
-          />
-        </div>
       </div>
-
-      <MobileMessageThreadDrawer
-        open={mobileThreadOpen}
-        onOpenChange={setMobileThreadOpen}
-        payload={payload}
-        searchValue={searchValue}
-        draftMessage={draftMessage}
-        isSending={isSending}
-        onDraftChange={setDraftMessage}
-        onSubmit={handleSubmit}
-      />
     </div>
   );
 }

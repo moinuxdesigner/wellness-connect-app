@@ -4,13 +4,13 @@ import { ArrowLeft, Ban, CircleAlert, Clock3, LogOut } from 'lucide-react';
 import { getAuthState } from '../auth/auth';
 import { logoutRequest } from '../auth/apiAuth';
 import AuthActionLoader from '../auth/AuthActionLoader';
-import { fetchTrainerAccessState, type TrainerAccessState } from './trainerAccess';
+import { fetchTrainerAccessState, getCachedTrainerAccessState, type TrainerAccessState } from './trainerAccess';
 import type { TrainerApplicationRecord, UploadValue } from './trainerOnboarding';
 
 export default function TrainerProtectedRoute() {
   const auth = getAuthState();
   const location = useLocation();
-  const [access, setAccess] = useState<TrainerAccessState | null>(null);
+  const [access, setAccess] = useState<TrainerAccessState | null>(() => getCachedTrainerAccessState());
 
   useEffect(() => {
     let active = true;
@@ -21,7 +21,9 @@ export default function TrainerProtectedRoute() {
       });
     };
 
-    syncAccess();
+    if (!getCachedTrainerAccessState()) {
+      syncAccess();
+    }
     window.addEventListener('focus', syncAccess);
     window.addEventListener('storage', syncAccess);
 

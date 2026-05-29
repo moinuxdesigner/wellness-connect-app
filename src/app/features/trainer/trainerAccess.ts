@@ -11,6 +11,10 @@ export type TrainerAccessState = {
   adminRemarks: string;
 };
 
+let cachedTrainerAccessState: TrainerAccessState | null = null;
+let cachedTrainerAccessToken: string | null = null;
+let pendingTrainerAccessRequest: Promise<TrainerAccessState> | null = null;
+
 function localTrainerAccessState(): TrainerAccessState {
   const user = getAuthState().user;
 
@@ -43,12 +47,28 @@ function localTrainerAccessState(): TrainerAccessState {
 
 export async function fetchTrainerAccessState(): Promise<TrainerAccessState> {
   const auth = getAuthState();
+  const currentToken = auth.token ?? null;
 
-  if (!auth.token || auth.token.startsWith('demo-token-')) {
-    return localTrainerAccessState();
+  if (cachedTrainerAccessState && cachedTrainerAccessToken === currentToken) {
+    return cachedTrainerAccessState;
   }
 
-  try {
+  if (pendingTrainerAccessRequest && cachedTrainerAccessToken === currentToken) {
+    return pendingTrainerAccessRequest;
+  }
+
+  const resolveAndCache = (value: TrainerAccessState) => {
+    cachedTrainerAccessState = value;
+    cachedTrainerAccessToken = currentToken;
+    return value;
+  };
+
+  if (!auth.token || auth.token.startsWith('demo-token-')) {
+    return resolveAndCache(localTrainerAccessState());
+  }
+
+  pendingTrainerAccessRequest = (async () => {
+    try {
     const response = await fetch(`${API_BASE}/trainer/access-status`, {
       headers: {
         Accept: 'application/json',
@@ -56,24 +76,40 @@ export async function fetchTrainerAccessState(): Promise<TrainerAccessState> {
       },
     });
 
-    if (!response.ok) {
-      return { status: 'onboarding_pending', application: null, adminRemarks: '' };
+      if (!response.ok) {
+        return resolveAndCache({ status: 'onboarding_pending', application: null, adminRemarks: '' });
+      }
+
+      const data = await response.json() as TrainerAccessState;
+      const application = data.application
+        ? {
+            ...data.application,
+            values: mergeTrainerOnboardingValues(data.application.values),
+          }
+        : null;
+
+      return resolveAndCache({
+        status: data.status,
+        application,
+        adminRemarks: data.adminRemarks ?? application?.adminRemarks ?? '',
+      });
+    } catch {
+      return resolveAndCache({ status: 'onboarding_pending', application: null, adminRemarks: '' });
+    } finally {
+      pendingTrainerAccessRequest = null;
     }
+  })();
 
-    const data = await response.json() as TrainerAccessState;
-    const application = data.application
-      ? {
-          ...data.application,
-          values: mergeTrainerOnboardingValues(data.application.values),
-        }
-      : null;
+  return pendingTrainerAccessRequest;
+}
 
-    return {
-      status: data.status,
-      application,
-      adminRemarks: data.adminRemarks ?? application?.adminRemarks ?? '',
-    };
-  } catch {
-    return { status: 'onboarding_pending', application: null, adminRemarks: '' };
-  }
+export function getCachedTrainerAccessState() {
+  const auth = getAuthState();
+  return cachedTrainerAccessToken === (auth.token ?? null) ? cachedTrainerAccessState : null;
+}
+
+export function invalidateTrainerAccessState() {
+  cachedTrainerAccessState = null;
+  cachedTrainerAccessToken = null;
+  pendingTrainerAccessRequest = null;
 }

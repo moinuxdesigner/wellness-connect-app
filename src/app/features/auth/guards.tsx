@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from 'react';
-import { Navigate, Outlet, useLocation } from 'react-router';
+import { Navigate, Outlet } from 'react-router';
 import type { Role } from '../../types';
 import { clearAuthState, getAuthState } from './auth';
 import { meRequest } from './apiAuth';
@@ -8,7 +8,6 @@ import { hasAnyPermission } from './permissions';
 
 export function RequireAuth() {
   const auth = getAuthState();
-  const location = useLocation();
   const [state, setState] = useState<'checking' | 'ready' | 'invalid'>(() => (
     auth.isAuthenticated && auth.token && auth.user ? 'checking' : 'invalid'
   ));
@@ -36,7 +35,7 @@ export function RequireAuth() {
     return () => {
       active = false;
     };
-  }, [auth.token, location.pathname]);
+  }, [auth.token]);
 
   if (state === 'checking') {
     return (

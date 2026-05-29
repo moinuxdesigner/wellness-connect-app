@@ -11,6 +11,8 @@ import {
   LogOut,
   Menu,
   MessageCircle,
+  PanelLeftClose,
+  PanelLeftOpen,
   Plus,
   Search,
   Settings,
@@ -33,7 +35,7 @@ const trainerNav: TrainerNavItem[] = [
   { label: 'Sessions', to: '/trainer/sessions/live', icon: CalendarDays },
   { label: 'Workout Plans', to: '/trainer/plans', icon: Dumbbell },
   { label: 'Progress', to: '/trainer/progress-review', icon: BarChart3 },
-  { label: 'Messages', icon: MessageCircle },
+  { label: 'Messages', to: '/trainer/messages', icon: MessageCircle },
   { label: 'Calendar', icon: CalendarDays },
   { label: 'Resources', icon: ClipboardList },
   { label: 'Settings', to: '/trainer/profile', icon: Settings },
@@ -56,6 +58,7 @@ function matchesNavLabel(label: string, pathname: string): boolean {
   if (label === 'Sessions') return pathname.startsWith('/trainer/sessions/live');
   if (label === 'Workout Plans' || label === 'Plans') return pathname.startsWith('/trainer/plans');
   if (label === 'Progress') return isProgressReviewPath(pathname) || pathname.startsWith('/trainer/check-ins');
+  if (label === 'Messages') return pathname === '/trainer/messages' || /^\/trainer\/clients\/[^/]+\/messages$/.test(pathname);
   if (label === 'Settings') return pathname.startsWith('/trainer/profile');
   if (label === 'Alerts') return pathname.startsWith('/trainer/notifications');
   return false;
@@ -76,6 +79,8 @@ export default function TrainerCommandCenterLayout() {
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarWidth = sidebarCollapsed ? 88 : 280;
 
   useEffect(() => {
     let mounted = true;
@@ -91,6 +96,17 @@ export default function TrainerCommandCenterLayout() {
     };
   }, []);
 
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const savedState = window.localStorage.getItem('trainer-sidebar-collapsed');
+    if (savedState === '1') setSidebarCollapsed(true);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    window.localStorage.setItem('trainer-sidebar-collapsed', sidebarCollapsed ? '1' : '0');
+  }, [sidebarCollapsed]);
+
   async function handleLogout() {
     if (isLoggingOut) return;
     setIsLoggingOut(true);
@@ -104,12 +120,24 @@ export default function TrainerCommandCenterLayout() {
   }
 
   return (
-    <div className="min-h-screen bg-white text-slate-900 lg:bg-[radial-gradient(circle_at_top_right,#f1efff_0%,#fbfbff_32%,#f8fafc_68%)]">
+    <div
+      className="min-h-screen bg-white text-slate-900 lg:bg-[radial-gradient(circle_at_top_right,#f1efff_0%,#fbfbff_32%,#f8fafc_68%)]"
+      style={{ ['--trainer-sidebar-width' as string]: `${sidebarWidth}px` }}
+    >
       {isLoggingOut ? <AuthActionLoader action="logout" /> : null}
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-[280px] flex-col border-r border-indigo-100 bg-white/95 lg:flex">
-        <Brand />
-        <TrainerNavigation pathname={location.pathname} />
-        <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} onLogout={handleLogout} isLoggingOut={isLoggingOut} />
+      <aside
+        className="fixed inset-y-0 left-0 z-30 hidden flex-col border-r border-indigo-100 bg-white/95 transition-[width] duration-300 lg:flex"
+        style={{ width: sidebarWidth }}
+      >
+        <Brand collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed((value) => !value)} />
+        <TrainerNavigation pathname={location.pathname} collapsed={sidebarCollapsed} />
+        <TrainerProfileCard
+          trainerName={visibleTrainerName}
+          avatar={avatar}
+          onLogout={handleLogout}
+          isLoggingOut={isLoggingOut}
+          collapsed={sidebarCollapsed}
+        />
       </aside>
 
       <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
@@ -124,7 +152,7 @@ export default function TrainerCommandCenterLayout() {
         </SheetContent>
       </Sheet>
 
-      <div className="lg:pl-[280px]">
+      <div className="transition-[padding-left] duration-300 lg:pl-[var(--trainer-sidebar-width)]">
         {!isLiveSession && !isProgressReview ? <header className="sticky top-0 z-20 hidden h-[78px] items-center gap-8 border-b border-indigo-100 bg-white/85 px-8 backdrop-blur lg:flex">
           <h1 className="shrink-0 text-2xl font-semibold tracking-tight text-[#101842]">Trainer Command Center</h1>
           <label className="ml-auto flex h-12 w-[390px] items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 text-slate-400 shadow-sm">
@@ -155,8 +183,8 @@ export default function TrainerCommandCenterLayout() {
         </header>
 
         <main className={isLiveSession
-          ? 'mx-auto max-w-none pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0'
-          : 'mx-auto max-w-[1540px] px-5 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-7 md:max-w-[940px] md:px-8 lg:px-8 lg:py-6 lg:pb-6'}
+          ? 'w-full pb-[calc(5.75rem+env(safe-area-inset-bottom))] lg:pb-0'
+          : 'w-full px-5 pb-[calc(5.75rem+env(safe-area-inset-bottom))] pt-2 sm:px-7 md:px-8 lg:px-8 lg:py-6 lg:pb-6'}
         >
           <Outlet />
         </main>
@@ -195,23 +223,55 @@ export default function TrainerCommandCenterLayout() {
   );
 }
 
-function Brand({ onNavigate }: { onNavigate?: () => void }) {
+function Brand({
+  onNavigate,
+  collapsed = false,
+  onToggle,
+}: {
+  onNavigate?: () => void;
+  collapsed?: boolean;
+  onToggle?: () => void;
+}) {
   return (
-    <Link to="/trainer" onClick={onNavigate} className="flex h-[78px] items-center gap-3 border-b border-indigo-50 px-7">
-      <span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
-        <Dumbbell size={27} />
-      </span>
-      <span>
-        <strong className="block text-lg font-semibold tracking-tight text-indigo-700">Aura Wellness</strong>
-        <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Connect</span>
-      </span>
-    </Link>
+    <div className={`flex h-[78px] items-center border-b border-indigo-50 ${collapsed ? 'justify-center px-3' : 'justify-between gap-3 px-7'}`}>
+      <Link to="/trainer" onClick={onNavigate} className={`flex min-w-0 items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
+        <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-indigo-50 text-indigo-600">
+          <Dumbbell size={27} />
+        </span>
+        {!collapsed ? (
+          <span className="min-w-0">
+            <strong className="block truncate text-lg font-semibold tracking-tight text-indigo-700">Aura Wellness</strong>
+            <span className="block text-[11px] font-medium uppercase tracking-[0.16em] text-slate-400">Connect</span>
+          </span>
+        ) : null}
+      </Link>
+      {onToggle ? (
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="hidden rounded-xl border border-slate-200 p-2 text-slate-600 transition hover:bg-slate-100 lg:inline-flex"
+        >
+          {collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
+        </button>
+      ) : null}
+    </div>
   );
 }
 
-function TrainerNavigation({ activeItem, onNavigate, pathname }: { activeItem?: string; onNavigate?: () => void; pathname: string }) {
+function TrainerNavigation({
+  activeItem,
+  onNavigate,
+  pathname,
+  collapsed = false,
+}: {
+  activeItem?: string;
+  onNavigate?: () => void;
+  pathname: string;
+  collapsed?: boolean;
+}) {
   return (
-    <nav className="flex-1 space-y-2 overflow-y-auto px-4 py-7">
+    <nav className={`flex-1 space-y-2 overflow-y-auto py-7 ${collapsed ? 'px-3' : 'px-4'}`}>
       {trainerNav.map((item) => {
         const Icon = item.icon;
         const isActive = activeItem ? activeItem === item.label : matchesNavLabel(item.label, pathname) || pathname === item.to;
@@ -222,11 +282,14 @@ function TrainerNavigation({ activeItem, onNavigate, pathname }: { activeItem?: 
               type="button"
               disabled
               title="Coming soon"
-              className={`flex w-full cursor-not-allowed items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium ${
+              className={`flex w-full cursor-not-allowed items-center rounded-xl py-3 text-sm font-medium ${
+                collapsed ? 'justify-center px-2' : 'gap-4 px-4'
+              } ${
                 isActive ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200 opacity-100' : 'text-slate-400'
               }`}
             >
-              <Icon size={20} /> {item.label}
+              <Icon size={20} />
+              {!collapsed ? item.label : null}
             </button>
           );
         }
@@ -235,11 +298,15 @@ function TrainerNavigation({ activeItem, onNavigate, pathname }: { activeItem?: 
             key={item.label}
             to={item.to}
             onClick={onNavigate}
-            className={`flex items-center gap-4 rounded-xl px-4 py-3 text-sm font-medium transition ${
+            title={collapsed ? item.label : undefined}
+            className={`flex items-center rounded-xl py-3 text-sm font-medium transition ${
+              collapsed ? 'justify-center px-2' : 'gap-4 px-4'
+            } ${
               isActive ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-lg shadow-indigo-200' : 'text-slate-600 hover:bg-indigo-50 hover:text-indigo-700'
             }`}
           >
-            <Icon size={20} /> {item.label}
+            <Icon size={20} />
+            {!collapsed ? item.label : null}
           </Link>
         );
       })}
@@ -253,37 +320,47 @@ function TrainerProfileCard({
   onNavigate,
   onLogout,
   isLoggingOut,
+  collapsed = false,
 }: {
   trainerName: string;
   avatar: string;
   onNavigate?: () => void;
   onLogout: () => void;
   isLoggingOut: boolean;
+  collapsed?: boolean;
 }) {
   return (
-    <div className="mx-4 mb-6 mt-auto rounded-2xl border border-slate-100 bg-white p-4 shadow-[0_2px_14px_rgba(30,41,59,0.06)]">
-      <Link to="/trainer/profile" onClick={onNavigate} className="block rounded-xl transition hover:bg-slate-50">
-        <div className="flex items-center gap-3">
+    <div className={`mb-6 mt-auto rounded-2xl border border-slate-100 bg-white shadow-[0_2px_14px_rgba(30,41,59,0.06)] ${collapsed ? 'mx-3 p-3' : 'mx-4 p-4'}`}>
+      <Link to="/trainer/profile" onClick={onNavigate} title={collapsed ? trainerName : undefined} className="block rounded-xl transition hover:bg-slate-50">
+        <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
           <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
-          <span className="min-w-0 flex-1">
-            <strong className="block truncate text-sm font-semibold text-slate-900">{trainerName}</strong>
-            <span className="block text-xs text-slate-500">Personal Trainer</span>
-          </span>
-          <ChevronDown size={16} className="text-indigo-600" />
+          {!collapsed ? (
+            <>
+              <span className="min-w-0 flex-1">
+                <strong className="block truncate text-sm font-semibold text-slate-900">{trainerName}</strong>
+                <span className="block text-xs text-slate-500">Personal Trainer</span>
+              </span>
+              <ChevronDown size={16} className="text-indigo-600" />
+            </>
+          ) : null}
         </div>
       </Link>
-      <div className="mt-3 flex items-center justify-between gap-3">
-        <span className="flex items-center gap-2 text-xs text-slate-500">
-          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" /> Online
+      <div className={`mt-3 flex ${collapsed ? 'flex-col items-center gap-2' : 'items-center justify-between gap-3'}`}>
+        <span className={`flex items-center gap-2 text-xs text-slate-500 ${collapsed ? 'justify-center' : ''}`}>
+          <span className="h-2.5 w-2.5 rounded-full bg-emerald-500" />
+          {!collapsed ? 'Online' : null}
         </span>
         <button
           type="button"
           onClick={onLogout}
           disabled={isLoggingOut}
-          className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60"
+          title={collapsed ? 'Logout' : undefined}
+          className={`inline-flex items-center rounded-xl text-xs font-semibold text-rose-600 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 ${
+            collapsed ? 'justify-center px-2 py-2' : 'gap-2 px-3 py-2'
+          }`}
         >
           <LogOut size={15} />
-          Logout
+          {!collapsed ? 'Logout' : null}
         </button>
       </div>
     </div>
