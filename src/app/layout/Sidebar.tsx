@@ -6,6 +6,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router';
 import { logoutRequest } from '../features/auth/apiAuth';
 import AuthActionLoader from '../features/auth/AuthActionLoader';
+import clientSidebarBg from '../../assets/client-sidebar-bg.svg';
 
 export interface NavItem {
   label: string;
@@ -88,9 +89,17 @@ function SidebarContent({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
-    <div className="flex h-full flex-col p-4">
+    <div className="relative flex h-full flex-col overflow-hidden bg-white p-4">
+      {title === 'Client Portal' ? (
+        <img
+          src={clientSidebarBg}
+          alt=""
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-auto w-full"
+        />
+      ) : null}
       {isLoggingOut ? <AuthActionLoader action="logout" /> : null}
-      <div className={`mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-2'}`}>
+      <div className={`relative z-10 mb-4 flex items-center ${collapsed ? 'justify-center' : 'justify-between gap-2'}`}>
         <AnimatePresence mode="wait" initial={false}>
           {collapsed ? (
             <motion.p
@@ -125,7 +134,7 @@ function SidebarContent({
           {onMobileClose ? <X size={16} /> : collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
         </button>
       </div>
-      <nav className="flex-1 space-y-1 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <nav className="relative z-10 flex-1 space-y-1 overflow-x-hidden overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         {items.map((item) => {
           const Icon = item.icon;
           return (
@@ -161,7 +170,7 @@ function SidebarContent({
           );
         })}
       </nav>
-      <div className="mt-3 border-t border-slate-200 pt-3">
+      <div className="relative z-10 mt-3 border-t border-slate-200 pt-3">
         <button
           type="button"
           disabled={isLoggingOut}

@@ -7,6 +7,15 @@ export interface ClientAppointment {
   id: number;
   client_user_id: number;
   practitioner_id: number;
+  practitioner?: {
+    id: number;
+    practitioner_type?: 'counsellor' | 'trainer' | 'coach' | string;
+    user?: {
+      id: number;
+      name: string;
+      email?: string;
+    } | null;
+  } | null;
   intake_flow_id?: number | null;
   service_type: 'psychology' | 'training' | 'combined' | 'package';
   mode: 'online' | 'in_person' | 'hybrid';

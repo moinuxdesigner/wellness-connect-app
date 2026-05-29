@@ -38,27 +38,27 @@ export default function Topbar({
   const displayRole = roleLabel(auth.user?.role);
 
   return (
-    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-3 backdrop-blur lg:px-6">
+    <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-5 backdrop-blur lg:px-6 lg:py-3">
       <div className="mx-auto flex w-full max-w-[1600px] items-center gap-3">
         <button
           type="button"
           onClick={onOpenMobileSidebar}
-          className="inline-flex rounded-xl border border-slate-200 p-2.5 text-slate-600 transition hover:bg-slate-50 lg:hidden"
+          className="inline-flex h-14 w-14 items-center justify-center rounded-[13px] border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden"
           aria-label="Open sidebar"
         >
           <Menu size={18} />
         </button>
 
-        <button
+        {/* <button
           type="button"
           onClick={onToggleSidebar}
           className="hidden rounded-xl border border-slate-200 p-2.5 text-slate-600 transition hover:bg-slate-50 lg:inline-flex"
           aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
-        </button>
+        </button> */}
 
-        <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
+        {/* <div className="hidden min-w-0 flex-1 items-center gap-3 md:flex">
           <label className="flex w-full max-w-2xl items-center gap-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
             <Search size={18} className="text-slate-400" />
             <input
@@ -69,22 +69,22 @@ export default function Topbar({
             />
             <span className="rounded-lg border border-slate-200 px-2 py-1 text-[11px] font-semibold text-slate-400">Ctrl K</span>
           </label>
-        </div>
+        </div> */}
 
         <div className="ml-auto flex items-center gap-2">
           <button
             type="button"
             onClick={() => auth.user?.role && navigate(getRoleNotificationsPath(auth.user.role))}
-            className="relative inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            className="relative inline-flex h-14 w-14 items-center justify-center rounded-[13px] border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:h-11 lg:w-11 lg:rounded-xl lg:shadow-none"
             aria-label="Notifications"
           >
             <Bell size={18} />
-            <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-rose-500 ring-2 ring-white" />
+            <span className="absolute right-3 top-3 h-3.5 w-3.5 rounded-full bg-rose-500 ring-2 ring-white lg:right-2 lg:top-2 lg:h-2.5 lg:w-2.5" />
           </button>
 
           <button
             type="button"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-xl border border-slate-200 text-slate-600 transition hover:bg-slate-50"
+            className="inline-flex h-14 w-14 items-center justify-center rounded-[13px] border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:h-11 lg:w-11 lg:rounded-xl lg:shadow-none"
             aria-label="Help"
           >
             <CircleHelp size={18} />
@@ -92,7 +92,7 @@ export default function Topbar({
 
           <button
             type="button"
-            className="inline-flex items-center gap-3 rounded-2xl border border-slate-200 bg-white px-3 py-2 shadow-sm transition hover:bg-slate-50"
+            className="inline-flex h-[58px] w-[58px] items-center justify-center gap-3 rounded-[14px] border border-slate-200 bg-white p-0 shadow-md transition hover:bg-slate-50 sm:w-auto sm:px-3 sm:py-2 lg:h-auto lg:rounded-2xl lg:shadow-sm"
             aria-label="Profile"
           >
             <Avatar className="h-10 w-10 border border-white shadow-sm">

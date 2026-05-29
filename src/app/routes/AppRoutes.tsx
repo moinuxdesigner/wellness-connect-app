@@ -37,6 +37,7 @@ import ClientDashboardPage from '../features/client/pages/ClientDashboardPage';
 import ClientAppointmentsPage from '../features/client/pages/ClientAppointmentsPage';
 import ClientProgramsPage from '../features/client/pages/ClientProgramsPage';
 import ClientTasksPage from '../features/client/pages/ClientTasksPage';
+import ClientProfilePage from '../features/client/pages/ClientProfilePage';
 import ClientMembershipPage from '../features/client/pages/ClientMembershipPage';
 import ClientReceiptPage from '../features/client/pages/ClientReceiptPage';
 import ClientIntakeFlowPage from '../features/client/intake/ClientIntakeFlowPage';
@@ -120,7 +121,7 @@ export default function AppRoutes() {
             <Route path="appointments" element={<PermissionBoundary anyOf={['client.appointments.view']}><ClientAppointmentsPage /></PermissionBoundary>} />
             <Route path="programs" element={<ClientProgramsPage />} />
             <Route path="tasks" element={<ClientTasksPage />} />
-            <Route path="profile" element={<ProfilePage role="client" />} />
+            <Route path="profile" element={<ClientProfilePage />} />
             <Route path="membership" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientMembershipPage /></PermissionBoundary>} />
             <Route path="receipts/:receiptId" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientReceiptPage /></PermissionBoundary>} />
             <Route path="activity" element={<PermissionBoundary anyOf={['client.activity_logs.view']}><ActivityLogPage title="Activity" subtitle="Track your account, intake, appointments, and membership events." emptyMessage="Your activity history is empty right now." /></PermissionBoundary>} />

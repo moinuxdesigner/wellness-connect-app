@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Download, X } from 'lucide-react';
+import { useLocation } from 'react-router';
 
 interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>;
@@ -9,6 +10,7 @@ interface BeforeInstallPromptEvent extends Event {
 const DISMISS_KEY = 'wc_pwa_install_dismissed';
 
 export default function PwaInstallPrompt() {
+  const location = useLocation();
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [showManualHelp, setShowManualHelp] = useState(false);
@@ -46,7 +48,7 @@ export default function PwaInstallPrompt() {
     };
   }, []);
 
-  if (!visible) {
+  if (!visible || location.pathname === '/client/appointments') {
     return null;
   }
 
