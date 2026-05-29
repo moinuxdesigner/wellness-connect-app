@@ -19,6 +19,9 @@ class ActivityLogController extends Controller
         $validated = $request->validate([
             'category' => ['nullable', 'string', 'max:80'],
             'subjectType' => ['nullable', 'string', 'max:191'],
+            'query' => ['nullable', 'string', 'max:120'],
+            'dateFrom' => ['nullable', 'date'],
+            'dateTo' => ['nullable', 'date'],
             'page' => ['nullable', 'integer', 'min:1'],
             'pageSize' => ['nullable', 'integer', 'min:1', 'max:100'],
             'role' => ['nullable', Rule::in(ActivityLogService::ROLES)],

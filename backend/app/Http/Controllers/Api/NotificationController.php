@@ -19,6 +19,17 @@ class NotificationController extends Controller
         return response()->json($this->notifications->inboxPayload($request->user()));
     }
 
+    public function markAllRead(Request $request): JsonResponse
+    {
+        $updatedCount = $this->notifications->markAllRead($request->user());
+
+        return response()->json([
+            'message' => $updatedCount > 0 ? 'All notifications marked as read.' : 'No unread notifications to update.',
+            'updatedCount' => $updatedCount,
+            'unreadCount' => 0,
+        ]);
+    }
+
     public function update(Request $request, Notification $notification): JsonResponse
     {
         abort_unless($notification->user_id === $request->user()->id, 403, 'This notification is not assigned to you.');

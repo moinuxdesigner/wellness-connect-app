@@ -85,7 +85,34 @@ class ActivityLogTest extends TestCase
                 ],
                 'pagination' => ['page', 'pageSize', 'total', 'totalPages'],
                 'availableCategories',
+                'availableActors',
+                'summary' => ['totalActivities', 'todayActivities', 'admins', 'usersAffected', 'criticalActions'],
             ]);
+    }
+
+    public function test_admin_can_search_activity_logs_by_human_query(): void
+    {
+        $admin = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $client = User::factory()->create(['role' => 'client', 'status' => 'active', 'name' => 'Ravi Kumar']);
+
+        app(ActivityLogService::class)->record('account', 'profile_updated', 'Ravi Kumar updated their profile.', [
+            'actor' => $client,
+            'subject' => $client,
+            'audienceUsers' => [$client],
+        ]);
+
+        app(ActivityLogService::class)->record('auth', 'logout', 'Admin signed out.', [
+            'actor' => $admin,
+            'subject' => $admin,
+            'audienceUsers' => [$admin],
+        ]);
+
+        Sanctum::actingAs($admin);
+
+        $this->getJson('/api/v1/activity-logs?query=Ravi')
+            ->assertOk()
+            ->assertJsonCount(1, 'entries')
+            ->assertJsonPath('entries.0.summary', 'Ravi Kumar updated their profile.');
     }
 
     public function test_activity_log_backfill_command_is_idempotent(): void

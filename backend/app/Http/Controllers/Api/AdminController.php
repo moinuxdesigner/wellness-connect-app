@@ -14,6 +14,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Str;
 
 class AdminController extends Controller
@@ -119,16 +120,25 @@ class AdminController extends Controller
         $this->authorizeAdmin($request);
 
         $users = User::query()
-            ->select('id', 'name', 'email', 'role', 'status', 'created_at')
+            ->select('id', 'name', 'email', 'phone', 'role', 'status', 'created_at')
+            ->selectSub(
+                DB::table('personal_access_tokens')
+                    ->selectRaw('MAX(last_used_at)')
+                    ->whereColumn('tokenable_id', 'users.id')
+                    ->where('tokenable_type', User::class),
+                'last_active_at'
+            )
             ->latest()
             ->get()
             ->map(fn (User $user) => [
                 'id' => (string) $user->id,
                 'name' => (string) $user->name,
                 'email' => (string) $user->email,
+                'phone' => $user->phone ? (string) $user->phone : null,
                 'role' => (string) $user->role,
                 'status' => (string) ($user->status ?? 'active'),
                 'joinedAt' => optional($user->created_at)->format('Y-m-d') ?? '',
+                'lastActiveAt' => $user->last_active_at ? Carbon::parse((string) $user->last_active_at)->toIso8601String() : null,
             ])->values();
 
         return response()->json([

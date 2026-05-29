@@ -17,7 +17,9 @@ use App\Models\User;
 use App\Models\WellnessPackage;
 use App\Models\WorkflowCase;
 use App\Models\WorkflowConfigRevision;
+use Carbon\Carbon;
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
 
@@ -72,8 +74,8 @@ class ActivityLogService
 
     public function feed(User $user, array $filters = []): array
     {
-        $query = $this->visibleQuery($user);
-        $availableCategories = (clone $query)
+        $availableCategoryQuery = $this->applyFeedFilters($this->visibleQuery($user), $filters, $user, false);
+        $availableCategories = (clone $availableCategoryQuery)
             ->select('category')
             ->distinct()
             ->orderBy('category')
@@ -81,27 +83,7 @@ class ActivityLogService
             ->values()
             ->all();
 
-        if (!empty($filters['category'])) {
-            $query->where('category', $filters['category']);
-        }
-
-        if (!empty($filters['subjectType'])) {
-            $query->where('subject_type', $filters['subjectType']);
-        }
-
-        if ($user->role === 'admin') {
-            if (!empty($filters['role'])) {
-                $query->whereHas('audiences', fn ($audienceQuery) => $audienceQuery->where('role', $filters['role']));
-            }
-
-            if (!empty($filters['actorUserId'])) {
-                $query->where('actor_user_id', (int) $filters['actorUserId']);
-            }
-
-            if (!empty($filters['targetRole'])) {
-                $query->where('target_role', $filters['targetRole']);
-            }
-        }
+        $query = $this->applyFeedFilters($this->visibleQuery($user), $filters, $user);
 
         $page = max(1, (int) ($filters['page'] ?? 1));
         $pageSize = min(100, max(1, (int) ($filters['pageSize'] ?? 20)));
@@ -126,6 +108,8 @@ class ActivityLogService
                 'totalPages' => max(1, (int) ceil($total / $pageSize)),
             ],
             'availableCategories' => $availableCategories,
+            'availableActors' => $this->availableActors($user, $filters),
+            'summary' => $this->summary($user, $filters, $total),
         ];
     }
 
@@ -216,6 +200,153 @@ class ActivityLogService
                         ->orWhere('user_id', $user->id);
                 });
         });
+    }
+
+    private function applyFeedFilters(Builder $query, array $filters, User $user, bool $applyActorFilter = true): Builder
+    {
+        if (!empty($filters['category'])) {
+            $query->where('category', $filters['category']);
+        }
+
+        if (!empty($filters['subjectType'])) {
+            $query->where('subject_type', $filters['subjectType']);
+        }
+
+        if (!empty($filters['query'])) {
+            $search = trim((string) $filters['query']);
+            $query->where(function (Builder $searchQuery) use ($search): void {
+                $like = '%' . str_replace(['%', '_'], ['\\%', '\\_'], $search) . '%';
+                $searchQuery
+                    ->where('summary', 'like', $like)
+                    ->orWhere('subject_label', 'like', $like)
+                    ->orWhereHas('actor', fn (Builder $actorQuery) => $actorQuery
+                        ->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                    )
+                    ->orWhereHas('target', fn (Builder $targetQuery) => $targetQuery
+                        ->where('name', 'like', $like)
+                        ->orWhere('email', 'like', $like)
+                    );
+            });
+        }
+
+        if (!empty($filters['dateFrom'])) {
+            $query->where('occurred_at', '>=', Carbon::parse((string) $filters['dateFrom'])->startOfDay());
+        }
+
+        if (!empty($filters['dateTo'])) {
+            $query->where('occurred_at', '<=', Carbon::parse((string) $filters['dateTo'])->endOfDay());
+        }
+
+        if ($user->role === 'admin') {
+            if (!empty($filters['role'])) {
+                $query->whereHas('audiences', fn (Builder $audienceQuery) => $audienceQuery->where('role', $filters['role']));
+            }
+
+            if ($applyActorFilter && !empty($filters['actorUserId'])) {
+                $query->where('actor_user_id', (int) $filters['actorUserId']);
+            }
+
+            if (!empty($filters['targetRole'])) {
+                $query->where('target_role', $filters['targetRole']);
+            }
+        }
+
+        return $query;
+    }
+
+    private function availableActors(User $user, array $filters): array
+    {
+        $actorIds = $this->applyFeedFilters($this->visibleQuery($user), $filters, $user, false)
+            ->whereNotNull('actor_user_id')
+            ->select('actor_user_id')
+            ->distinct()
+            ->limit(50)
+            ->pluck('actor_user_id')
+            ->map(fn ($id) => (int) $id)
+            ->all();
+
+        if ($actorIds === []) {
+            return [];
+        }
+
+        $actors = User::query()
+            ->whereIn('id', $actorIds)
+            ->get(['id', 'name', 'role'])
+            ->keyBy('id');
+
+        return collect($actorIds)
+            ->map(function (int $actorId) use ($actors): ?array {
+                $actor = $actors->get($actorId);
+                if (!$actor) {
+                    return null;
+                }
+
+                return [
+                    'id' => $actor->id,
+                    'name' => $actor->name,
+                    'role' => $actor->role,
+                ];
+            })
+            ->filter()
+            ->values()
+            ->all();
+    }
+
+    private function summary(User $user, array $filters, int $total): array
+    {
+        $query = $this->applyFeedFilters($this->visibleQuery($user), $filters, $user);
+
+        $todayActivities = (clone $query)
+            ->whereDate('occurred_at', now()->toDateString())
+            ->count();
+
+        $admins = (clone $query)
+            ->where(function (Builder $adminQuery): void {
+                $adminQuery
+                    ->where('actor_role', 'admin')
+                    ->orWhereHas('actor', fn (Builder $actorQuery) => $actorQuery->where('role', 'admin'));
+            })
+            ->distinct()
+            ->pluck('actor_user_id')
+            ->filter()
+            ->unique()
+            ->count();
+
+        $usersAffected = collect((clone $query)->get(['target_user_id', 'subject_type', 'subject_id']))
+            ->flatMap(function (ActivityEvent $event): array {
+                $ids = [];
+                if ($event->target_user_id) {
+                    $ids[] = 'target:' . $event->target_user_id;
+                }
+
+                if ($event->subject_type === User::class && $event->subject_id) {
+                    $ids[] = 'subject:' . $event->subject_id;
+                }
+
+                return $ids;
+            })
+            ->unique()
+            ->count();
+
+        $criticalActions = (clone $query)
+            ->where(function (Builder $criticalQuery): void {
+                $criticalQuery->whereIn('action', [
+                    'refund_processed',
+                    'user_deleted',
+                    'password_reset_forced',
+                    'case_breached',
+                ]);
+            })
+            ->count();
+
+        return [
+            'totalActivities' => $total,
+            'todayActivities' => $todayActivities,
+            'admins' => $admins,
+            'usersAffected' => $usersAffected,
+            'criticalActions' => $criticalActions,
+        ];
     }
 
     private function buildAudienceRows(array $audienceRoles, array $audienceUsers, array $actors, array $targets): array

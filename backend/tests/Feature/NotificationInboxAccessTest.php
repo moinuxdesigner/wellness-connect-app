@@ -96,6 +96,92 @@ class NotificationInboxAccessTest extends TestCase
         ]);
     }
 
+    public function test_user_can_mark_all_of_their_unread_notifications_as_read(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        $otherUser = User::factory()->create(['role' => 'helpdesk', 'status' => 'active']);
+
+        $alreadyRead = Notification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'workflow_sla_breach',
+            'channel' => 'in_app',
+            'payload_json' => ['title' => 'Already read'],
+            'status' => 'read',
+            'sent_at' => now()->subHour(),
+            'read_at' => now()->subMinutes(30),
+        ]);
+        $firstUnread = Notification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'escalation',
+            'channel' => 'in_app',
+            'payload_json' => ['title' => 'First unread'],
+            'status' => 'queued',
+            'sent_at' => now()->subMinutes(20),
+        ]);
+        $secondUnread = Notification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'appointment_no_show',
+            'channel' => 'in_app',
+            'payload_json' => ['title' => 'Second unread'],
+            'status' => 'sent',
+            'sent_at' => now()->subMinutes(5),
+        ]);
+        $otherUsersUnread = Notification::query()->create([
+            'user_id' => $otherUser->id,
+            'type' => 'escalation',
+            'channel' => 'in_app',
+            'payload_json' => ['title' => 'Other user unread'],
+            'status' => 'queued',
+            'sent_at' => now()->subMinutes(2),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->patchJson('/api/v1/notifications/mark-all-read')
+            ->assertOk()
+            ->assertJsonPath('updatedCount', 2)
+            ->assertJsonPath('unreadCount', 0);
+
+        $this->assertDatabaseHas('notifications', [
+            'id' => $alreadyRead->id,
+            'status' => 'read',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'id' => $firstUnread->id,
+            'status' => 'read',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'id' => $secondUnread->id,
+            'status' => 'read',
+        ]);
+        $this->assertDatabaseHas('notifications', [
+            'id' => $otherUsersUnread->id,
+            'status' => 'queued',
+            'read_at' => null,
+        ]);
+    }
+
+    public function test_mark_all_read_is_idempotent_when_everything_is_already_read(): void
+    {
+        $user = User::factory()->create(['role' => 'admin', 'status' => 'active']);
+        Notification::query()->create([
+            'user_id' => $user->id,
+            'type' => 'workflow_sla_breach',
+            'channel' => 'in_app',
+            'payload_json' => ['title' => 'Read item'],
+            'status' => 'read',
+            'sent_at' => now()->subMinutes(5),
+            'read_at' => now()->subMinutes(4),
+        ]);
+
+        Sanctum::actingAs($user);
+
+        $this->patchJson('/api/v1/notifications/mark-all-read')
+            ->assertOk()
+            ->assertJsonPath('updatedCount', 0)
+            ->assertJsonPath('unreadCount', 0);
+    }
+
     public function test_user_cannot_update_someone_elses_notification(): void
     {
         $user = User::factory()->create(['role' => 'client', 'status' => 'active']);

@@ -46,6 +46,7 @@ Route::prefix('v1')->group(function (): void {
         Route::get('/activity-logs', [ActivityLogController::class, 'index'])
             ->middleware('permission:admin.activity_logs.view,client.activity_logs.view,counsellor.activity_logs.view,trainer.activity_logs.view,coach.activity_logs.view,helpdesk.activity_logs.view,finance.activity_logs.view,legal.activity_logs.view,content.activity_logs.view');
         Route::get('/notifications', [NotificationController::class, 'index']);
+        Route::patch('/notifications/mark-all-read', [NotificationController::class, 'markAllRead']);
         Route::patch('/notifications/{notification}', [NotificationController::class, 'update']);
         Route::get('/account/profile', [AccountProfileController::class, 'show']);
         Route::put('/account/profile', [AccountProfileController::class, 'update']);

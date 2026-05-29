@@ -16,15 +16,23 @@ class NotificationInboxService
         }
 
         $items = (clone $baseQuery)
-            ->orderByRaw('CASE WHEN read_at IS NULL THEN 0 ELSE 1 END')
+            ->orderByRaw("CASE WHEN read_at IS NULL AND status != 'read' THEN 0 ELSE 1 END")
             ->latest('id')
             ->limit($limit)
             ->get();
 
         return [
-            'unreadCount' => (clone $baseQuery)->whereNull('read_at')->count(),
+            'unreadCount' => $this->unreadQuery(clone $baseQuery)->count(),
             'items' => $items->map(fn (Notification $notification) => $this->payload($notification))->values(),
         ];
+    }
+
+    public function markAllRead(User $user): int
+    {
+        return $this->unreadQuery(Notification::query()->where('user_id', $user->id))->update([
+            'status' => 'read',
+            'read_at' => now(),
+        ]);
     }
 
     public function updateReadState(Notification $notification, bool $read): Notification
@@ -50,5 +58,14 @@ class NotificationInboxService
             'createdAt' => optional($notification->created_at)->toIso8601String(),
             'meta' => $meta,
         ];
+    }
+
+    private function unreadQuery($query)
+    {
+        return $query->where(function ($builder): void {
+            $builder
+                ->whereNull('read_at')
+                ->where('status', '!=', 'read');
+        });
     }
 }

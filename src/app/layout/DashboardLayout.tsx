@@ -30,8 +30,10 @@ export default function DashboardLayout({ navItems, title, children }: { navItem
       >
         <Topbar
           onOpenMobileSidebar={() => setMobileSidebarOpen(true)}
+          onToggleSidebar={() => setCollapsed((prev) => !prev)}
+          sidebarCollapsed={collapsed}
         />
-        <main className="mx-auto max-w-7xl p-4 pb-24 lg:p-6">{children ?? <Outlet />}</main>
+        <main className="mx-auto w-full max-w-[1600px] p-4 pb-24 lg:p-6">{children ?? <Outlet />}</main>
       </motion.div>
       <BottomNav items={navItems} onOpenMenu={() => setMobileSidebarOpen(true)} />
     </div>

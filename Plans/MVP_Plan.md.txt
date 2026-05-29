@@ -1,0 +1,544 @@
+## Aura Wellness Connect — MVP Plan with Admin User Role
+
+### MVP Goal
+
+Build a simple working MVP to validate whether customers want a **guided wellness journey** combining psychology, personal training, lifestyle support, and later nutrition/physiotherapy.
+
+The MVP should not be a full hospital/EMR system. It should prove:
+
+**Can users register → complete intake → book service → receive professional support → track follow-up → continue using the service?**
+
+---
+
+# 1. MVP Roles
+
+## Main Roles
+
+| Role             | Purpose                                                                         |
+| ---------------- | ------------------------------------------------------------------------------- |
+| **Admin**        | Manages the platform, users, professionals, services, bookings, and reports     |
+| **Client/User**  | Registers, completes intake, books sessions, views plans and progress           |
+| **Professional** | Psychologist, trainer, nutritionist, physiotherapist, etc.                      |
+| **Super Admin**  | Optional for later; can manage branches, subscription, modules, global settings |
+
+For MVP, keep it simple:
+
+**Admin + Client + Professional**
+
+---
+
+# 2. Admin Role — Core Responsibilities
+
+Admin should be able to control the entire MVP from one dashboard.
+
+## Admin Dashboard
+
+Admin can see:
+
+* Total clients
+* Total professionals
+* Today’s appointments
+* Pending bookings
+* Completed sessions
+* Revenue summary
+* High-priority/risk clients
+* Recent activity
+* Pending approvals
+
+---
+
+# 3. Admin Features for MVP
+
+## 3.1 User Management
+
+Admin can:
+
+* View all registered clients
+* Search/filter clients
+* View client profile
+* Check intake status
+* Check booking history
+* Mark user active/inactive
+* Add internal notes
+
+### Client Details Page Should Show
+
+* Name
+* Age/gender
+* Contact details
+* Primary wellness concern
+* Selected service
+* Risk/intake summary
+* Appointment history
+* Assigned professional
+* Progress status
+
+---
+
+## 3.2 Professional Management
+
+Admin can:
+
+* Add professional
+* Approve/reject professional
+* View professional profile
+* Assign service category
+* Set availability
+* Activate/deactivate professional
+* View professional bookings
+* View performance summary
+
+### Professional Types
+
+For MVP, start with:
+
+* Psychologist / Counselor
+* Personal Trainer
+
+Later add:
+
+* Nutritionist
+* Physiotherapist
+* Doctor
+* Health Coach
+
+---
+
+## 3.3 Service Management
+
+Admin can create and manage services.
+
+Example services:
+
+| Service                      | Type                   |
+| ---------------------------- | ---------------------- |
+| Stress & Wellness Counseling | Psychology             |
+| Fitness Habit Coaching       | Personal Training      |
+| Mind + Body Reset Program    | Combined               |
+| Student Focus Support        | Psychology + Lifestyle |
+| Weight & Lifestyle Program   | Fitness + Lifestyle    |
+
+Admin can set:
+
+* Service name
+* Description
+* Duration
+* Price
+* Online/offline availability
+* Assigned professionals
+* Active/inactive status
+
+---
+
+## 3.4 Intake Form Management
+
+Admin can view user intake responses.
+
+MVP intake should capture:
+
+* Main concern
+* Stress level
+* Sleep quality
+* Fitness level
+* Medical condition declaration
+* Pain/injury status
+* Food/lifestyle habits
+* Preferred service
+* Emergency/risk question for counseling safety
+
+Admin should see simple tags:
+
+* **Low priority**
+* **Needs review**
+* **High attention**
+* **Not suitable for online-only support**
+
+Avoid clinical diagnosis language in MVP.
+
+---
+
+## 3.5 Booking Management
+
+Admin can:
+
+* View all bookings
+* Approve/reschedule/cancel booking
+* Assign professional
+* Change booking status
+* Add admin note
+* Send reminder manually
+* Filter by date/service/professional/status
+
+### Booking Status
+
+Use simple statuses:
+
+* Requested
+* Confirmed
+* Completed
+* Cancelled
+* Rescheduled
+* No-show
+
+---
+
+## 3.6 Session Management
+
+Admin can monitor sessions without seeing sensitive private notes unless required.
+
+Admin can view:
+
+* Client name
+* Professional name
+* Service
+* Date/time
+* Status
+* Payment status
+* Follow-up required or not
+
+Sensitive psychology notes should be private to the professional and restricted.
+
+---
+
+## 3.7 Program / Care Plan Management
+
+Admin can create simple guided programs.
+
+Example MVP programs:
+
+### Program 1: Stress + Fitness Reset
+
+Includes:
+
+* Intake assessment
+* 1 counseling session
+* 1 fitness consultation
+* Weekly check-in
+* Progress review
+
+### Program 2: Student Focus & Wellness
+
+Includes:
+
+* Stress screening
+* Focus routine
+* Sleep habit tracking
+* Follow-up session
+
+### Program 3: Weight + Lifestyle Starter
+
+Includes:
+
+* Fitness assessment
+* Lifestyle plan
+* Habit tracking
+* Weekly progress update
+
+Admin can manage:
+
+* Program name
+* Included services
+* Duration
+* Price
+* Assigned professionals
+* Progress checkpoints
+
+---
+
+## 3.8 Payment Management
+
+For MVP, keep payment simple.
+
+Admin can see:
+
+* Payment pending
+* Payment received
+* Refund requested
+* Session-wise revenue
+* Professional payout amount
+
+Payment gateway can come later, but at least maintain payment records.
+
+MVP options:
+
+* Manual UPI payment record
+* Razorpay payment link
+* Later full payment gateway integration
+
+---
+
+## 3.9 Notifications Management
+
+Admin can send or trigger notifications for:
+
+* Booking confirmation
+* Appointment reminder
+* Payment reminder
+* Follow-up reminder
+* Program update
+* Professional approval
+* Client onboarding incomplete
+
+Channels:
+
+* Email
+* WhatsApp manually at first
+* In-app notification later
+
+---
+
+## 3.10 Activity Logs
+
+Admin should see user-friendly activity logs.
+
+Avoid technical language like:
+
+> API updated booking_status field.
+
+Use simple sentences:
+
+* “A new client completed the wellness intake form.”
+* “Dr. Priya accepted a counseling session request.”
+* “Rahul’s fitness consultation was marked completed.”
+* “Payment was recorded for Mind + Body Reset Program.”
+* “Admin assigned a personal trainer to Ayesha.”
+
+---
+
+# 4. Client/User MVP Features
+
+Client can:
+
+* Register/login
+* Complete onboarding
+* Fill intake form
+* Choose service/program
+* Book appointment
+* View booking status
+* Attend online/offline session
+* View basic plan
+* Track progress/check-ins
+* Receive reminders
+* Give feedback
+
+Keep the client journey simple:
+
+**Sign up → Intake → Recommended service → Book → Attend → Follow-up → Feedback**
+
+---
+
+# 5. Professional MVP Features
+
+Professional can:
+
+* Login
+* View assigned clients
+* View bookings
+* View intake summary
+* Add session summary
+* Add follow-up notes
+* Update session status
+* Suggest next session
+* View basic client progress
+
+For MVP, do not overload professional dashboard.
+
+Focus on:
+
+**Today’s sessions → client details → session update → follow-up**
+
+---
+
+# 6. MVP Modules Priority
+
+## Must-Have for MVP
+
+| Module                  | Priority  |
+| ----------------------- | --------- |
+| Authentication/Login    | Must-have |
+| Admin Dashboard         | Must-have |
+| Client Management       | Must-have |
+| Professional Management | Must-have |
+| Service Management      | Must-have |
+| Intake Form             | Must-have |
+| Booking Management      | Must-have |
+| Session Status          | Must-have |
+| Basic Payment Records   | Must-have |
+| Activity Logs           | Must-have |
+
+## Should-Have
+
+| Module            | Priority    |
+| ----------------- | ----------- |
+| Notifications     | Should-have |
+| Progress Tracking | Should-have |
+| Program/Care Plan | Should-have |
+| Feedback Form     | Should-have |
+
+## Later
+
+| Module              | Priority |
+| ------------------- | -------- |
+| AI recommendations  | Later    |
+| Full EMR            | Later    |
+| Multi-branch        | Later    |
+| Store               | Later    |
+| Community           | Later    |
+| Mobile app          | Later    |
+| Advanced analytics  | Later    |
+| Corporate dashboard | Later    |
+
+---
+
+# 7. Suggested MVP Timeline
+
+## Phase 1: Foundation — 3 to 4 weeks
+
+Build:
+
+* Login/auth
+* Role-based access
+* Admin dashboard shell
+* Client registration
+* Professional registration
+* Basic database structure
+
+---
+
+## Phase 2: Core Workflow — 4 to 6 weeks
+
+Build:
+
+* Intake form
+* Service management
+* Booking flow
+* Admin booking management
+* Professional dashboard
+* Client dashboard
+
+---
+
+## Phase 3: Operations — 3 to 4 weeks
+
+Build:
+
+* Session status update
+* Payment record
+* Activity logs
+* Notifications
+* Feedback form
+* Basic reports
+
+---
+
+## Phase 4: Testing & Pilot Prep — 2 to 3 weeks
+
+Do:
+
+* Bug fixing
+* UX refinement
+* Security check
+* Sample data testing
+* Pilot setup with 2 professionals
+* Prepare feedback collection
+
+### Total MVP Time
+
+**Around 3 to 4 months**
+
+---
+
+# 8. Recommended MVP Scope
+
+For first release, start only with:
+
+## Services
+
+1. Psychology / counseling
+2. Personal training / fitness coaching
+3. Combined Mind + Body wellness program
+
+Do not start with all services at once.
+
+---
+
+# 9. Admin Dashboard Sections
+
+Admin sidebar can include:
+
+1. Dashboard
+2. Clients
+3. Professionals
+4. Services
+5. Intake Reviews
+6. Bookings
+7. Sessions
+8. Programs
+9. Payments
+10. Notifications
+11. Activity Logs
+12. Reports
+13. Settings
+
+---
+
+# 10. Admin MVP User Story Examples
+
+### User Management
+
+**As an Admin, I want to view all clients so that I can monitor registrations, intake completion, bookings, and service progress.**
+
+### Professional Approval
+
+**As an Admin, I want to approve professionals before they start receiving bookings so that only verified professionals can provide services.**
+
+### Booking Assignment
+
+**As an Admin, I want to assign a professional to a client booking so that every client request is handled properly.**
+
+### Intake Review
+
+**As an Admin, I want to review client intake summaries so that high-attention cases can be identified before booking.**
+
+### Activity Logs
+
+**As an Admin, I want to see simple activity updates so that I can understand what happened without reading technical logs.**
+
+---
+
+# 11. Simple MVP Database Tables
+
+Minimum tables:
+
+* users
+* roles
+* clients
+* professionals
+* services
+* intake_forms
+* bookings
+* sessions
+* programs
+* program_enrollments
+* payments
+* notifications
+* activity_logs
+* feedback
+
+---
+
+# 12. Strong MVP Definition
+
+**Aura Wellness Connect MVP is a role-based wellness platform where clients complete intake, book psychology or personal training services, professionals manage sessions and follow-ups, and admin manages users, services, bookings, payments, activity logs, and basic reports.**
+
+---
+
+# 13. Final Recommendation
+
+Do not build a large wellness ecosystem immediately.
+
+Your first MVP should prove only this:
+
+**Can Aura guide a client from wellness problem → right service → professional session → follow-up → visible progress?**
+
+If this works, then scaling to nutrition, physiotherapy, corporate wellness, AI, and multi-branch becomes meaningful.

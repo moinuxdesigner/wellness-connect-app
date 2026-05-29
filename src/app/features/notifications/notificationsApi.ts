@@ -18,6 +18,12 @@ export type NotificationsResponse = {
   items: AppNotification[];
 };
 
+export type NotificationMarkAllReadResponse = {
+  message: string;
+  updatedCount: number;
+  unreadCount: number;
+};
+
 function headers(withJson = false): HeadersInit {
   const token = getAuthState().token;
   if (!token) throw new Error('Missing authenticated session token.');
@@ -77,6 +83,13 @@ export function getRoleNotificationsPath(role: Role): string {
 
 export async function getNotifications() {
   return request<NotificationsResponse>('notifications');
+}
+
+export async function markAllNotificationsRead() {
+  return request<NotificationMarkAllReadResponse>('notifications/mark-all-read', {
+    method: 'PATCH',
+    headers: headers(),
+  });
 }
 
 export async function updateNotification(id: number, read: boolean) {

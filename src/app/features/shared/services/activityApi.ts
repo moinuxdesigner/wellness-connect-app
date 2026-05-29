@@ -1,5 +1,5 @@
 import { getAuthState } from '../../auth/auth';
-import type { ActivityLogEntry, ActivityLogPagination, Role } from '../../../types';
+import type { ActivityLogActorOption, ActivityLogEntry, ActivityLogPagination, ActivityLogSummary, Role } from '../../../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
@@ -7,11 +7,16 @@ type ActivityLogResponse = {
   entries: ActivityLogEntry[];
   pagination: ActivityLogPagination;
   availableCategories: string[];
+  availableActors: ActivityLogActorOption[];
+  summary: ActivityLogSummary;
 };
 
 export type ActivityLogFilters = {
   category?: string;
   subjectType?: string;
+  query?: string;
+  dateFrom?: string;
+  dateTo?: string;
   page?: number;
   pageSize?: number;
   role?: Role;
@@ -66,5 +71,13 @@ export async function getActivityLogs(filters: ActivityLogFilters = {}): Promise
       totalPages: 1,
     }) as ActivityLogPagination,
     availableCategories: (data?.availableCategories ?? []) as string[],
+    availableActors: (data?.availableActors ?? []) as ActivityLogActorOption[],
+    summary: (data?.summary ?? {
+      totalActivities: 0,
+      todayActivities: 0,
+      admins: 0,
+      usersAffected: 0,
+      criticalActions: 0,
+    }) as ActivityLogSummary,
   };
 }

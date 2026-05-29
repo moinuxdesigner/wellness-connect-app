@@ -36,9 +36,11 @@ export interface UserSummary {
   id: string;
   name: string;
   email: string;
+  phone: string | null;
   role: Role;
   status: 'active' | 'pending' | 'suspended';
   joinedAt: string;
+  lastActiveAt: string | null;
 }
 
 export interface AppointmentSummary {
@@ -102,4 +104,18 @@ export interface ActivityLogPagination {
   pageSize: number;
   total: number;
   totalPages: number;
+}
+
+export interface ActivityLogSummary {
+  totalActivities: number;
+  todayActivities: number;
+  admins: number;
+  usersAffected: number;
+  criticalActions: number;
+}
+
+export interface ActivityLogActorOption {
+  id: number;
+  name: string;
+  role: Role | string | null;
 }
