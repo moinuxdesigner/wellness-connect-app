@@ -1,0 +1,49 @@
+# Migration Comparison Report
+
+Active database: `wellness_connect`
+Office comparison database: `office_backup_compare`
+
+## Laravel migrate:status
+```text
+
+  Migration name .............................................. Batch / Status  
+  0001_01_01_000000_create_users_table ............................... [1] Ran  
+  0001_01_01_000001_create_cache_table ............................... [1] Ran  
+  0001_01_01_000002_create_jobs_table ................................ [1] Ran  
+  2026_05_02_174829_create_personal_access_tokens_table .............. [1] Ran  
+  2026_05_02_180000_add_role_to_users_table .......................... [1] Ran  
+  2026_05_03_090000_add_profile_fields_to_users_table ................ [1] Ran  
+  2026_05_03_093000_create_appointments_table ........................ [1] Ran  
+  2026_05_03_100000_create_client_profiles_table ..................... [1] Ran  
+  2026_05_03_100005_add_status_to_users_table ........................ [1] Ran  
+  2026_05_03_100010_create_service_catalog_and_wellness_packages_table  [1] Ran  
+  2026_05_03_100020_create_practitioner_tables ....................... [1] Ran  
+  2026_05_03_100030_create_intake_tables ............................. [1] Ran  
+  2026_05_03_100035_normalize_appointments_schema .................... [1] Ran  
+  2026_05_03_100040_extend_appointments_and_events ................... [1] Ran  
+  2026_05_03_100050_create_notifications_and_consent_records ......... [1] Ran  
+  2026_05_24_120000_create_trainer_applications_table ................ [1] Ran  
+  2026_05_25_120000_create_support_requests_table .................... [1] Ran  
+  2026_05_25_130000_create_role_change_audits_table .................. [2] Ran  
+  2026_05_25_140000_create_permission_matrix_tables .................. [3] Ran  
+  2026_05_25_141000_add_unavailable_permission_catalogue_entries ..... [4] Ran  
+  2026_05_25_150000_create_membership_billing_foundation ............. [5] Ran  
+  2026_05_26_080000_create_workflow_configuration_tables ............. [6] Ran  
+  2026_05_26_080100_enable_workflow_and_helpdesk_permissions ......... [6] Ran  
+  2026_05_26_120000_create_activity_log_tables ....................... [6] Ran  
+  2026_05_26_140000_enable_performance_permission .................... [6] Ran  
+  2026_05_26_160000_enable_trainer_application_drafts ................ [6] Ran  
+  2026_05_26_170000_create_trainer_registration_challenges_table ..... [7] Ran  
+  2026_05_26_180000_create_trainer_workspace_tables .................. [8] Ran  
+  2026_05_27_200000_create_trainer_progress_review_threads ........... [9] Ran  
+
+```
+
+## Present in home but missing in office
+- None
+
+## Present in office but missing in home
+- None
+
+## Summary
+Schemas look equivalent by migration inventory.
