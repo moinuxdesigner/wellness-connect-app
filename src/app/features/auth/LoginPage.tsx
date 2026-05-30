@@ -41,19 +41,19 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f7f4ff_42%,_#f3efff_100%)] px-0 py-3 text-[#090B3F] sm:px-4 sm:py-4 lg:px-0 lg:py-0">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f7f4ff_42%,_#f3efff_100%)] px-0 py-0 text-[#090B3F] sm:px-4 lg:px-0">
       {loading ? <AuthActionLoader action="login" /> : null}
 
       <div
         className="flex min-h-screen w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
         style={{ background: shellBackground }}
       >
-        <div className="grid min-h-screen flex-1 lg:grid-cols-[48.5%_51.5%]">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[57%_43%]">
           <section className="flex flex-col px-6 pb-8 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
             <BrandHeader />
 
             <div className="flex flex-1 items-center">
-              <div className="mx-auto w-full max-w-[540px] pt-8 lg:mx-0 lg:pt-4">
+              <div className="mx-auto w-full max-w-[540px] pt-8 lg:pt-4">
                 <div className="space-y-4">
                   <h1 className="text-[1rem] font-bold leading-[0.98] tracking-[-0.04em] text-[#10155e] sm:text-[2rem]">
                     Welcome back! <span className="align-[8%] text-[0.88em]">{waveEmoji}</span>
