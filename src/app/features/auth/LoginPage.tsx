@@ -41,11 +41,11 @@ export default function LoginPage() {
   const [loading, setLoading] = useState(false);
 
   return (
-    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f7f4ff_42%,_#f3efff_100%)] px-3 py-3 text-[#090B3F] sm:px-4 sm:py-4 lg:px-6 lg:py-6">
+    <div className="min-h-screen bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f7f4ff_42%,_#f3efff_100%)] px-0 py-3 text-[#090B3F] sm:px-4 sm:py-4 lg:px-0 lg:py-0">
       {loading ? <AuthActionLoader action="login" /> : null}
 
       <div
-        className="mx-auto flex min-h-[calc(100vh-24px)] w-full max-w-[1536px] flex-col overflow-hidden rounded-[28px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
+        className="flex min-h-[calc(100vh-24px)] w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
         style={{ background: shellBackground }}
       >
         <div className="grid flex-1 lg:grid-cols-[48.5%_51.5%]">
@@ -53,9 +53,9 @@ export default function LoginPage() {
             <BrandHeader />
 
             <div className="flex flex-1 items-center">
-              <div className="mx-auto w-full max-w-[540px] pt-8 lg:mx-0 lg:pt-10">
+              <div className="mx-auto w-full max-w-[540px] pt-8 lg:mx-0 lg:pt-4">
                 <div className="space-y-4">
-                  <h1 className="text-[2.85rem] font-bold leading-[0.98] tracking-[-0.04em] text-[#10155e] sm:text-[3.2rem]">
+                  <h1 className="text-[1rem] font-bold leading-[0.98] tracking-[-0.04em] text-[#10155e] sm:text-[2rem]">
                     Welcome back! <span className="align-[8%] text-[0.88em]">{waveEmoji}</span>
                   </h1>
                   <p className="max-w-[520px] text-[1.08rem] font-medium leading-8 text-[#53639b] sm:text-[1.12rem]">
@@ -189,10 +189,11 @@ export default function LoginPage() {
           </section>
 
           <section
-            className="relative flex min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] px-6 pb-8 pt-6 sm:px-8 md:min-h-[700px] lg:border-l lg:border-t-0 lg:px-10 lg:pb-12 lg:pt-8 xl:px-12"
+            className="relative flex min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] lg:border-l lg:border-t-0"
             style={{ background: rightPanelBackground }}
           >
-            <div className="flex justify-end">
+            {/* Support Button */}
+            <div className="absolute top-6 right-6 lg:top-8 lg:right-10 xl:right-12 z-20">
               <Link
                 to="/contact"
                 className="inline-flex items-center gap-2.5 rounded-full px-1 py-1 text-[1rem] font-medium text-[#5b679e] transition hover:text-[#5228ff]"
@@ -203,14 +204,12 @@ export default function LoginPage() {
               </Link>
             </div>
 
-            <div className="relative flex flex-1 items-center justify-center py-4 sm:py-8 lg:py-6">
-              <HeroBackdrop />
-              <IllustrationScene />
-            </div>
+            {/* Full-screen illustration */}
+            <IllustrationScene />
           </section>
         </div>
 
-        <footer className="border-t border-[#efebff] bg-[linear-gradient(180deg,rgba(250,248,255,0.92)_0%,rgba(245,242,255,0.98)_100%)] px-5 py-5 sm:px-8 sm:py-6 lg:px-12 xl:px-14">
+        <footer className="hidden border-t border-[#efebff] bg-[linear-gradient(180deg,rgba(250,248,255,0.92)_0%,rgba(245,242,255,0.98)_100%)] px-5 py-5 sm:px-8 sm:py-6 lg:px-12 xl:px-14">
           <div className="grid gap-5 rounded-[22px] border border-white/70 bg-white/35 px-5 py-5 shadow-[0_18px_36px_rgba(114,90,220,0.07)] backdrop-blur-[6px] md:grid-cols-[1fr_auto_0.9fr] md:items-center md:gap-7 lg:px-10 lg:py-6">
             <SecurityInfo
               icon={<ShieldCheck className="h-8 w-8 text-[#7152ff]" strokeWidth={1.9} />}
@@ -231,6 +230,9 @@ export default function LoginPage() {
 }
 
 function BrandHeader() {
+  const viewportWidth = window.innerWidth;
+  const vieportHeight = window.innerHeight;
+  console.log("Viewport Size : " + viewportWidth + " " + vieportHeight);
   return (
     <Link to="/" className="inline-flex w-fit items-start gap-3 rounded-2xl transition hover:opacity-95">
       <img src={brandLogo} alt="Aura Wellness logo icon" className="h-[58px] w-[58px] shrink-0 object-contain" />
@@ -316,11 +318,11 @@ function WellnessOrbitCard({
 
 function IllustrationScene() {
   return (
-    <div className="relative z-10 mx-auto mt-10 w-full max-w-[760px] lg:mt-16">
+    <div className="absolute inset-0 flex items-center justify-center">
       <img
         src={loginHeroReference}
         alt="Heart mascot sitting in a chair with laptop and wellness orbit icons"
-        className="mx-auto block h-auto w-full max-w-[720px] object-contain drop-shadow-[0_16px_32px_rgba(118,94,210,0.10)]"
+        className="h-full w-full object-cover drop-shadow-[0_16px_32px_rgba(118,94,210,0.10)]"
       />
     </div>
   );
