@@ -45,10 +45,10 @@ export default function LoginPage() {
       {loading ? <AuthActionLoader action="login" /> : null}
 
       <div
-        className="flex min-h-[calc(100vh-24px)] w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
+        className="flex min-h-screen w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
         style={{ background: shellBackground }}
       >
-        <div className="grid flex-1 lg:grid-cols-[48.5%_51.5%]">
+        <div className="grid min-h-screen flex-1 lg:grid-cols-[48.5%_51.5%]">
           <section className="flex flex-col px-6 pb-8 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
             <BrandHeader />
 
