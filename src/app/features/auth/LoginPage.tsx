@@ -45,20 +45,20 @@ export default function LoginPage() {
       {loading ? <AuthActionLoader action="login" /> : null}
 
       <div
-        className="flex min-h-screen w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)] lg:min-h-[calc(100vh-48px)]"
+        className="flex min-h-screen w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)]"
         style={{ background: shellBackground }}
       >
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[57%_43%]">
-          <section className="flex flex-col px-6 pb-8 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
+        <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-[57%_43%]">
+          <section className="flex h-full flex-col items-center px-6 pb-8 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
             <BrandHeader />
 
             <div className="flex flex-1 items-center">
               <div className="mx-auto w-full max-w-[540px] pt-8 lg:pt-4">
-                <div className="space-y-4">
+                <div className="space-y-4 text-center">
                   <h1 className="text-[1rem] font-bold leading-[0.98] tracking-[-0.04em] text-[#10155e] sm:text-[2rem]">
                     Welcome back! <span className="align-[8%] text-[0.88em]">{waveEmoji}</span>
                   </h1>
-                  <p className="max-w-[520px] text-[1.08rem] font-medium leading-8 text-[#53639b] sm:text-[1.12rem]">
+                  <p className="mx-auto max-w-[520px] text-[1.08rem] font-medium leading-8 text-[#53639b] sm:text-[1.12rem]">
                     Sign in to continue your wellness journey.
                   </p>
                 </div>
@@ -178,7 +178,7 @@ export default function LoginPage() {
                   </div>
                 </form>
 
-                <p className="mt-8 text-[1.02rem] font-medium text-[#54639a]">
+                <p className="mt-8 text-center text-[1.02rem] font-medium text-[#54639a]">
                   Don&apos;t have an account?{' '}
                   <Link className="font-semibold text-[#5b2dff] transition hover:text-[#4319dd]" to="/signup">
                     Sign up
@@ -189,7 +189,7 @@ export default function LoginPage() {
           </section>
 
           <section
-            className="relative flex min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] lg:border-l lg:border-t-0"
+            className="relative flex h-full min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] lg:border-l lg:border-t-0"
             style={{ background: rightPanelBackground }}
           >
             {/* Support Button */}
@@ -230,17 +230,20 @@ export default function LoginPage() {
 }
 
 function BrandHeader() {
-  const viewportWidth = window.innerWidth;
-  const vieportHeight = window.innerHeight;
-  console.log("Viewport Size : " + viewportWidth + " " + vieportHeight);
   return (
-    <Link to="/" className="inline-flex w-fit items-start gap-3 rounded-2xl transition hover:opacity-95">
-      <img src={brandLogo} alt="Aura Wellness logo icon" className="h-[58px] w-[58px] shrink-0 object-contain" />
-      <div className="flex min-w-0 flex-col gap-1">
-        <img src={brandTitle} alt="Aura Wellness Connect" className="h-[32px] w-auto max-w-[270px] object-contain sm:h-[55px] sm:max-w-[304px]" />
-        {/* <p className="pl-0.5 text-[1.02rem] font-medium text-[#5a689e]">Connect. Heal. Thrive.</p> */}
-      </div>
-    </Link>
+    <div className="mx-auto flex w-full max-w-[540px] justify-center">
+      <Link to="/" className="inline-flex items-center gap-3 rounded-2xl transition hover:opacity-95">
+        <img src={brandLogo} alt="Aura Wellness logo icon" className="h-[58px] w-[58px] shrink-0 object-contain" />
+        <div className="flex min-w-0 flex-col gap-1">
+          <img
+            src={brandTitle}
+            alt="Aura Wellness Connect"
+            className="h-[32px] w-auto max-w-[270px] object-contain sm:h-[55px] sm:max-w-[304px]"
+          />
+          {/* <p className="pl-0.5 text-[1.02rem] font-medium text-[#5a689e]">Connect. Heal. Thrive.</p> */}
+        </div>
+      </Link>
+    </div>
   );
 }
 
