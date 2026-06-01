@@ -6,7 +6,7 @@ import LoginPage from '../features/auth/LoginPage';
 import ForgotPasswordPage from '../features/auth/ForgotPasswordPage';
 import ResetPasswordPage from '../features/auth/ResetPasswordPage';
 import { PermissionBoundary, RequireAuth, RequirePermission, RequireRole } from '../features/auth/guards';
-import LandingPage from '../features/public/LandingPage';
+import HomePage from '../features/public/HomePage';
 import GetStartedWizardPage from '../features/public/GetStartedWizardPage';
 import SimplePublicPage from '../features/public/SimplePublicPage';
 import PricingPage from '../features/public/PricingPage';
@@ -74,7 +74,7 @@ function TrainerPageLoader({ children }: { children: ReactNode }) {
 export default function AppRoutes() {
   return (
     <Routes>
-      <Route path="/" element={<PublicLayout><LandingPage /></PublicLayout>} />
+      <Route path="/" element={<PublicLayout><HomePage /></PublicLayout>} />
       <Route path="/careers" element={<PublicLayout><CareersPage /></PublicLayout>} />
       <Route path="/pricing" element={<PublicLayout><PricingPage /></PublicLayout>} />
       <Route path="/about" element={<PublicLayout><SimplePublicPage title="About" description="WellnessConnect unifies counselling, training, coaching, and operations in one platform." /></PublicLayout>} />
