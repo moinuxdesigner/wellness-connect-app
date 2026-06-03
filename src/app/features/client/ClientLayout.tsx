@@ -1,4 +1,4 @@
-import { Activity, Calendar, ClipboardList, HeartPulse, ListChecks, UserCircle2 } from 'lucide-react';
+import { Activity, Brain, Calendar, ClipboardList, HeartPulse, ListChecks, UserCircle2 } from 'lucide-react';
 import { Outlet } from 'react-router';
 import DashboardLayout from '../../layout/DashboardLayout';
 import { getAuthState } from '../auth/auth';
@@ -9,6 +9,7 @@ export const clientNavItems = [
   { label: 'Home', to: '/client', icon: HeartPulse, end: true },
   { label: 'Book Appointment', to: '/client/intake', icon: ListChecks, permission: 'client.intake.manage' },
   { label: 'Calendar', to: '/client/appointments', icon: Calendar, permission: 'client.appointments.view' },
+  { label: 'CBT Care', to: '/client/cbt', icon: Brain, permission: 'client.cbt.view' },
   { label: 'Progress', to: '/client/programs', icon: Activity },
   { label: 'Profile', to: '/client/profile', icon: UserCircle2 },
   { label: 'Membership', to: '/client/membership', icon: ClipboardList, permission: 'client.memberships.manage' },
@@ -18,6 +19,7 @@ export const clientNavItems = [
 const clientBottomNavItems: NavItem[] = [
   { label: 'Home', to: '/client', icon: HeartPulse, end: true },
   { label: 'Appointments', to: '/client/appointments', icon: Calendar, permission: 'client.appointments.view' },
+  { label: 'CBT', to: '/client/cbt', icon: Brain, permission: 'client.cbt.view' },
   { label: 'Progress', to: '/client/programs', icon: Activity },
 ];
 

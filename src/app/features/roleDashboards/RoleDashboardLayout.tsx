@@ -2,6 +2,7 @@ import { Outlet } from 'react-router';
 import {
   Activity,
   Bell,
+  Brain,
   BookOpen,
   CalendarDays,
   ClipboardCheck,
@@ -50,6 +51,7 @@ const roleShells: Record<Role, { title: string; navItems: NavItem[] }> = {
       { label: 'Profile', to: '/counsellor/profile', icon: UserCircle2 },
       { label: 'Sessions', to: '/counsellor/sessions', icon: CalendarDays },
       { label: 'Clients', to: '/counsellor/clients', icon: ClipboardCheck },
+      { label: 'CBT Care', to: '/counsellor/cbt', icon: Brain, permission: 'counsellor.cbt.view' },
       { label: 'Activity', to: '/counsellor/activity', icon: Activity, permission: 'counsellor.activity_logs.view' },
     ],
   },

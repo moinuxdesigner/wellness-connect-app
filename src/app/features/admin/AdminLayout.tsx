@@ -5,6 +5,7 @@ import {
   BadgeIndianRupee,
   BarChart3,
   Bell,
+  Brain,
   BookOpen,
   ClipboardList,
   Gauge,
@@ -41,6 +42,7 @@ export const adminNavItems = [
   { label: 'Escalations', to: '/admin/escalations', icon: ShieldAlert, permission: 'admin.escalations.view' },
   { label: 'Program Management', to: '/admin/programs', icon: BookOpen, permission: 'admin.programs.view' },
   { label: 'Membership Plans', to: '/admin/memberships', icon: ClipboardList, permission: 'admin.memberships.manage' },
+  { label: 'CBT Templates', to: '/admin/cbt/exercise-library', icon: Brain, permission: 'admin.cbt_templates.manage' },
   { label: 'Activity Logs', to: '/admin/logs', icon: Activity, permission: 'admin.activity_logs.view' },
 ];
 

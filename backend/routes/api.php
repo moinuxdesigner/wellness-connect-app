@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
+use App\Http\Controllers\Api\CbtController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
 use App\Http\Controllers\Api\PermissionController;
@@ -50,6 +51,30 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('/notifications/{notification}', [NotificationController::class, 'update']);
         Route::get('/account/profile', [AccountProfileController::class, 'show']);
         Route::put('/account/profile', [AccountProfileController::class, 'update']);
+
+        Route::prefix('cbt')->group(function (): void {
+            Route::get('/categories', [CbtController::class, 'categories'])->middleware('permission:admin.cbt_templates.manage,counsellor.cbt.view');
+            Route::post('/categories', [CbtController::class, 'storeCategory'])->middleware('permission:admin.cbt_templates.manage');
+            Route::get('/exercise-templates', [CbtController::class, 'templates'])->middleware('permission:admin.cbt_templates.manage,counsellor.cbt.view');
+            Route::post('/exercise-templates', [CbtController::class, 'storeTemplate'])->middleware('permission:admin.cbt_templates.manage');
+            Route::put('/exercise-templates/{templateId}', [CbtController::class, 'updateTemplate'])->middleware('permission:admin.cbt_templates.manage');
+
+            Route::get('/clients/{clientId}/plans', [CbtController::class, 'clientPlans'])->middleware('permission:counsellor.cbt.view');
+            Route::post('/clients/{clientId}/plans', [CbtController::class, 'storePlan'])->middleware('permission:counsellor.cbt.manage');
+            Route::get('/plans/{planId}', [CbtController::class, 'showPlan'])->middleware('permission:client.cbt.view,counsellor.cbt.view');
+            Route::put('/plans/{planId}', [CbtController::class, 'updatePlan'])->middleware('permission:counsellor.cbt.manage');
+            Route::post('/plans/{planId}/exercises', [CbtController::class, 'assignExercise'])->middleware('permission:counsellor.cbt.manage');
+            Route::get('/plans/{planId}/progress', [CbtController::class, 'planProgress'])->middleware('permission:client.cbt.view,counsellor.cbt.view');
+            Route::get('/plans/{planId}/responses', [CbtController::class, 'planResponses'])->middleware('permission:counsellor.cbt.review');
+            Route::post('/responses/{responseId}/review', [CbtController::class, 'reviewResponse'])->middleware('permission:counsellor.cbt.review');
+
+            Route::get('/my-plan', [CbtController::class, 'myPlan'])->middleware('permission:client.cbt.view');
+            Route::get('/my-exercises', [CbtController::class, 'myExercises'])->middleware('permission:client.cbt.view');
+            Route::get('/exercise-instances/{instanceId}', [CbtController::class, 'showInstance'])->middleware('permission:client.cbt.view');
+            Route::post('/exercise-instances/{instanceId}/start', [CbtController::class, 'startInstance'])->middleware('permission:client.cbt.manage');
+            Route::post('/exercise-instances/{instanceId}/submit', [CbtController::class, 'submitInstance'])->middleware('permission:client.cbt.manage');
+            Route::get('/my-progress', [CbtController::class, 'myProgress'])->middleware('permission:client.cbt.view');
+        });
 
         Route::put('/client/profile', [ClientProfileController::class, 'update'])->middleware('permission:client.profile.update');
 

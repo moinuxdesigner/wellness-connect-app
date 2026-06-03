@@ -57,6 +57,18 @@ import ContentProgramsPage from '../features/content/ContentProgramsPage';
 import ContentAssetsPage from '../features/content/ContentAssetsPage';
 import FinanceBillingPage from '../features/finance/FinanceBillingPage';
 import ProfilePage from '../features/profile/ProfilePage';
+import ClientCbtDashboard from '../features/cbt/pages/client/ClientCbtDashboard';
+import MyCbtPlan from '../features/cbt/pages/client/MyCbtPlan';
+import MyExercises from '../features/cbt/pages/client/MyExercises';
+import CompleteExercise from '../features/cbt/pages/client/CompleteExercise';
+import MyProgress from '../features/cbt/pages/client/MyProgress';
+import PractitionerCbtDashboard from '../features/cbt/pages/practitioner/PractitionerCbtDashboard';
+import ClientCbtOverview from '../features/cbt/pages/practitioner/ClientCbtOverview';
+import CreateCbtPlan from '../features/cbt/pages/practitioner/CreateCbtPlan';
+import AssignExercise from '../features/cbt/pages/practitioner/AssignExercise';
+import ReviewResponses from '../features/cbt/pages/practitioner/ReviewResponses';
+import CbtProgressReport from '../features/cbt/pages/practitioner/CbtProgressReport';
+import ExerciseTemplateLibrary from '../features/cbt/pages/admin/ExerciseTemplateLibrary';
 
 const TrainerDashboardPage = lazy(() => import('../features/trainer/TrainerDashboardPage'));
 const LiveSessionPage = lazy(() => import('../features/trainer/LiveSessionPage'));
@@ -109,6 +121,7 @@ export default function AppRoutes() {
           <Route path="escalations" element={<PermissionBoundary anyOf={['admin.workflows.manage']}><AdminEscalationsPage /></PermissionBoundary>} />
           <Route path="programs" element={<PermissionBoundary anyOf={['admin.programs.view']}><ProgramManagementPage /></PermissionBoundary>} />
           <Route path="memberships" element={<PermissionBoundary anyOf={['admin.memberships.manage']}><MembershipPlanManagementPage /></PermissionBoundary>} />
+          <Route path="cbt/exercise-library" element={<PermissionBoundary anyOf={['admin.cbt_templates.manage']}><ExerciseTemplateLibrary /></PermissionBoundary>} />
           <Route path="logs" element={<PermissionBoundary anyOf={['admin.activity_logs.view']}><ActivityLogPage title="Activity Logs" subtitle="Audit and activity stream across every workspace." emptyMessage="No activity has been recorded yet." showAdminFilters /></PermissionBoundary>} />
         </Route>
 
@@ -120,6 +133,11 @@ export default function AppRoutes() {
             <Route path="intake" element={<PermissionBoundary anyOf={['client.intake.manage']}><ClientIntakeFlowPage /></PermissionBoundary>} />
             <Route path="appointments" element={<PermissionBoundary anyOf={['client.appointments.view']}><ClientAppointmentsPage /></PermissionBoundary>} />
             <Route path="programs" element={<ClientProgramsPage />} />
+            <Route path="cbt" element={<PermissionBoundary anyOf={['client.cbt.view']}><ClientCbtDashboard /></PermissionBoundary>} />
+            <Route path="cbt/plan" element={<PermissionBoundary anyOf={['client.cbt.view']}><MyCbtPlan /></PermissionBoundary>} />
+            <Route path="cbt/exercises" element={<PermissionBoundary anyOf={['client.cbt.view']}><MyExercises /></PermissionBoundary>} />
+            <Route path="cbt/exercises/:instanceId" element={<PermissionBoundary anyOf={['client.cbt.manage']}><CompleteExercise /></PermissionBoundary>} />
+            <Route path="cbt/progress" element={<PermissionBoundary anyOf={['client.cbt.view']}><MyProgress /></PermissionBoundary>} />
             <Route path="tasks" element={<ClientTasksPage />} />
             <Route path="profile" element={<ClientProfilePage />} />
             <Route path="membership" element={<PermissionBoundary anyOf={['client.memberships.manage']}><ClientMembershipPage /></PermissionBoundary>} />
@@ -136,6 +154,13 @@ export default function AppRoutes() {
             <Route path="profile" element={<ProfilePage role="counsellor" />} />
             <Route path="sessions" element={<CounsellorSessionsPage />} />
             <Route path="clients" element={<CounsellorClientsPage />} />
+            <Route path="cbt" element={<PermissionBoundary anyOf={['counsellor.cbt.view']}><PractitionerCbtDashboard /></PermissionBoundary>} />
+            <Route path="cbt/clients/:clientId" element={<PermissionBoundary anyOf={['counsellor.cbt.view']}><ClientCbtOverview /></PermissionBoundary>} />
+            <Route path="cbt/clients/:clientId/create-plan" element={<PermissionBoundary anyOf={['counsellor.cbt.manage']}><CreateCbtPlan /></PermissionBoundary>} />
+            <Route path="cbt/plans/:planId" element={<PermissionBoundary anyOf={['counsellor.cbt.view']}><CbtProgressReport /></PermissionBoundary>} />
+            <Route path="cbt/plans/:planId/assign" element={<PermissionBoundary anyOf={['counsellor.cbt.manage']}><AssignExercise /></PermissionBoundary>} />
+            <Route path="cbt/plans/:planId/reviews" element={<PermissionBoundary anyOf={['counsellor.cbt.review']}><ReviewResponses /></PermissionBoundary>} />
+            <Route path="cbt/reviews" element={<PermissionBoundary anyOf={['counsellor.cbt.review']}><ReviewResponses /></PermissionBoundary>} />
             <Route path="activity" element={<PermissionBoundary anyOf={['counsellor.activity_logs.view']}><ActivityLogPage title="Counsellor Activity" subtitle="Follow your session-related and account events." emptyMessage="Your counsellor activity feed will populate as client and care operations are recorded." /></PermissionBoundary>} />
           </Route>
         </Route>

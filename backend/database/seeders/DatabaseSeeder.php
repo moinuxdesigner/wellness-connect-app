@@ -19,6 +19,8 @@ class DatabaseSeeder extends Seeder
 
     public function run(): void
     {
+        $this->call(CbtTemplateSeeder::class);
+
         foreach ([
             ['code' => 'psychology', 'name' => 'Psychology Support', 'description' => 'Counselling support'],
             ['code' => 'training', 'name' => 'Personal Training', 'description' => 'Fitness training'],
