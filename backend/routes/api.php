@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\AdminController;
 use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
+use App\Http\Controllers\Api\ClientDashboardController;
 use App\Http\Controllers\Api\CbtController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
@@ -76,6 +77,7 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/my-progress', [CbtController::class, 'myProgress'])->middleware('permission:client.cbt.view');
         });
 
+        Route::get('/client/dashboard', [ClientDashboardController::class, 'show'])->middleware('permission:client.dashboard.view');
         Route::put('/client/profile', [ClientProfileController::class, 'update'])->middleware('permission:client.profile.update');
 
         Route::middleware('permission:client.intake.manage')->group(function (): void {

@@ -51,6 +51,29 @@ body {
   padding-bottom: env(safe-area-inset-bottom);
 }
 
+.theme-transitioning,
+.theme-transitioning body,
+.theme-transitioning .dashboard-theme,
+.theme-transitioning .dashboard-theme *,
+.theme-transitioning .bottom-nav,
+.theme-transitioning .bottom-nav * {
+  transition-duration: 280ms;
+  transition-property: background, background-color, border-color, box-shadow, color, fill, opacity, stroke;
+  transition-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .theme-transitioning,
+  .theme-transitioning body,
+  .theme-transitioning .dashboard-theme,
+  .theme-transitioning .dashboard-theme *,
+  .theme-transitioning .bottom-nav,
+  .theme-transitioning .bottom-nav * {
+    transition-duration: 0ms;
+  }
+
+}
+
 .dashboard-content {
   margin-left: 0;
 }
@@ -67,8 +90,16 @@ body {
     #020617;
 }
 
-.dark .dashboard-theme :where(.bg-white, .bg-white\/90, .bg-white\/95, .bg-slate-50) {
+.dark .dashboard-theme :where(.bg-white, .bg-white\/60, .bg-white\/70, .bg-white\/75, .bg-white\/80, .bg-white\/82, .bg-white\/90, .bg-white\/95, .bg-slate-50, [class*="bg-white/"]) {
   background-color: rgb(15 23 42 / 0.92);
+}
+
+.dark .dashboard-theme :where(section.bg-gradient-to-br, article.bg-gradient-to-br, div.bg-gradient-to-br) {
+  background-image: linear-gradient(135deg, rgb(30 41 59 / 0.96), rgb(15 23 42 / 0.96) 48%, rgb(30 41 59 / 0.9));
+}
+
+.dark .dashboard-theme :where(section.bg-gradient-to-r, article.bg-gradient-to-r, div.bg-gradient-to-r) {
+  background-image: linear-gradient(90deg, rgb(30 41 59 / 0.96), rgb(15 23 42 / 0.96));
 }
 
 .dark .dashboard-theme :where(.bg-slate-100) {
@@ -95,7 +126,7 @@ body {
   background-color: rgb(244 63 94 / 0.16);
 }
 
-.dark .dashboard-theme :where(.border-slate-100, .border-slate-200, .border-slate-300) {
+.dark .dashboard-theme :where(.border-white, .border-white\/60, .border-white\/70, .border-white\/80, [class*="border-white/"], .border-slate-100, .border-slate-200, .border-slate-300) {
   border-color: rgb(51 65 85 / 0.92);
 }
 
@@ -131,7 +162,9 @@ body {
   color: #fda4af;
 }
 
-.dark .dashboard-theme :where(input, textarea, select) {
+.dark .dashboard-theme :where(input:not(.bg-transparent), textarea, select) {
+  background-color: rgb(15 23 42 / 0.92);
+  border-color: rgb(51 65 85 / 0.92);
   color: #f8fafc;
 }
 
@@ -152,6 +185,72 @@ body {
   overflow: hidden;
   -webkit-box-orient: vertical;
   -webkit-line-clamp: 2;
+}
+
+.get-started-wizard {
+  color-scheme: light;
+  background:
+    radial-gradient(circle at 18% 8%, rgb(199 210 254 / 0.46), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgb(187 247 208 / 0.34), transparent 24rem),
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #ffffff 100%);
+  color: #0f172a;
+}
+
+.dark .get-started-wizard {
+  background:
+    radial-gradient(circle at 18% 8%, rgb(199 210 254 / 0.46), transparent 28rem),
+    radial-gradient(circle at 88% 18%, rgb(187 247 208 / 0.34), transparent 24rem),
+    linear-gradient(135deg, #f8fafc 0%, #eef2ff 48%, #ffffff 100%);
+  color: #0f172a;
+}
+
+.dark .get-started-wizard :where(.text-slate-900) {
+  color: #0f172a;
+}
+
+.dark .get-started-wizard :where(.text-slate-500) {
+  color: #64748b;
+}
+
+.dark .get-started-wizard :where(.text-slate-400) {
+  color: #94a3b8;
+}
+
+.dark .get-started-wizard :where(.text-indigo-600) {
+  color: #4f46e5;
+}
+
+.dark .get-started-wizard :where(.bg-white) {
+  background-color: #ffffff;
+}
+
+.dark .get-started-wizard :where(.bg-slate-50) {
+  background-color: #f8fafc;
+}
+
+.dark .get-started-wizard :where(.bg-slate-100) {
+  background-color: #f1f5f9;
+}
+
+.dark .get-started-wizard :where(.border-slate-100) {
+  border-color: #f1f5f9;
+}
+
+.dark .get-started-wizard :where(.border-slate-200) {
+  border-color: #e2e8f0;
+}
+
+.dark .get-started-wizard :where(.border-slate-300) {
+  border-color: #cbd5e1;
+}
+
+.dark .get-started-wizard :where(input) {
+  background-color: #ffffff;
+  color: #0f172a;
+}
+
+.dark .get-started-wizard :where(input)::placeholder {
+  color: #94a3b8;
 }
 
 @media (min-width: 1024px) {

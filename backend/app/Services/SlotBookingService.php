@@ -19,7 +19,7 @@ class SlotBookingService
         return DB::transaction(function () use ($clientUserId, $practitionerId, $slotId, $serviceType, $mode, $intakeFlowId, $subscription) {
             $slot = AvailabilitySlot::query()->lockForUpdate()->findOrFail($slotId);
 
-            if ($slot->slot_status !== 'open') {
+            if ($slot->slot_status !== 'open' || (int) $slot->practitioner_id !== $practitionerId || $slot->starts_at->lte(now())) {
                 throw new RuntimeException('Selected slot is no longer available.');
             }
 

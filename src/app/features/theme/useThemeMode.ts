@@ -4,6 +4,10 @@ export type ThemeMode = 'light' | 'dark';
 
 const themeStorageKey = 'wellnessconnect-theme-mode';
 const themeChangeEvent = 'wellnessconnect-theme-change';
+const themeTransitionClass = 'theme-transitioning';
+const themeTransitionDurationMs = 280;
+
+let themeTransitionTimer: number | undefined;
 
 function getSystemTheme(): ThemeMode {
   if (typeof window === 'undefined') return 'light';
@@ -20,11 +24,39 @@ function getThemeSnapshot(): ThemeMode {
   return readStoredTheme() ?? getSystemTheme();
 }
 
-function applyTheme(mode: ThemeMode) {
+function commitTheme(mode: ThemeMode) {
   if (typeof document === 'undefined') return;
   document.documentElement.classList.toggle('dark', mode === 'dark');
   document.documentElement.dataset.theme = mode;
   document.documentElement.style.colorScheme = mode;
+}
+
+function shouldAnimateThemeChange(): boolean {
+  if (typeof window === 'undefined') return false;
+  return !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
+
+function finishThemeTransition() {
+  if (typeof document === 'undefined') return;
+  document.documentElement.classList.remove(themeTransitionClass);
+  if (themeTransitionTimer) {
+    window.clearTimeout(themeTransitionTimer);
+    themeTransitionTimer = undefined;
+  }
+}
+
+function applyTheme(mode: ThemeMode, animate = false) {
+  if (typeof document === 'undefined') return;
+  if (!animate || !shouldAnimateThemeChange()) {
+    commitTheme(mode);
+    return;
+  }
+
+  if (themeTransitionTimer) window.clearTimeout(themeTransitionTimer);
+  document.documentElement.classList.add(themeTransitionClass);
+  void document.documentElement.offsetWidth;
+  commitTheme(mode);
+  themeTransitionTimer = window.setTimeout(finishThemeTransition, themeTransitionDurationMs);
 }
 
 function subscribe(callback: () => void) {
@@ -63,7 +95,7 @@ export function useThemeMode() {
 
   function setMode(nextMode: ThemeMode) {
     window.localStorage.setItem(themeStorageKey, nextMode);
-    applyTheme(nextMode);
+    applyTheme(nextMode, true);
     window.dispatchEvent(new CustomEvent(themeChangeEvent, { detail: nextMode }));
   }
 

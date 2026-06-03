@@ -155,7 +155,7 @@ export default function GetStartedWizardPage() {
             </div>
             <input
               autoFocus
-              className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-base transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               placeholder="Enter your full name"
               value={name}
               onChange={(e) => setName(e.target.value)}
@@ -232,7 +232,7 @@ export default function GetStartedWizardPage() {
             <input
               autoFocus
               type="email"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-base transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -262,7 +262,7 @@ export default function GetStartedWizardPage() {
             <input
               autoFocus
               type="password"
-              className="w-full rounded-xl border border-slate-300 px-4 py-3.5 text-base transition-colors focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
+              className="w-full rounded-xl border border-slate-300 bg-white px-4 py-3.5 text-base text-slate-900 transition-colors placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-100"
               placeholder="Minimum 8 characters"
               value={password}
               minLength={8}
@@ -368,7 +368,7 @@ export default function GetStartedWizardPage() {
   const showProgress = step < 6;
 
   return (
-    <div className="flex min-h-screen flex-col bg-gradient-to-br from-slate-50 via-indigo-50/30 to-white">
+    <div className="get-started-wizard flex min-h-screen flex-col">
       <div className="mx-auto w-full max-w-lg flex-1 px-4 pb-8 pt-5 sm:px-6 sm:py-10">
 
         {/* Top bar */}

@@ -95,7 +95,7 @@ function SidebarContent({
           src={clientSidebarBg}
           alt=""
           aria-hidden="true"
-          className="pointer-events-none absolute inset-x-0 bottom-0 h-auto w-full"
+          className="pointer-events-none absolute inset-x-0 bottom-0 h-auto w-full transition-opacity duration-300 dark:opacity-0"
         />
       ) : null}
       {isLoggingOut ? <AuthActionLoader action="logout" /> : null}

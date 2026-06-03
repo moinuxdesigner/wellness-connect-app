@@ -2,7 +2,6 @@
 
 namespace Database\Seeders;
 
-use App\Models\AvailabilitySlot;
 use App\Models\ClientProfile;
 use App\Models\Practitioner;
 use App\Models\PractitionerSpecialty;
@@ -99,18 +98,6 @@ class DatabaseSeeder extends Seeder
             PractitionerSpecialty::updateOrCreate(['practitioner_id' => $trainer->id, 'specialty_code' => $specialty]);
         }
 
-        $slots = [
-            ['practitioner_id' => $counsellor->id, 'starts_at' => '2026-05-20 18:30:00', 'ends_at' => '2026-05-20 19:20:00'],
-            ['practitioner_id' => $counsellor->id, 'starts_at' => '2026-05-21 19:00:00', 'ends_at' => '2026-05-21 19:50:00'],
-            ['practitioner_id' => $trainer->id, 'starts_at' => '2026-05-20 08:00:00', 'ends_at' => '2026-05-20 09:00:00'],
-            ['practitioner_id' => $trainer->id, 'starts_at' => '2026-05-21 17:30:00', 'ends_at' => '2026-05-21 18:30:00'],
-        ];
-
-        foreach ($slots as $slot) {
-            AvailabilitySlot::updateOrCreate(
-                ['practitioner_id' => $slot['practitioner_id'], 'starts_at' => $slot['starts_at']],
-                ['ends_at' => $slot['ends_at'], 'slot_status' => 'open']
-            );
-        }
+        $this->call(AvailabilitySlotSeeder::class);
     }
 }

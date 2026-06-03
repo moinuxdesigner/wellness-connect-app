@@ -123,6 +123,22 @@ function formatDateTime(value?: string) {
   return value ? new Date(value).toLocaleString() : '-';
 }
 
+function formatDateParam(value: Date) {
+  const localDate = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
+  return localDate.toISOString().slice(0, 10);
+}
+
+function upcomingSlotWindow() {
+  const from = new Date();
+  const to = new Date();
+  to.setDate(from.getDate() + 30);
+
+  return {
+    from: formatDateParam(from),
+    to: formatDateParam(to),
+  };
+}
+
 function practitionerLabel(type: PractitionerItem['type']) {
   if (type === 'trainer') return 'Fitness trainer';
   if (type === 'counsellor') return 'Psychologist';
@@ -187,24 +203,45 @@ export default function ClientIntakeFlowPage() {
 
   useEffect(() => {
     if (!state.selectedPractitionerId) return;
-    getPractitionerSlots(state.selectedPractitionerId, '2026-05-01', '2026-07-31').then(setSlots).catch(() => {
+    const window = upcomingSlotWindow();
+    getPractitionerSlots(state.selectedPractitionerId, window.from, window.to).then((items) => {
+      setSlots(items);
+      if (state.selectedSlotId && !items.some((slot) => slot.id === state.selectedSlotId)) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: null } });
+      }
+    }).catch(() => {
       setSlots([]);
+      dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: null } });
     });
-  }, [state.selectedPractitionerId]);
+  }, [state.selectedPractitionerId, state.selectedSlotId]);
 
   useEffect(() => {
     if (!state.selectedPsychologistId) return;
-    getPractitionerSlots(state.selectedPsychologistId, '2026-05-01', '2026-07-31').then(setPsychologistSlots).catch(() => {
+    const window = upcomingSlotWindow();
+    getPractitionerSlots(state.selectedPsychologistId, window.from, window.to).then((items) => {
+      setPsychologistSlots(items);
+      if (state.selectedPsychologistSlotId && !items.some((slot) => slot.id === state.selectedPsychologistSlotId)) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: null } });
+      }
+    }).catch(() => {
       setPsychologistSlots([]);
+      dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: null } });
     });
-  }, [state.selectedPsychologistId]);
+  }, [state.selectedPsychologistId, state.selectedPsychologistSlotId]);
 
   useEffect(() => {
     if (!state.selectedTrainerId) return;
-    getPractitionerSlots(state.selectedTrainerId, '2026-05-01', '2026-07-31').then(setTrainerSlots).catch(() => {
+    const window = upcomingSlotWindow();
+    getPractitionerSlots(state.selectedTrainerId, window.from, window.to).then((items) => {
+      setTrainerSlots(items);
+      if (state.selectedTrainerSlotId && !items.some((slot) => slot.id === state.selectedTrainerSlotId)) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: null } });
+      }
+    }).catch(() => {
       setTrainerSlots([]);
+      dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: null } });
     });
-  }, [state.selectedTrainerId]);
+  }, [state.selectedTrainerId, state.selectedTrainerSlotId]);
 
   async function onContinueFromService() {
     setLoading(true);
@@ -323,7 +360,7 @@ export default function ClientIntakeFlowPage() {
       <button
         type="button"
         onClick={() => setPickerMode(mode)}
-        className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2 text-left transition hover:bg-slate-50"
+        className="flex min-h-14 w-full items-center justify-between gap-3 rounded-xl border border-slate-300 bg-white px-3 py-2 text-left transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800"
       >
         <span>
           <span className="block text-sm font-semibold text-slate-800">{practitioner ? practitioner.name : title}</span>
@@ -334,18 +371,32 @@ export default function ClientIntakeFlowPage() {
     );
   }
 
-  function renderSlotSelect(slotsForPractitioner: SlotItem[], selectedId: number | null, onSelect: (slotId: number | null) => void) {
+  function renderSlotSelect(slotsForPractitioner: SlotItem[], selectedId: number | null, onSelect: (slotId: number | null) => void, practitionerSelected: boolean) {
+    const hasSlots = slotsForPractitioner.length > 0;
+
     return (
-      <select className="rounded-xl border border-slate-300 px-3 py-2" value={selectedId ?? ''} onChange={(event) => onSelect(Number(event.target.value) || null)}>
-        <option value="">Select time slot</option>
-        {slotsForPractitioner.map((slot) => <option key={slot.id} value={slot.id}>{formatDateTime(slot.starts_at)}</option>)}
-      </select>
+      <div className="grid gap-2">
+        <select
+          className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:disabled:bg-slate-800"
+          value={selectedId ?? ''}
+          onChange={(event) => onSelect(Number(event.target.value) || null)}
+          disabled={!practitionerSelected || !hasSlots}
+        >
+          <option value="">{!practitionerSelected ? 'Select practitioner first' : hasSlots ? 'Select time slot' : 'No upcoming slots available'}</option>
+          {slotsForPractitioner.map((slot) => <option key={slot.id} value={slot.id}>{formatDateTime(slot.starts_at)}</option>)}
+        </select>
+        {practitionerSelected && !hasSlots ? (
+          <p className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 dark:border-amber-400/30 dark:bg-amber-400/10 dark:text-amber-200">
+            No upcoming slots available for this practitioner.
+          </p>
+        ) : null}
+      </div>
     );
   }
 
   function renderAppointmentSummary(title: string, practitioner: PractitionerItem | undefined, slot: SlotItem | undefined) {
     return (
-      <DSCard className="space-y-1 bg-slate-50 shadow-none">
+      <DSCard className="space-y-1 bg-slate-50 shadow-none dark:bg-slate-900">
         <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{title}</p>
         <p className="text-sm font-semibold text-slate-900">{practitioner?.name ?? '-'}</p>
         <p className="text-sm capitalize text-slate-600">{practitioner ? practitionerLabel(practitioner.type) : '-'}</p>
@@ -359,7 +410,7 @@ export default function ClientIntakeFlowPage() {
     const underReview = confirmation?.state === 'under_review';
 
     return (
-      <div className="fixed inset-0 z-50 overflow-y-auto bg-white px-4 py-6 sm:px-8">
+      <div className="fixed inset-0 z-50 overflow-y-auto bg-white px-4 py-6 dark:bg-slate-950 sm:px-8">
         <div className="mx-auto flex min-h-full max-w-3xl flex-col justify-center gap-5">
           <div>
             <p className="text-sm font-semibold text-[var(--ds-brand)]">{underReview ? 'Review started' : 'Slots reserved'}</p>
@@ -387,7 +438,7 @@ export default function ClientIntakeFlowPage() {
   }
 
   return (
-    <div className="mx-auto w-full max-w-lg pb-20">
+    <div className="client-intake-flow mx-auto w-full max-w-lg pb-20">
       <div className="mb-7 flex items-center justify-between">
         {state.step > 1 ? (
           <button
@@ -463,12 +514,12 @@ export default function ClientIntakeFlowPage() {
           <>
             <MobileSectionTitle title="Intake questions" subtitle="Answer briefly so we can match the right support." />
             <label className="grid gap-1.5 text-sm font-medium text-slate-700">What brings you here today?
-              <select className="rounded-xl border border-slate-300 px-3 py-2" value={state.concern} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { concern: e.target.value } })}>
+              <select className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" value={state.concern} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { concern: e.target.value } })}>
                 {concernChoices.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-slate-700">How long?
-              <select className="rounded-xl border border-slate-300 px-3 py-2" value={state.duration} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { duration: e.target.value } })}>
+              <select className="rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100" value={state.duration} onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { duration: e.target.value } })}>
                 <option value="lt_2_weeks">Less than 2 weeks</option>
                 <option value="2_8_weeks">2-8 weeks</option>
                 <option value="2_6_months">2-6 months</option>
@@ -477,7 +528,7 @@ export default function ClientIntakeFlowPage() {
             </label>
             <label className="grid gap-1.5 text-sm font-medium text-slate-700">What would success look like?
               <textarea
-                className="min-h-24 rounded-xl border border-slate-300 px-3 py-2"
+                className="min-h-24 rounded-xl border border-slate-300 bg-white px-3 py-2 text-slate-900 placeholder:text-slate-400 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
                 value={state.outcome}
                 onChange={(e) => dispatch({ type: 'SET_FIELD', payload: { outcome: e.target.value } })}
                 placeholder="Example: I want to feel calmer, sleep better, build a consistent fitness routine, and know which first steps to follow each week."
@@ -495,7 +546,7 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Select Psychologist" subtitle="Choose a psychologist and select your session time." />
             {renderPractitionerButton('psychologist', selectedPsychologist, 'Select Psychologist', 'Open psychologist list')}
             {selectedPsychologist ? <p className="text-xs text-slate-600">Specialties: {selectedPsychologist.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(psychologistSlots, state.selectedPsychologistSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } }))}
+            {renderSlotSelect(psychologistSlots, state.selectedPsychologistSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } }), Boolean(state.selectedPsychologistId))}
             <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 2 })}>Back</DSSecondaryButton><DSButton className="flex-1 gap-2" onClick={() => dispatch({ type: 'SET_STEP', payload: 4 })} disabled={!state.selectedPsychologistId || !state.selectedPsychologistSlotId}>Continue <ArrowRight size={16} /></DSButton></div>
           </>
         ) : null}
@@ -505,7 +556,7 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Select Fitness Trainer" subtitle="Choose a trainer and select your session time." />
             {renderPractitionerButton('trainer', selectedTrainer, 'Select Fitness Trainer', 'Open trainer list')}
             {selectedTrainer ? <p className="text-xs text-slate-600">Specialties: {selectedTrainer.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(trainerSlots, state.selectedTrainerSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } }))}
+            {renderSlotSelect(trainerSlots, state.selectedTrainerSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } }), Boolean(state.selectedTrainerId))}
             <div className="flex gap-2"><DSSecondaryButton className="flex-1" onClick={() => dispatch({ type: 'SET_STEP', payload: 3 })}>Back</DSSecondaryButton><DSButton className="flex-1 gap-2" onClick={() => dispatch({ type: 'SET_STEP', payload: 5 })} disabled={!state.selectedTrainerId || !state.selectedTrainerSlotId}>Review <ArrowRight size={16} /></DSButton></div>
           </>
         ) : null}
@@ -526,7 +577,7 @@ export default function ClientIntakeFlowPage() {
             <MobileSectionTitle title="Schedule your first session" subtitle="Pick practitioner and time slot." />
             {renderPractitionerButton('single', selectedPractitioner, 'Select practitioner', 'Choose from recommended matches')}
             {selectedPractitioner ? <p className="text-xs text-slate-600">Specialties: {selectedPractitioner.specialties.join(', ')}</p> : null}
-            {renderSlotSelect(slots, state.selectedSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }))}
+            {renderSlotSelect(slots, state.selectedSlotId, (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }), Boolean(state.selectedPractitionerId))}
             {state.serviceType !== 'package' && activeMemberships.length ? (
               <label className="rounded-xl border border-indigo-100 bg-indigo-50 p-3 text-sm text-slate-700">
                 <span className="flex items-center gap-2 font-medium">
@@ -534,7 +585,7 @@ export default function ClientIntakeFlowPage() {
                   Use membership credits
                 </span>
                 {useCredits ? (
-                  <select value={selectedMembershipId ?? ''} onChange={(event) => setSelectedMembershipId(Number(event.target.value))} className="mt-3 w-full rounded-lg border border-indigo-200 bg-white p-2">
+                  <select value={selectedMembershipId ?? ''} onChange={(event) => setSelectedMembershipId(Number(event.target.value))} className="mt-3 w-full rounded-lg border border-indigo-200 bg-white p-2 text-slate-900 dark:border-indigo-500/40 dark:bg-slate-900 dark:text-slate-100">
                     {activeMemberships.map((membership) => <option key={membership.id} value={membership.id}>{membership.planName} - counselling {membership.credits.counselling}, training {membership.credits.training}</option>)}
                   </select>
                 ) : null}
@@ -545,7 +596,7 @@ export default function ClientIntakeFlowPage() {
         ) : null}
 
         <Dialog open={pickerMode !== null} onOpenChange={(open) => setPickerMode(open ? pickerMode : null)}>
-          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-white p-4 sm:max-w-none sm:p-6">
+          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-white p-4 dark:bg-slate-950 sm:max-w-none sm:p-6">
             <DialogHeader className="max-w-3xl">
               <DialogTitle>{pickerMode === 'trainer' ? 'Select Fitness Trainer' : pickerMode === 'psychologist' ? 'Select Psychologist' : 'Select practitioner'}</DialogTitle>
               <DialogDescription>
@@ -561,7 +612,7 @@ export default function ClientIntakeFlowPage() {
                     key={practitioner.id}
                     type="button"
                     onClick={() => selectPractitioner(practitioner)}
-                    className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-[var(--ds-brand)] bg-indigo-50' : 'border-slate-200 bg-white hover:bg-slate-50'}`}
+                    className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-[var(--ds-brand)] bg-indigo-50 dark:bg-indigo-500/15' : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800'}`}
                   >
                     <span className="min-w-0">
                       <span className="block text-sm font-semibold text-slate-900">{practitioner.name}</span>
@@ -572,7 +623,7 @@ export default function ClientIntakeFlowPage() {
                   </button>
                 );
               }) : (
-                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">No practitioners are available for this selection yet.</p>
+                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No practitioners are available for this selection yet.</p>
               )}
             </div>
           </DialogContent>

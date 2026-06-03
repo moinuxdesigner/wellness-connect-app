@@ -26,6 +26,65 @@ export interface ClientAppointment {
   reschedule_count: number;
 }
 
+export interface ClientDashboardSessionMetric {
+  value: string | null;
+  badge: string;
+  serviceType: ClientAppointment['service_type'];
+  startsAt: string | null;
+}
+
+export interface ClientDashboardProgram {
+  title: string | null;
+  type: ClientAppointment['service_type'] | 'training' | 'psychology';
+  status: string;
+}
+
+export interface ClientDashboardMembershipStatus {
+  label: string;
+  status: string;
+}
+
+export interface ClientDashboardScheduleItem {
+  id: number;
+  time: string | null;
+  title: string;
+  coach: string;
+  location: string;
+  detail: string;
+  status: string;
+  serviceType: ClientAppointment['service_type'];
+  mode: ClientAppointment['mode'];
+  startsAt: string | null;
+}
+
+export interface ClientDashboardActivityItem {
+  id: number;
+  title: string;
+  detail: string;
+  time: string | null;
+  category: string;
+}
+
+export interface ClientDashboardResponse {
+  user: {
+    id: number;
+    name: string;
+  };
+  metrics: {
+    nextSession: ClientDashboardSessionMetric | null;
+    tasksPending: number;
+    activeProgram: ClientDashboardProgram | null;
+    membershipStatus: ClientDashboardMembershipStatus;
+  };
+  schedule: ClientDashboardScheduleItem[];
+  recentActivity: ClientDashboardActivityItem[];
+  progress: {
+    sessionsCompletedThisMonth: number;
+    daysActiveThisMonth: number;
+    currentStreakDays: number;
+  };
+}
+
 export interface IntakeFlow {
   id: number;
   service_type: 'psychology' | 'training' | 'combined' | 'package';
@@ -393,6 +452,14 @@ export async function getClientAppointmentsRequest() {
   const data = await readJson(response);
   if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch appointments'));
   return (data.appointments ?? []) as ClientAppointment[];
+}
+
+export async function getClientDashboardRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/client/dashboard`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch client dashboard'));
+  return data as ClientDashboardResponse;
 }
 
 export async function rescheduleAppointmentRequest(id: number, slot_id: number) {

@@ -8,6 +8,14 @@ use Illuminate\Database\Eloquent\Model;
 #[Fillable(['practitioner_id', 'starts_at', 'ends_at', 'slot_status', 'held_by_user_id'])]
 class AvailabilitySlot extends Model
 {
+    protected function casts(): array
+    {
+        return [
+            'starts_at' => 'datetime',
+            'ends_at' => 'datetime',
+        ];
+    }
+
     public function practitioner()
     {
         return $this->belongsTo(Practitioner::class);

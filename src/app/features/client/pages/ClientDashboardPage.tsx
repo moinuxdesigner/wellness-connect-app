@@ -1,7 +1,7 @@
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
 import {
   Activity,
-  Apple,
   ArrowRight,
   BarChart3,
   Brain,
@@ -19,6 +19,13 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { getAuthState } from '../../auth/auth';
+import {
+  getClientDashboardRequest,
+  type ClientAppointment,
+  type ClientDashboardActivityItem,
+  type ClientDashboardResponse,
+  type ClientDashboardScheduleItem,
+} from '../../shared/services/api';
 
 type Tone = 'violet' | 'blue' | 'green' | 'orange';
 
@@ -59,13 +66,6 @@ const toneStyles: Record<Tone, {
   },
 };
 
-const scheduleItems = [
-  { time: '6:00 PM', title: 'Personal Training', coach: 'Coach Alex', location: 'In-Person', detail: 'Studio A', status: 'Upcoming', tone: 'violet' as Tone, Icon: Dumbbell, LocationIcon: MapPin },
-  { time: '7:30 PM', title: 'Psychology Session', coach: 'Dr. Sarah Malik', location: 'Online', detail: 'Video Call', status: 'Upcoming', tone: 'blue' as Tone, Icon: Brain, LocationIcon: Video },
-  { time: '8:30 PM', title: 'Nutrition Follow-up', coach: 'Nutritionist Zara', location: 'Online', detail: 'Video Call', status: 'Confirmed', tone: 'green' as Tone, Icon: Apple, LocationIcon: Video },
-  { time: '9:15 PM', title: 'Mindfulness Check-in', coach: 'Coach Rida', location: 'Online', detail: 'Video Call', status: 'Upcoming', tone: 'orange' as Tone, Icon: Activity, LocationIcon: Video },
-];
-
 const actions = [
   { label: 'Book Appointment', Icon: CalendarDays, tone: 'violet' as Tone, to: '/client/intake' },
   { label: 'Join Session', Icon: Video, tone: 'blue' as Tone, to: '/client/appointments' },
@@ -73,16 +73,82 @@ const actions = [
   { label: 'Message Coach', Icon: MessageCircle, tone: 'orange' as Tone, to: '/client/activity' },
 ];
 
-const recentActivity = [
-  { title: 'Completed Personal Training', detail: 'Coach Alex - May 20, 2024', time: '8:00 PM', Icon: Dumbbell, tone: 'violet' as Tone },
-  { title: 'Personal Wellness Plan updated', detail: 'Coach Rida - May 19, 2024', time: '5:30 PM', Icon: Leaf, tone: 'green' as Tone },
-  { title: 'Message from Dr. Sarah Malik', detail: 'May 19, 2024', time: '2:15 PM', Icon: MessageCircle, tone: 'blue' as Tone },
-];
+type ServiceType = ClientAppointment['service_type'] | 'psychology' | 'training' | string | undefined | null;
+
+function serviceTone(serviceType: ServiceType): Tone {
+  if (serviceType === 'psychology') return 'blue';
+  if (serviceType === 'training') return 'violet';
+  if (serviceType === 'combined') return 'green';
+  if (serviceType === 'package') return 'orange';
+  return 'violet';
+}
+
+function serviceIcon(serviceType: ServiceType): LucideIcon {
+  if (serviceType === 'psychology') return Brain;
+  if (serviceType === 'training') return Dumbbell;
+  if (serviceType === 'combined') return Leaf;
+  if (serviceType === 'package') return ShieldCheck;
+  return CalendarDays;
+}
+
+function activityIcon(category: string): LucideIcon {
+  if (category === 'cbt') return Brain;
+  if (category === 'trainer' || category === 'training') return Dumbbell;
+  if (category === 'membership') return ShieldCheck;
+  if (category === 'message') return MessageCircle;
+  if (category === 'appointment') return CalendarDays;
+  return Activity;
+}
+
+function activityTone(category: string): Tone {
+  if (category === 'cbt') return 'blue';
+  if (category === 'trainer' || category === 'training') return 'violet';
+  if (category === 'membership') return 'orange';
+  if (category === 'appointment') return 'green';
+  return 'violet';
+}
 
 export default function ClientDashboardPage() {
   const user = getAuthState().user;
   const navigate = useNavigate();
-  const displayName = user?.name ?? 'Client';
+  const [dashboard, setDashboard] = useState<ClientDashboardResponse | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    getClientDashboardRequest()
+      .then((response) => {
+        if (!isMounted) return;
+        setDashboard(response);
+        setError(null);
+      })
+      .catch((requestError) => {
+        if (!isMounted) return;
+        setError(requestError instanceof Error ? requestError.message : 'Unable to load client dashboard');
+      })
+      .finally(() => {
+        if (isMounted) setLoading(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const displayName = dashboard?.user.name ?? user?.name ?? 'Client';
+  const nextSession = dashboard?.metrics.nextSession;
+  const activeProgram = dashboard?.metrics.activeProgram;
+  const membershipStatus = dashboard?.metrics.membershipStatus;
+  const scheduleItems = dashboard?.schedule ?? [];
+  const recentActivity = dashboard?.recentActivity ?? [];
+  const progress = dashboard?.progress;
+  const nextTone = serviceTone(nextSession?.serviceType);
+  const nextIcon = serviceIcon(nextSession?.serviceType);
+  const activeProgramTone = serviceTone(activeProgram?.type);
+  const activeProgramIcon = serviceIcon(activeProgram?.type);
+  const membershipValueClass = membershipStatus?.status === 'active' ? 'text-emerald-600' : 'text-slate-950';
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-6 lg:space-y-6">
@@ -93,18 +159,24 @@ export default function ClientDashboardPage() {
         <p className="text-base leading-6 text-slate-500 sm:text-lg">Let's build a healthier mind and body.</p>
       </header>
 
+      {error ? (
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+          {error}
+        </div>
+      ) : null}
+
       <section className="grid gap-4 lg:hidden">
-        <MetricCard icon={CalendarDays} tone="violet" label="Next Session" value="6:00 PM" badge="Training" />
-        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value="3" onClick={() => navigate('/client/tasks')} />
+        <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={loading ? 'Loading...' : nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={loading ? 'Loading...' : String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
         <DailyCheckInCard />
         <QuickActionsCard onNavigate={navigate} />
       </section>
 
       <section className="hidden gap-4 sm:grid-cols-2 xl:grid-cols-4 lg:grid">
-        <MetricCard icon={CalendarDays} tone="violet" label="Next Session" value="6:00 PM" badge="Training" />
-        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value="3" onClick={() => navigate('/client/tasks')} />
-        <MetricCard icon={Leaf} tone="green" label="Active Program" value="Personal Wellness Plan" />
-        <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value="Active" valueClassName="text-emerald-600" />
+        <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={loading ? 'Loading...' : nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={loading ? 'Loading...' : String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
+        <MetricCard icon={activeProgramIcon} tone={activeProgramTone} label="Active Program" value={loading ? 'Loading...' : activeProgram?.title ?? 'Not assigned'} />
+        <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value={loading ? 'Loading...' : membershipStatus?.label ?? 'Inactive'} valueClassName={membershipValueClass} />
       </section>
 
       <section className="hidden gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(420px,0.98fr)] lg:grid">
@@ -123,9 +195,9 @@ export default function ClientDashboardPage() {
             </div>
 
             <div className="mt-4 overflow-hidden rounded-lg border border-slate-200/80 bg-white">
-              {scheduleItems.map((item, index) => (
-                <ScheduleRow key={item.time} item={item} isLast={index === scheduleItems.length - 1} />
-              ))}
+              {scheduleItems.length ? scheduleItems.map((item, index) => (
+                <ScheduleRow key={item.id} item={item} isLast={index === scheduleItems.length - 1} />
+              )) : <EmptyState message={loading ? 'Loading today schedule...' : 'No appointments scheduled for today.'} />}
             </div>
 
             <button
@@ -138,13 +210,13 @@ export default function ClientDashboardPage() {
             </button>
           </Card>
 
-          <RecentActivityCard />
+          <RecentActivityCard activities={recentActivity} loading={loading} />
         </div>
 
         <div className="space-y-5">
           <DailyCheckInCard />
           <QuickActionsCard onNavigate={navigate} />
-          <ProgressSnapshotCard onNavigate={navigate} />
+          <ProgressSnapshotCard onNavigate={navigate} progress={progress} loading={loading} />
         </div>
       </section>
     </div>
@@ -214,14 +286,14 @@ function MetricCard({
   );
 }
 
-function ScheduleRow({ item, isLast }: { item: (typeof scheduleItems)[number]; isLast: boolean }) {
-  const Icon = item.Icon;
-  const LocationIcon = item.LocationIcon;
-  const styles = toneStyles[item.tone];
+function ScheduleRow({ item, isLast }: { item: ClientDashboardScheduleItem; isLast: boolean }) {
+  const Icon = serviceIcon(item.serviceType);
+  const LocationIcon = item.mode === 'online' ? Video : MapPin;
+  const styles = toneStyles[serviceTone(item.serviceType)];
 
   return (
     <article className={`grid grid-cols-[82px_20px_minmax(0,1.2fr)_minmax(96px,0.9fr)_auto] items-center gap-3 px-3 py-3 ${isLast ? '' : 'border-b border-slate-100'} max-sm:grid-cols-[72px_18px_minmax(0,1fr)_auto] max-sm:gap-2`}>
-      <p className="text-sm font-semibold text-slate-950">{item.time}</p>
+      <p className="text-sm font-semibold text-slate-950">{item.time ?? '--'}</p>
       <div className="relative flex justify-center self-stretch">
         <span className={`mt-4 h-2.5 w-2.5 rounded-full ${styles.dot}`} />
         {!isLast ? <span className="absolute left-1/2 top-7 h-[calc(100%+1.5rem)] w-px -translate-x-1/2 bg-slate-200" /> : null}
@@ -242,11 +314,15 @@ function ScheduleRow({ item, isLast }: { item: (typeof scheduleItems)[number]; i
         </p>
         <p className="mt-1 pl-5">{item.detail}</p>
       </div>
-      <span className={`justify-self-end rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'Confirmed' ? toneStyles.green.pill : toneStyles.violet.pill}`}>
+      <span className={`justify-self-end rounded-full px-3 py-1 text-xs font-semibold ${item.status === 'Confirmed' || item.status === 'Completed' ? toneStyles.green.pill : toneStyles.violet.pill}`}>
         {item.status}
       </span>
     </article>
   );
+}
+
+function EmptyState({ message }: { message: string }) {
+  return <p className="px-4 py-5 text-sm font-medium text-slate-500">{message}</p>;
 }
 
 function DailyCheckInCard() {
@@ -298,7 +374,15 @@ function QuickActionsCard({ onNavigate }: { onNavigate: (to: string) => void }) 
   );
 }
 
-function ProgressSnapshotCard({ onNavigate }: { onNavigate: (to: string) => void }) {
+function ProgressSnapshotCard({
+  onNavigate,
+  progress,
+  loading,
+}: {
+  onNavigate: (to: string) => void;
+  progress?: ClientDashboardResponse['progress'];
+  loading: boolean;
+}) {
   return (
     <Card>
       <div className="flex items-center justify-between gap-4">
@@ -308,12 +392,12 @@ function ProgressSnapshotCard({ onNavigate }: { onNavigate: (to: string) => void
         </button>
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
-        <ProgressTile label="Sessions Completed" value="12" detail="This Month" tone="violet" />
-        <ProgressTile label="Days Active" value="18" detail="This Month" tone="green" />
+        <ProgressTile label="Sessions Completed" value={loading ? '...' : String(progress?.sessionsCompletedThisMonth ?? 0)} detail="This Month" tone="violet" />
+        <ProgressTile label="Days Active" value={loading ? '...' : String(progress?.daysActiveThisMonth ?? 0)} detail="This Month" tone="green" />
         <article className="flex min-h-[104px] items-center justify-between rounded-lg border border-slate-200 p-4">
           <div>
             <p className="text-xs font-medium text-slate-500">Current Streak</p>
-            <p className="mt-2 text-2xl font-semibold text-slate-950">7 Days</p>
+            <p className="mt-2 text-2xl font-semibold text-slate-950">{loading ? '...' : `${progress?.currentStreakDays ?? 0} Days`}</p>
             <p className="mt-1 text-sm text-slate-500">Keep it up!</p>
           </div>
           <span className="grid h-14 w-14 place-items-center rounded-full bg-orange-50 text-orange-500">
@@ -352,7 +436,7 @@ function MiniTrend({ tone }: { tone: 'violet' | 'green' }) {
   );
 }
 
-function RecentActivityCard() {
+function RecentActivityCard({ activities, loading }: { activities: ClientDashboardActivityItem[]; loading: boolean }) {
   return (
     <Card>
       <div className="flex items-center justify-between gap-4">
@@ -362,11 +446,11 @@ function RecentActivityCard() {
         </button>
       </div>
       <div className="mt-4 divide-y divide-slate-100">
-        {recentActivity.map((activity) => {
-          const Icon = activity.Icon;
-          const styles = toneStyles[activity.tone];
+        {activities.length ? activities.map((activity) => {
+          const Icon = activityIcon(activity.category);
+          const styles = toneStyles[activityTone(activity.category)];
           return (
-            <article key={activity.title} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+            <article key={activity.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
               <span className={`grid h-11 w-11 shrink-0 place-items-center rounded-full ${styles.iconWrap} ${styles.icon}`}>
                 <Icon size={22} />
               </span>
@@ -378,7 +462,7 @@ function RecentActivityCard() {
               <ArrowRight size={16} className="shrink-0 text-slate-500" />
             </article>
           );
-        })}
+        }) : <EmptyState message={loading ? 'Loading recent activity...' : 'No recent activity yet.'} />}
       </div>
     </Card>
   );

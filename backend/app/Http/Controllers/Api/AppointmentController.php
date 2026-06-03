@@ -94,7 +94,7 @@ class AppointmentController extends Controller
             DB::transaction(function () use ($appointment, $validated, $request): void {
                 $slot = AvailabilitySlot::query()->lockForUpdate()->findOrFail($validated['slot_id']);
 
-                if ($slot->slot_status !== 'open') {
+                if ($slot->slot_status !== 'open' || (int) $slot->practitioner_id !== (int) $appointment->practitioner_id || $slot->starts_at->lte(now())) {
                     throw new RuntimeException('Selected slot is no longer available.');
                 }
 

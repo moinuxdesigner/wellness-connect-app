@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Practitioner;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Carbon;
 
 class PractitionerController extends Controller
 {
@@ -29,20 +30,26 @@ class PractitionerController extends Controller
 
     public function slots(Request $request, Practitioner $practitioner): JsonResponse
     {
-        $from = $request->query('from');
-        $to = $request->query('to');
+        $now = now();
+        $from = $request->query('from')
+            ? Carbon::parse((string) $request->query('from'))->startOfDay()
+            : $now;
+        $from = $from->lt($now) ? $now : $from;
+        $to = $request->query('to')
+            ? Carbon::parse((string) $request->query('to'))->endOfDay()
+            : $now->copy()->addDays(30)->endOfDay();
 
-        $query = $practitioner->slots()->where('slot_status', 'open');
-
-        if ($from) {
-            $query->whereDate('starts_at', '>=', $from);
+        if ($to->lt($from)) {
+            return response()->json(['slots' => []]);
         }
 
-        if ($to) {
-            $query->whereDate('starts_at', '<=', $to);
-        }
-
-        $slots = $query->orderBy('starts_at')->get(['id', 'starts_at', 'ends_at', 'slot_status']);
+        $slots = $practitioner->slots()
+            ->where('slot_status', 'open')
+            ->where('starts_at', '>', $now)
+            ->where('starts_at', '>=', $from)
+            ->where('starts_at', '<=', $to)
+            ->orderBy('starts_at')
+            ->get(['id', 'starts_at', 'ends_at', 'slot_status']);
 
         return response()->json(['slots' => $slots]);
     }
