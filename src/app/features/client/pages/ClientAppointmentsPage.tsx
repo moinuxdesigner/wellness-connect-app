@@ -12,6 +12,7 @@ import {
   MapPin,
   Plus,
   Video,
+  X,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ClientAppointment } from '../../shared/services/api';
@@ -174,6 +175,7 @@ export default function ClientAppointmentsPage() {
   const [appointments, setAppointments] = useState<ClientAppointment[]>([]);
   const [notice, setNotice] = useState('');
   const [activeTab, setActiveTab] = useState<EventTab>('today');
+  const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(() => new Date());
   const [visibleMonth, setVisibleMonth] = useState(() => {
     const today = new Date();
@@ -208,146 +210,93 @@ export default function ClientAppointmentsPage() {
     })
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at)), [appointments, selectedDate, weekEnd]);
   const displayedAppointments = activeTab === 'today' ? selectedAppointments : weekAppointments;
-  const monthDays = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
+
+  function handleJumpToSchedule() {
+    const anchorDate = scheduleAnchorDate(appointments);
+    setSelectedDate(anchorDate);
+    setVisibleMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
+  }
+
+  function handleSelectDate(day: Date) {
+    setSelectedDate(day);
+    setActiveTab('today');
+    setIsCalendarOpen(false);
+  }
 
   return (
-    <div className="mx-auto w-full max-w-[1480px] space-y-4 overflow-x-clip pb-0 lg:space-y-5 lg:pb-2">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+    <div className="mx-auto w-full max-w-[1480px] space-y-3 overflow-x-clip pb-0 lg:space-y-5 lg:pb-2">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
         <div>
-          <h1 className="text-[28px] font-semibold leading-[1.12] tracking-tight text-slate-950 sm:text-[32px] lg:text-4xl">My Schedule</h1>
+          <h1 className="text-[26px] font-semibold leading-[1.08] tracking-tight text-slate-950 sm:text-[32px] lg:text-4xl">My Schedule</h1>
           {/* <p className="mt-4 max-w-[330px] text-[18px] leading-[1.55] text-slate-500 sm:max-w-xl sm:text-base sm:leading-7">
             View and manage both training and counselling sessions already on your calendar.
           </p> */}
         </div>
 
-        <button
-          type="button"
-          onClick={() => navigate('/client/intake')}
-          className="hidden min-h-11 items-center justify-center gap-2 rounded-lg bg-violet-600 px-6 text-sm font-semibold text-white shadow-sm transition hover:bg-violet-700 lg:inline-flex"
-        >
-          <Plus size={18} />
-          Book Appointment
-        </button>
+        <div className="flex w-full gap-3 sm:w-auto">
+          <button
+            type="button"
+            onClick={() => setIsCalendarOpen(true)}
+            className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:bg-slate-50 lg:hidden"
+            aria-label="Open calendar"
+          >
+            <CalendarDays size={18} />
+          </button>
+          <button
+            type="button"
+            onClick={() => navigate('/client/intake')}
+            className="inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-lg bg-violet-600 px-4 text-[0.95rem] font-semibold text-white shadow-sm transition hover:bg-violet-700 sm:w-auto sm:flex-none sm:px-6 sm:text-sm"
+          >
+            <Plus size={17} />
+            Book Appointment
+          </button>
+        </div>
       </div>
 
       {notice ? <p className="rounded-lg border border-violet-100 bg-violet-50 px-3 py-2 text-sm text-violet-700">{notice}</p> : null}
 
       <div className="grid min-w-0 gap-5 xl:grid-cols-[minmax(0,0.94fr)_minmax(520px,1.06fr)]">
-        <section className="min-w-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-3 shadow-[0_2px_8px_rgba(15,23,42,0.12)] sm:p-5 lg:p-7">
-          <div className="mb-5 grid grid-cols-[42px_1fr_42px] items-center gap-2 sm:grid-cols-[44px_1fr_96px] sm:gap-3 lg:mb-5">
-            <button
-              type="button"
-              onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() - 1, 1))}
-              className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
-              aria-label="Previous month"
-            >
-              <ChevronLeft size={20} />
-            </button>
-            <h2 className="text-center text-[23px] font-semibold leading-none text-slate-950 sm:text-xl lg:text-2xl">{monthLabel(visibleMonth)}</h2>
-            <div className="flex justify-end gap-2 sm:gap-3">
-              <button
-                type="button"
-                onClick={() => setVisibleMonth((month) => new Date(month.getFullYear(), month.getMonth() + 1, 1))}
-                className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
-                aria-label="Next month"
-              >
-                <ChevronRight size={20} />
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  const anchorDate = scheduleAnchorDate(appointments);
-                  setSelectedDate(anchorDate);
-                  setVisibleMonth(new Date(anchorDate.getFullYear(), anchorDate.getMonth(), 1));
-                }}
-                className="hidden h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:flex"
-                aria-label="Jump to selected schedule"
-              >
-                <CalendarDays size={20} />
-              </button>
-            </div>
-          </div>
+        <AppointmentsCalendarPanel
+          className="hidden lg:block"
+          appointmentsByDay={appointmentsByDay}
+          visibleMonth={visibleMonth}
+          selectedDate={selectedDate}
+          onChangeMonth={setVisibleMonth}
+          onJumpToSchedule={handleJumpToSchedule}
+          onSelectDate={handleSelectDate}
+        />
 
-          <div className="grid min-w-0 grid-cols-7 gap-y-3 border-b border-slate-200 pb-5 sm:gap-y-4 sm:pb-6">
-            {weekdayLabels.map((day) => (
-              <div key={day} className="pb-1 text-center text-[14px] font-semibold text-slate-950 sm:pb-0 sm:text-sm">{day}</div>
-            ))}
-            {monthDays.map((day) => {
-              const key = dateKey(day);
-              const isSelected = key === selectedKey;
-              const dayAppointments = appointmentsByDay[key] ?? [];
-              const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
-              const visibleDotAppointments = isSelected && day.getFullYear() === 2026 && day.getMonth() === 4 && day.getDate() === 13
-                ? dayAppointments.filter((appointment) => appointment.service_type !== 'package').slice(0, 3)
-                : [];
-
-              return (
-                <button
-                  key={key}
-                  type="button"
-                  onClick={() => {
-                    setSelectedDate(day);
-                    setActiveTab('today');
-                  }}
-                  className="group flex h-[43px] min-w-0 flex-col items-center justify-start gap-0.5 rounded-lg text-[16px] font-medium text-slate-950 transition hover:bg-slate-50 sm:h-12 sm:gap-1 sm:text-sm lg:h-14 lg:text-base"
-                  aria-label={`Select ${longDateLabel(day)}`}
-                >
-                  <span className={`grid h-8 w-8 place-items-center rounded-full sm:h-9 sm:w-9 lg:h-10 lg:w-10 ${isSelected ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : isCurrentMonth ? 'text-slate-950' : 'text-slate-300'}`}>
-                    {day.getDate()}
-                  </span>
-                  <span className="flex h-2 items-center justify-center gap-1 sm:hidden">
-                    {visibleDotAppointments.map((appointment) => {
-                      const tone = presentationFor(appointment).tone;
-                      return <span key={appointment.id} className={`h-2 w-2 rounded-full ${toneStyles[tone].dot}`} />;
-                    })}
-                  </span>
-                  <span className="hidden h-2 items-center justify-center gap-1 sm:flex">
-                    {dayAppointments.slice(0, 3).map((appointment) => {
-                      const tone = presentationFor(appointment).tone;
-                      return <span key={appointment.id} className={`h-2 w-2 rounded-full ${toneStyles[tone].dot}`} />;
-                    })}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-
-          <div className="mt-5 grid grid-cols-2 items-center gap-x-3 gap-y-3 text-sm text-slate-500 min-[380px]:grid-cols-3 sm:text-sm lg:flex lg:flex-wrap lg:justify-center lg:gap-x-6">
-            {legendItems.map((item) => (
-              <span key={item.label} className="inline-flex min-w-0 items-center justify-center gap-2">
-                <span className={`h-3 w-3 rounded-full sm:h-2.5 sm:w-2.5 ${toneStyles[item.tone].dot}`} />
-                <span className="truncate">{item.label}</span>
-              </span>
-            ))}
-          </div>
-        </section>
-
-        <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-5">
-          <div className="grid grid-cols-2 border-b border-slate-200 text-xs font-semibold sm:text-sm">
+        <section className="min-w-0 overflow-hidden rounded-lg border border-slate-200 bg-white p-2.5 shadow-sm sm:p-5">
+          <div className="grid grid-cols-2 border-b border-slate-200 text-[0.78rem] font-semibold sm:text-sm">
             <button
               type="button"
               onClick={() => setActiveTab('today')}
-              className={`border-b-2 px-2 py-3 transition sm:px-3 sm:py-4 ${activeTab === 'today' ? 'border-violet-600 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+              className={`border-b-2 px-2 py-2.5 transition sm:px-3 sm:py-4 ${activeTab === 'today' ? 'border-violet-600 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
             >
               Events for today
             </button>
             <button
               type="button"
               onClick={() => setActiveTab('week')}
-              className={`border-b-2 px-2 py-3 transition sm:px-3 sm:py-4 ${activeTab === 'week' ? 'border-violet-600 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
+              className={`border-b-2 px-2 py-2.5 transition sm:px-3 sm:py-4 ${activeTab === 'week' ? 'border-violet-600 text-violet-600' : 'border-transparent text-slate-500 hover:text-slate-900'}`}
             >
-              Upcoming for this week
+              Upcoming events
             </button>
           </div>
 
-          <div className="mt-4 flex items-center justify-between gap-3 sm:mt-5">
-            <h2 className="text-base font-semibold text-slate-950 sm:text-lg lg:text-xl">{longDateLabel(selectedDate)}</h2>
-            <button type="button" className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 sm:h-11 sm:w-11" aria-label="Calendar options">
-              <CalendarDays size={18} />
+          <div className="mt-3 flex items-center justify-between gap-3 sm:mt-5">
+            <h2 className="text-[0.96rem] font-semibold text-slate-950 sm:text-lg lg:text-xl">{longDateLabel(selectedDate)}</h2>
+            <button
+              type="button"
+              onClick={() => setIsCalendarOpen(true)}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-slate-200 text-slate-500 sm:h-11 sm:w-11 lg:hidden"
+              aria-label="Open calendar"
+            >
+              <CalendarDays size={16} />
             </button>
           </div>
 
-          <div className="mt-3 space-y-2.5 sm:mt-4 sm:space-y-3">
+          <div className="mt-2.5 space-y-2 sm:mt-4 sm:space-y-3">
             {displayedAppointments.length === 0 ? (
               <div className="rounded-lg border border-dashed border-slate-200 bg-slate-50 px-4 py-8 text-center">
                 <CalendarDays className="mx-auto text-slate-300" size={30} />
@@ -368,6 +317,37 @@ export default function ClientAppointmentsPage() {
           </div>
         </section>
       </div>
+
+      {isCalendarOpen ? (
+        <div className="fixed inset-0 z-50 bg-slate-950/45 lg:hidden">
+          <div className="flex h-full flex-col bg-slate-50 px-3 pb-3 pt-4">
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold text-slate-950">Calendar</h2>
+                <p className="text-sm text-slate-500">Select a day to view your events.</p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCalendarOpen(false)}
+                className="flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-600 shadow-sm"
+                aria-label="Close calendar"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <AppointmentsCalendarPanel
+              className="min-h-0 flex-1 overflow-y-auto"
+              appointmentsByDay={appointmentsByDay}
+              visibleMonth={visibleMonth}
+              selectedDate={selectedDate}
+              onChangeMonth={setVisibleMonth}
+              onJumpToSchedule={handleJumpToSchedule}
+              onSelectDate={handleSelectDate}
+            />
+          </div>
+        </div>
+      ) : null}
 
       {/* <section className="hidden items-center justify-between gap-4 rounded-lg bg-violet-50 px-6 py-5 shadow-sm lg:flex">
         <div className="flex items-center gap-5">
@@ -393,6 +373,111 @@ export default function ClientAppointmentsPage() {
   );
 }
 
+function AppointmentsCalendarPanel({
+  className = '',
+  appointmentsByDay,
+  visibleMonth,
+  selectedDate,
+  onChangeMonth,
+  onJumpToSchedule,
+  onSelectDate,
+}: {
+  className?: string;
+  appointmentsByDay: Record<string, ClientAppointment[]>;
+  visibleMonth: Date;
+  selectedDate: Date;
+  onChangeMonth: (month: Date) => void;
+  onJumpToSchedule: () => void;
+  onSelectDate: (day: Date) => void;
+}) {
+  const monthDays = useMemo(() => buildMonthDays(visibleMonth), [visibleMonth]);
+  const selectedKey = dateKey(selectedDate);
+
+  return (
+    <section className={`min-w-0 overflow-hidden rounded-[14px] border border-slate-200 bg-white p-3 shadow-[0_2px_8px_rgba(15,23,42,0.12)] sm:p-5 lg:p-7 ${className}`}>
+      <div className="mb-5 grid grid-cols-[42px_1fr_42px] items-center gap-2 sm:grid-cols-[44px_1fr_96px] sm:gap-3 lg:mb-5">
+        <button
+          type="button"
+          onClick={() => onChangeMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() - 1, 1))}
+          className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
+          aria-label="Previous month"
+        >
+          <ChevronLeft size={20} />
+        </button>
+        <h2 className="text-center text-[23px] font-semibold leading-none text-slate-950 sm:text-xl lg:text-2xl">{monthLabel(visibleMonth)}</h2>
+        <div className="flex justify-end gap-2 sm:gap-3">
+          <button
+            type="button"
+            onClick={() => onChangeMonth(new Date(visibleMonth.getFullYear(), visibleMonth.getMonth() + 1, 1))}
+            className="flex h-[42px] w-[42px] items-center justify-center rounded-[11px] border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:h-11 sm:w-11 sm:rounded-lg"
+            aria-label="Next month"
+          >
+            <ChevronRight size={20} />
+          </button>
+          <button
+            type="button"
+            onClick={onJumpToSchedule}
+            className="hidden h-11 w-11 items-center justify-center rounded-lg border border-slate-200 text-slate-500 transition hover:bg-slate-50 sm:flex"
+            aria-label="Jump to selected schedule"
+          >
+            <CalendarDays size={20} />
+          </button>
+        </div>
+      </div>
+
+      <div className="grid min-w-0 grid-cols-7 gap-y-3 border-b border-slate-200 pb-5 sm:gap-y-4 sm:pb-6">
+        {weekdayLabels.map((day) => (
+          <div key={day} className="pb-1 text-center text-[14px] font-semibold text-slate-950 sm:pb-0 sm:text-sm">{day}</div>
+        ))}
+        {monthDays.map((day) => {
+          const key = dateKey(day);
+          const isSelected = key === selectedKey;
+          const dayAppointments = appointmentsByDay[key] ?? [];
+          const isCurrentMonth = day.getMonth() === visibleMonth.getMonth();
+          const visibleDotAppointments = isSelected && day.getFullYear() === 2026 && day.getMonth() === 4 && day.getDate() === 13
+            ? dayAppointments.filter((appointment) => appointment.service_type !== 'package').slice(0, 3)
+            : [];
+
+          return (
+            <button
+              key={key}
+              type="button"
+              onClick={() => onSelectDate(day)}
+              className="group flex h-[43px] min-w-0 flex-col items-center justify-start gap-0.5 rounded-lg text-[16px] font-medium text-slate-950 transition hover:bg-slate-50 sm:h-12 sm:gap-1 sm:text-sm lg:h-14 lg:text-base"
+              aria-label={`Select ${longDateLabel(day)}`}
+            >
+              <span className={`grid h-8 w-8 place-items-center rounded-full sm:h-9 sm:w-9 lg:h-10 lg:w-10 ${isSelected ? 'bg-violet-600 text-white shadow-lg shadow-violet-200' : isCurrentMonth ? 'text-slate-950' : 'text-slate-300'}`}>
+                {day.getDate()}
+              </span>
+              <span className="flex h-2 items-center justify-center gap-1 sm:hidden">
+                {visibleDotAppointments.map((appointment) => {
+                  const tone = presentationFor(appointment).tone;
+                  return <span key={appointment.id} className={`h-2 w-2 rounded-full ${toneStyles[tone].dot}`} />;
+                })}
+              </span>
+              <span className="hidden h-2 items-center justify-center gap-1 sm:flex">
+                {dayAppointments.slice(0, 3).map((appointment) => {
+                  const tone = presentationFor(appointment).tone;
+                  return <span key={appointment.id} className={`h-2 w-2 rounded-full ${toneStyles[tone].dot}`} />;
+                })}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-5 grid grid-cols-2 items-center gap-x-3 gap-y-3 text-sm text-slate-500 min-[380px]:grid-cols-3 sm:text-sm lg:flex lg:flex-wrap lg:justify-center lg:gap-x-6">
+        {legendItems.map((item) => (
+          <span key={item.label} className="inline-flex min-w-0 items-center justify-center gap-2">
+            <span className={`h-3 w-3 rounded-full sm:h-2.5 sm:w-2.5 ${toneStyles[item.tone].dot}`} />
+            <span className="truncate">{item.label}</span>
+          </span>
+        ))}
+      </div>
+    </section>
+  );
+}
+
 function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppointment; onCancel: () => Promise<void>; onBook: () => void }) {
   const presentation = presentationFor(appointment);
   const styles = toneStyles[presentation.tone];
@@ -402,12 +487,12 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
   const canCancel = isActionable(appointment);
 
   return (
-    <article className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)] transition hover:border-slate-300 hover:shadow-[0_16px_34px_-26px_rgba(15,23,42,0.42)] sm:p-3.5">
+    <article className="relative overflow-hidden rounded-lg border border-slate-200 bg-white p-2.5 shadow-[0_10px_28px_-24px_rgba(15,23,42,0.34)] transition hover:border-slate-300 hover:shadow-[0_16px_34px_-26px_rgba(15,23,42,0.42)] sm:p-3.5">
       <span className={`absolute inset-y-0 left-0 w-1 ${styles.rail}`} />
-      <div className="grid min-w-0 grid-cols-[52px_minmax(0,1fr)] items-start gap-3 pl-1 sm:grid-cols-[68px_42px_minmax(0,1fr)_auto] sm:items-center sm:pl-0">
-        <div className="pl-1 sm:pl-1">
-          <p className="text-sm font-semibold leading-none text-slate-950">{timeLabel(appointment.starts_at)}</p>
-          <p className="mt-1.5 text-xs font-medium text-slate-400">{durationLabel(appointment)}</p>
+      <div className="grid min-w-0 grid-cols-[46px_minmax(0,1fr)] items-start gap-2 pl-0.5 sm:grid-cols-[68px_42px_minmax(0,1fr)_auto] sm:items-center sm:gap-3 sm:pl-0">
+        <div className="pl-0.5 sm:pl-1">
+          <p className="text-[0.78rem] font-semibold leading-none text-slate-950 sm:text-sm">{timeLabel(appointment.starts_at)}</p>
+          <p className="mt-1 text-[0.68rem] font-medium leading-none text-slate-400 sm:mt-1.5 sm:text-xs">{durationLabel(appointment)}</p>
         </div>
 
         <div className={`hidden h-10 w-10 place-items-center rounded-lg sm:grid ${styles.iconWrap}`}>
@@ -415,16 +500,16 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
         </div>
 
         <div className="min-w-0">
-          <div className="flex min-w-0 items-center gap-2">
-            <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg sm:hidden ${styles.iconWrap}`}>
-              <Icon size={19} className={styles.icon} />
+          <div className="flex min-w-0 items-center gap-1.5 sm:gap-2">
+            <span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg sm:hidden ${styles.iconWrap}`}>
+              <Icon size={17} className={styles.icon} />
             </span>
-            <h3 className="truncate text-sm font-semibold leading-5 text-slate-950 sm:text-base">{presentation.title}</h3>
-            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold ${styles.pill}`}>{statusLabel(appointment)}</span>
+            <h3 className="truncate text-[0.82rem] font-semibold leading-4 text-slate-950 sm:text-base sm:leading-5">{presentation.title}</h3>
+            <span className={`shrink-0 rounded-full px-1.5 py-0.5 text-[10px] font-semibold sm:px-2 sm:text-[11px] ${styles.pill}`}>{statusLabel(appointment)}</span>
           </div>
-          <p className="mt-0.5 truncate text-sm text-slate-500">{practitionerName(appointment)}</p>
-          <p className="mt-1 flex items-center gap-1.5 text-xs font-medium text-slate-400">
-            {appointment.mode === 'in_person' ? <MapPin size={13} /> : <Video size={13} />}
+          <p className="mt-0.5 truncate text-[0.76rem] text-slate-500 sm:text-sm">{practitionerName(appointment)}</p>
+          <p className="mt-0.5 flex items-center gap-1 text-[0.68rem] font-medium text-slate-400 sm:mt-1 sm:gap-1.5 sm:text-xs">
+            {appointment.mode === 'in_person' ? <MapPin size={11} /> : <Video size={11} />}
             {location}
           </p>
         </div>
@@ -433,7 +518,7 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
           {canJoin ? (
             <button
               type="button"
-              className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-emerald-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-200"
+              className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-emerald-100 bg-white text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50 focus:outline-none focus:ring-2 focus:ring-emerald-200 sm:h-9 sm:w-9"
               aria-label="Join Google Meet session"
               title="Join Google Meet"
             >
@@ -442,17 +527,18 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
           ) : null}
           <button
             type="button"
-            className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-200"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50 hover:text-slate-800 focus:outline-none focus:ring-2 focus:ring-violet-200 sm:h-9 sm:w-9"
             aria-label="View appointment details"
             title="View details"
           >
-            <Eye size={17} />
+            <Eye size={15} className="sm:hidden" />
+            <Eye size={17} className="hidden sm:block" />
           </button>
           {!canJoin && appointment.status !== 'cancelled' && appointment.status !== 'completed' ? (
             <button
               type="button"
               onClick={appointment.service_type === 'training' ? onBook : onCancel}
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-200 sm:h-9 sm:px-3 sm:text-xs"
             >
               {appointment.service_type === 'training' ? 'Reschedule' : 'Cancel'}
             </button>
@@ -461,7 +547,7 @@ function EventCard({ appointment, onCancel, onBook }: { appointment: ClientAppoi
             <button
               type="button"
               onClick={onCancel}
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-xs font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-200"
+              className="inline-flex h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-2.5 text-[11px] font-semibold text-slate-600 shadow-sm transition hover:bg-slate-50 hover:text-slate-900 focus:outline-none focus:ring-2 focus:ring-violet-200 sm:h-9 sm:px-3 sm:text-xs"
             >
               Cancel
             </button>

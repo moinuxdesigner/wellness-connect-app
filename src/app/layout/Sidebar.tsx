@@ -39,7 +39,7 @@ export default function Sidebar({
         initial={false}
         animate={{ width }}
         transition={{ type: 'spring', stiffness: 240, damping: 28 }}
-        className="fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white lg:block"
+        className="fixed inset-y-0 left-0 z-30 hidden overflow-hidden border-r border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-950 lg:block"
       >
         <SidebarContent collapsed={collapsed} items={items} onToggle={onToggle} title={title} />
       </motion.aside>
@@ -50,14 +50,14 @@ export default function Sidebar({
             <motion.button
               type="button"
               aria-label="Close menu"
-              className="fixed inset-0 z-40 bg-slate-950/40 lg:hidden"
+              className="fixed inset-0 z-40 bg-slate-950/60 lg:hidden"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={onMobileClose}
             />
             <motion.aside
-              className="fixed inset-y-0 left-0 z-50 w-[min(88vw,320px)] overflow-hidden border-r border-slate-200 bg-white shadow-2xl lg:hidden"
+              className="fixed inset-y-0 left-0 z-50 w-[min(88vw,320px)] overflow-hidden border-r border-slate-200 bg-white shadow-2xl dark:border-slate-800 dark:bg-slate-950 lg:hidden"
               initial={{ x: '-100%' }}
               animate={{ x: 0 }}
               exit={{ x: '-100%' }}
@@ -89,7 +89,7 @@ function SidebarContent({
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-white p-4">
+    <div className="relative flex h-full flex-col overflow-hidden bg-white p-4 text-slate-900 dark:bg-slate-950 dark:text-slate-100">
       {title === 'Client Portal' ? (
         <img
           src={clientSidebarBg}
@@ -108,7 +108,7 @@ function SidebarContent({
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -4 }}
               transition={{ duration: 0.15 }}
-              className="text-xs font-semibold uppercase tracking-widest text-indigo-600"
+              className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-300"
             >
               WC
             </motion.p>
@@ -120,15 +120,15 @@ function SidebarContent({
               exit={{ opacity: 0, x: -8 }}
               transition={{ duration: 0.18 }}
             >
-              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">WellnessConnect</p>
-              <h1 className="text-xl font-semibold text-slate-900">{title}</h1>
+              <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600 dark:text-indigo-300">WellnessConnect</p>
+              <h1 className="text-xl font-semibold text-slate-900 dark:text-slate-100">{title}</h1>
             </motion.div>
           )}
         </AnimatePresence>
         <button
           type="button"
           onClick={onMobileClose ?? onToggle}
-          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100"
+          className="rounded-lg border border-slate-200 p-2 text-slate-600 hover:bg-slate-100 dark:border-slate-700 dark:text-slate-300 dark:hover:bg-slate-800"
           aria-label={onMobileClose ? 'Close sidebar' : collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
         >
           {onMobileClose ? <X size={16} /> : collapsed ? <PanelLeftOpen size={16} /> : <PanelLeftClose size={16} />}
@@ -148,7 +148,7 @@ function SidebarContent({
                 `flex items-center rounded-xl py-2 text-sm font-medium ${
                   collapsed ? 'justify-center px-2' : 'gap-2 px-3'
                 } ${
-                  isActive ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
+                  isActive ? 'bg-indigo-50 text-indigo-700 dark:bg-indigo-500/15 dark:text-indigo-200' : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:bg-slate-800 dark:hover:text-white'
                 }`
               }
             >
@@ -170,7 +170,7 @@ function SidebarContent({
           );
         })}
       </nav>
-      <div className="relative z-10 mt-3 border-t border-slate-200 pt-3">
+      <div className="relative z-10 mt-3 border-t border-slate-200 pt-3 dark:border-slate-800">
         <button
           type="button"
           disabled={isLoggingOut}
@@ -186,7 +186,7 @@ function SidebarContent({
               setIsLoggingOut(false);
             }
           }}
-          className={`flex w-full items-center rounded-xl py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 ${
+          className={`flex w-full items-center rounded-xl py-2 text-sm font-medium text-rose-700 transition hover:bg-rose-50 disabled:cursor-not-allowed disabled:opacity-60 dark:text-rose-300 dark:hover:bg-rose-500/10 ${
             collapsed ? 'justify-center px-2' : 'gap-2 px-3'
           }`}
         >

@@ -48,23 +48,23 @@ export default function LoginPage() {
         className="flex min-h-screen w-full max-w-[1920px] flex-col overflow-hidden rounded-[0px] border border-[#ebe4ff] bg-white shadow-[0_24px_80px_rgba(95,67,230,0.12)]"
         style={{ background: shellBackground }}
       >
-        <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-[57%_43%]">
-          <section className="flex h-full flex-col items-center px-6 pb-8 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
+        <div className="grid min-h-0 flex-1 items-stretch lg:grid-cols-[40%_60%]">
+          <section className="flex h-full flex-col items-center px-5 pb-5 pt-4 sm:px-8 sm:pb-8 sm:pt-7 lg:px-12 lg:pb-12 lg:pt-8 xl:px-16">
             <BrandHeader />
 
-            <div className="flex flex-1 items-center">
-              <div className="mx-auto w-full max-w-[540px] pt-8 lg:pt-4">
-                <div className="space-y-4 text-center">
-                  <h1 className="text-[1rem] font-bold leading-[0.98] tracking-[-0.04em] text-[#10155e] sm:text-[2rem]">
+            <div className="flex flex-1 items-start sm:items-center">
+              <div className="mx-auto w-full max-w-[540px] pt-3 sm:pt-8 lg:pt-4">
+                <div className="space-y-3 text-center sm:space-y-4">
+                  <h1 className="text-[1.7rem] font-bold leading-[1.02] tracking-[-0.045em] text-[#10155e] sm:text-[2rem]">
                     Welcome back! <span className="align-[8%] text-[0.88em]">{waveEmoji}</span>
                   </h1>
-                  <p className="mx-auto max-w-[520px] text-[1.08rem] font-medium leading-8 text-[#53639b] sm:text-[1.12rem]">
+                  <p className="mx-auto max-w-[520px] text-[1rem] font-medium leading-7 text-[#53639b] sm:text-[1.12rem] sm:leading-8">
                     Sign in to continue your wellness journey.
                   </p>
                 </div>
 
                 <form
-                  className="mt-10 space-y-7"
+                  className="mt-7 space-y-5 sm:mt-10 sm:space-y-7"
                   onSubmit={async (event) => {
                     event.preventDefault();
                     setNotice('');
@@ -82,12 +82,12 @@ export default function LoginPage() {
                     }
                   }}
                 >
-                  <div className="space-y-2.5">
-                    <label className="block text-[1.05rem] font-semibold text-[#14185c]">Email address</label>
+                  <div className="space-y-2 sm:space-y-2.5">
+                    <label className="block text-[0.95rem] font-semibold text-[#14185c] sm:text-[1.05rem]">Email address</label>
                     <InputShell tone="active" icon={<Mail className="h-5 w-5" strokeWidth={2.2} />}>
                       <input
                         autoComplete="email"
-                        className="w-full bg-transparent text-[1rem] font-medium text-[#151a5f] placeholder:text-[#959dbb] focus:outline-none"
+                        className="w-full bg-transparent text-[0.98rem] font-medium text-[#151a5f] placeholder:text-[#959dbb] focus:outline-none sm:text-[1rem]"
                         type="email"
                         value={email}
                         onChange={(event) => setEmail(event.target.value)}
@@ -97,8 +97,8 @@ export default function LoginPage() {
                     </InputShell>
                   </div>
 
-                  <div className="space-y-2.5">
-                    <label className="block text-[1.05rem] font-semibold text-[#14185c]">Password</label>
+                  <div className="space-y-2 sm:space-y-2.5">
+                    <label className="block text-[0.95rem] font-semibold text-[#14185c] sm:text-[1.05rem]">Password</label>
                     <InputShell
                       icon={<LockKeyhole className="h-5 w-5" strokeWidth={2.15} />}
                       trailing={
@@ -109,13 +109,13 @@ export default function LoginPage() {
                           aria-label={showPassword ? 'Hide password' : 'Show password'}
                         >
                           {showPassword ? <EyeOff className="h-5 w-5" strokeWidth={2} /> : <Eye className="h-5 w-5" strokeWidth={2} />}
-                          <span className="text-[1.02rem]">{showPassword ? 'Hide' : 'Show'}</span>
+                          <span className="text-[0.96rem] sm:text-[1.02rem]">{showPassword ? 'Hide' : 'Show'}</span>
                         </button>
                       }
                     >
                       <input
                         autoComplete="current-password"
-                        className="w-full bg-transparent text-[1rem] font-medium text-[#151a5f] placeholder:text-[#959dbb] focus:outline-none"
+                        className="w-full bg-transparent text-[0.98rem] font-medium text-[#151a5f] placeholder:text-[#959dbb] focus:outline-none sm:text-[1rem]"
                         type={showPassword ? 'text' : 'password'}
                         value={password}
                         onChange={(event) => setPassword(event.target.value)}
@@ -125,7 +125,7 @@ export default function LoginPage() {
                     </InputShell>
                   </div>
 
-                  <div className="flex items-center justify-between gap-4 text-[1.02rem]">
+                  <div className="flex items-center justify-between gap-4 text-[0.95rem] sm:text-[1.02rem]">
                     <button
                       type="button"
                       onClick={() => setRememberMe((value) => !value)}
@@ -147,7 +147,7 @@ export default function LoginPage() {
                   {notice ? <Message tone="warning">{notice}</Message> : null}
 
                   <button
-                    className="inline-flex h-[60px] w-full items-center justify-center gap-3 rounded-[16px] bg-[linear-gradient(90deg,#4b27ff_0%,#6f3dff_100%)] px-6 text-[1.18rem] font-semibold text-white shadow-[0_18px_36px_rgba(89,45,255,0.28)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-60"
+                    className="inline-flex h-[56px] w-full items-center justify-center gap-3 rounded-[16px] bg-[linear-gradient(90deg,#4b27ff_0%,#6f3dff_100%)] px-6 text-[1.08rem] font-semibold text-white shadow-[0_18px_36px_rgba(89,45,255,0.28)] transition hover:brightness-[1.03] disabled:cursor-not-allowed disabled:opacity-60 sm:h-[60px] sm:text-[1.18rem]"
                     type="submit"
                     disabled={loading}
                   >
@@ -155,20 +155,20 @@ export default function LoginPage() {
                     <ArrowRight className="h-5 w-5" strokeWidth={2.4} />
                   </button>
 
-                  <div className="flex items-center gap-5 pt-1">
+                  <div className="flex items-center gap-4 pt-0.5 sm:gap-5 sm:pt-1">
                     <span className="h-px flex-1 bg-[#e4ddf8]" />
-                    <span className="text-[1.03rem] font-semibold tracking-[0.14em] text-[#6675aa]">OR</span>
+                    <span className="text-[0.98rem] font-semibold tracking-[0.12em] text-[#6675aa] sm:text-[1.03rem] sm:tracking-[0.14em]">OR</span>
                     <span className="h-px flex-1 bg-[#e4ddf8]" />
                   </div>
 
-                  <div className="space-y-4">
+                  <div className="space-y-3 sm:space-y-4">
                     <button
                       type="button"
                       onClick={() => {
                         setNotice('');
                         setGoogleNotice('Google sign-in is coming soon. Please continue with email and password for now.');
                       }}
-                      className="inline-flex h-[60px] w-full items-center justify-center gap-4 rounded-[16px] border border-[#d9d1f5] bg-white px-6 text-[1.04rem] font-semibold text-[#182062] shadow-[0_12px_24px_rgba(122,102,211,0.08)] transition hover:border-[#cbbff8] hover:bg-[#fcfbff]"
+                      className="inline-flex h-[56px] w-full items-center justify-center gap-4 rounded-[16px] border border-[#d9d1f5] bg-white px-6 text-[1rem] font-semibold text-[#182062] shadow-[0_12px_24px_rgba(122,102,211,0.08)] transition hover:border-[#cbbff8] hover:bg-[#fcfbff] sm:h-[60px] sm:text-[1.04rem]"
                     >
                       <GoogleIcon />
                       <span>Continue with Google</span>
@@ -178,7 +178,7 @@ export default function LoginPage() {
                   </div>
                 </form>
 
-                <p className="mt-8 text-center text-[1.02rem] font-medium text-[#54639a]">
+                <p className="mt-6 text-center text-[0.98rem] font-medium text-[#54639a] sm:mt-8 sm:text-[1.02rem]">
                   Don&apos;t have an account?{' '}
                   <Link className="font-semibold text-[#5b2dff] transition hover:text-[#4319dd]" to="/signup">
                     Sign up
@@ -189,7 +189,7 @@ export default function LoginPage() {
           </section>
 
           <section
-            className="relative flex h-full min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] lg:border-l lg:border-t-0"
+            className="relative hidden h-full min-h-[620px] flex-col overflow-hidden border-t border-[#efebff] lg:flex lg:border-l lg:border-t-0"
             style={{ background: rightPanelBackground }}
           >
             {/* Support Button */}
@@ -233,12 +233,16 @@ function BrandHeader() {
   return (
     <div className="mx-auto flex w-full max-w-[540px] justify-center">
       <Link to="/" className="inline-flex items-center gap-3 rounded-2xl transition hover:opacity-95">
-        <img src={brandLogo} alt="Aura Wellness logo icon" className="h-[58px] w-[58px] shrink-0 object-contain" />
+        <img
+          src={brandLogo}
+          alt="Aura Wellness logo icon"
+          className="h-[46px] w-[46px] shrink-0 object-contain sm:h-[58px] sm:w-[58px]"
+        />
         <div className="flex min-w-0 flex-col gap-1">
           <img
             src={brandTitle}
             alt="Aura Wellness Connect"
-            className="h-[32px] w-auto max-w-[270px] object-contain sm:h-[55px] sm:max-w-[304px]"
+            className="h-[24px] w-auto max-w-[190px] object-contain sm:h-[55px] sm:max-w-[304px]"
           />
           {/* <p className="pl-0.5 text-[1.02rem] font-medium text-[#5a689e]">Connect. Heal. Thrive.</p> */}
         </div>
@@ -260,7 +264,7 @@ function InputShell({
 }) {
   return (
     <div
-      className={`flex h-[60px] items-center gap-3 rounded-[16px] border bg-white px-5 shadow-[0_10px_24px_rgba(111,92,220,0.05)] transition ${
+      className={`flex h-[56px] items-center gap-3 rounded-[16px] border bg-white px-4 shadow-[0_10px_24px_rgba(111,92,220,0.05)] transition sm:h-[60px] sm:px-5 ${
         tone === 'active' ? 'border-[#6c4eff] shadow-[0_14px_28px_rgba(91,45,255,0.10)]' : 'border-[#d7d9ef]'
       }`}
     >

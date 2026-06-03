@@ -3,6 +3,7 @@ import { Outlet } from 'react-router';
 import DashboardLayout from '../../layout/DashboardLayout';
 import { getAuthState } from '../auth/auth';
 import { hasPermission } from '../auth/permissions';
+import type { NavItem } from '../../layout/Sidebar';
 
 export const clientNavItems = [
   { label: 'Home', to: '/client', icon: HeartPulse, end: true },
@@ -14,9 +15,22 @@ export const clientNavItems = [
   { label: 'Activity', to: '/client/activity', icon: Activity, permission: 'client.activity_logs.view' },
 ];
 
+const clientBottomNavItems: NavItem[] = [
+  { label: 'Home', to: '/client', icon: HeartPulse, end: true },
+  { label: 'Appointments', to: '/client/appointments', icon: Calendar, permission: 'client.appointments.view' },
+  { label: 'Progress', to: '/client/programs', icon: Activity },
+];
+
 export function ClientLayout() {
   const user = getAuthState().user;
-  return <DashboardLayout navItems={clientNavItems.filter((item) => !item.permission || hasPermission(user, item.permission))} title="Client Portal"><Outlet /></DashboardLayout>;
+  const allowedNavItems = clientNavItems.filter((item) => !item.permission || hasPermission(user, item.permission));
+  const allowedBottomNavItems = clientBottomNavItems.filter((item) => !item.permission || hasPermission(user, item.permission));
+
+  return (
+    <DashboardLayout navItems={allowedNavItems} bottomNavItems={allowedBottomNavItems} title="Client Portal">
+      <Outlet />
+    </DashboardLayout>
+  );
 }
 
 export function ClientPageTitle({ title, subtitle }: { title: string; subtitle: string }) {

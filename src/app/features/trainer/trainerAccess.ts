@@ -45,6 +45,22 @@ function localTrainerAccessState(): TrainerAccessState {
   }
 }
 
+function accessStateFromApplication(application: TrainerApplicationRecord): TrainerAccessState {
+  switch (application.status) {
+    case 'approved':
+      return { status: 'approved', application, adminRemarks: application.adminRemarks };
+    case 'needs_resubmission':
+      return { status: 'needs_resubmission', application, adminRemarks: application.adminRemarks };
+    case 'rejected':
+      return { status: 'rejected', application, adminRemarks: application.adminRemarks };
+    case 'draft':
+      return { status: 'onboarding_pending', application, adminRemarks: application.adminRemarks };
+    case 'submitted':
+    case 'under_review':
+      return { status: 'pending_review', application, adminRemarks: application.adminRemarks };
+  }
+}
+
 export async function fetchTrainerAccessState(): Promise<TrainerAccessState> {
   const auth = getAuthState();
   const currentToken = auth.token ?? null;
@@ -77,7 +93,7 @@ export async function fetchTrainerAccessState(): Promise<TrainerAccessState> {
     });
 
       if (!response.ok) {
-        return resolveAndCache({ status: 'onboarding_pending', application: null, adminRemarks: '' });
+        return resolveAndCache(localTrainerAccessState());
       }
 
       const data = await response.json() as TrainerAccessState;
@@ -88,13 +104,16 @@ export async function fetchTrainerAccessState(): Promise<TrainerAccessState> {
           }
         : null;
 
-      return resolveAndCache({
+      const nextAccess = {
         status: data.status,
         application,
         adminRemarks: data.adminRemarks ?? application?.adminRemarks ?? '',
-      });
+      } satisfies TrainerAccessState;
+      const localAccess = localTrainerAccessState();
+
+      return resolveAndCache(nextAccess.status === 'onboarding_pending' && localAccess.status !== 'onboarding_pending' ? localAccess : nextAccess);
     } catch {
-      return resolveAndCache({ status: 'onboarding_pending', application: null, adminRemarks: '' });
+      return resolveAndCache(localTrainerAccessState());
     } finally {
       pendingTrainerAccessRequest = null;
     }
@@ -111,5 +130,11 @@ export function getCachedTrainerAccessState() {
 export function invalidateTrainerAccessState() {
   cachedTrainerAccessState = null;
   cachedTrainerAccessToken = null;
+  pendingTrainerAccessRequest = null;
+}
+
+export function setCachedTrainerAccessStateFromApplication(application: TrainerApplicationRecord) {
+  cachedTrainerAccessState = accessStateFromApplication(application);
+  cachedTrainerAccessToken = getAuthState().token ?? null;
   pendingTrainerAccessRequest = null;
 }

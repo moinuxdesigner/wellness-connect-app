@@ -93,14 +93,21 @@ export default function ClientDashboardPage() {
         <p className="text-base leading-6 text-slate-500 sm:text-lg">Let's build a healthier mind and body.</p>
       </header>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <section className="grid gap-4 lg:hidden">
+        <MetricCard icon={CalendarDays} tone="violet" label="Next Session" value="6:00 PM" badge="Training" />
+        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value="3" onClick={() => navigate('/client/tasks')} />
+        <DailyCheckInCard />
+        <QuickActionsCard onNavigate={navigate} />
+      </section>
+
+      <section className="hidden gap-4 sm:grid-cols-2 xl:grid-cols-4 lg:grid">
         <MetricCard icon={CalendarDays} tone="violet" label="Next Session" value="6:00 PM" badge="Training" />
         <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value="3" onClick={() => navigate('/client/tasks')} />
         <MetricCard icon={Leaf} tone="green" label="Active Program" value="Personal Wellness Plan" />
         <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value="Active" valueClassName="text-emerald-600" />
       </section>
 
-      <section className="grid gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(420px,0.98fr)]">
+      <section className="hidden gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(420px,0.98fr)] lg:grid">
         <div className="space-y-5">
           <Card>
             <div className="flex items-start justify-between gap-4">

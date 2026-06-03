@@ -22,10 +22,29 @@
   --app-radius-md: 0.5rem;
 }
 
+.dark {
+  color-scheme: dark;
+  --ds-brand: #8ea7ff;
+  --ds-brand-strong: #b7c6ff;
+  --ds-surface: #0f172a;
+  --ds-surface-muted: #111827;
+  --ds-border: #334155;
+  --ds-text-primary: #f8fafc;
+  --ds-text-secondary: #cbd5e1;
+  --ds-success: #86efac;
+  --ds-warning: #fcd34d;
+  --ds-danger: #fda4af;
+}
+
 body {
   margin: 0;
   background: #f8fafc;
   color: #0f172a;
+}
+
+.dark body {
+  background: #020617;
+  color: #f8fafc;
 }
 
 body {
@@ -34,6 +53,98 @@ body {
 
 .dashboard-content {
   margin-left: 0;
+}
+
+.dashboard-theme {
+  background:
+    radial-gradient(circle at top left, rgb(238 242 255 / 0.72), transparent 34rem),
+    #f8fafc;
+}
+
+.dark .dashboard-theme {
+  background:
+    radial-gradient(circle at top left, rgb(79 70 229 / 0.14), transparent 34rem),
+    #020617;
+}
+
+.dark .dashboard-theme :where(.bg-white, .bg-white\/90, .bg-white\/95, .bg-slate-50) {
+  background-color: rgb(15 23 42 / 0.92);
+}
+
+.dark .dashboard-theme :where(.bg-slate-100) {
+  background-color: rgb(30 41 59 / 0.92);
+}
+
+.dark .dashboard-theme :where(.bg-slate-200) {
+  background-color: rgb(51 65 85 / 0.92);
+}
+
+.dark .dashboard-theme :where(.bg-indigo-50, .bg-violet-50, .bg-blue-50) {
+  background-color: rgb(99 102 241 / 0.16);
+}
+
+.dark .dashboard-theme :where(.bg-emerald-50, .bg-green-50) {
+  background-color: rgb(16 185 129 / 0.16);
+}
+
+.dark .dashboard-theme :where(.bg-amber-50, .bg-yellow-50) {
+  background-color: rgb(245 158 11 / 0.16);
+}
+
+.dark .dashboard-theme :where(.bg-rose-50, .bg-red-50) {
+  background-color: rgb(244 63 94 / 0.16);
+}
+
+.dark .dashboard-theme :where(.border-slate-100, .border-slate-200, .border-slate-300) {
+  border-color: rgb(51 65 85 / 0.92);
+}
+
+.dark .dashboard-theme :where(.divide-slate-100 > :not([hidden]) ~ :not([hidden]), .divide-slate-200 > :not([hidden]) ~ :not([hidden])) {
+  border-color: rgb(51 65 85 / 0.92);
+}
+
+.dark .dashboard-theme :where(.text-slate-950, .text-slate-900, .text-slate-800) {
+  color: #f8fafc;
+}
+
+.dark .dashboard-theme :where(.text-slate-700, .text-slate-600) {
+  color: #cbd5e1;
+}
+
+.dark .dashboard-theme :where(.text-slate-500, .text-slate-400) {
+  color: #94a3b8;
+}
+
+.dark .dashboard-theme :where(.text-indigo-700, .text-indigo-600, .text-violet-700, .text-violet-600, .text-blue-700, .text-blue-600) {
+  color: #c4b5fd;
+}
+
+.dark .dashboard-theme :where(.text-emerald-700, .text-emerald-600, .text-green-700, .text-green-600) {
+  color: #86efac;
+}
+
+.dark .dashboard-theme :where(.text-amber-700, .text-amber-600, .text-yellow-700, .text-yellow-600) {
+  color: #fcd34d;
+}
+
+.dark .dashboard-theme :where(.text-rose-700, .text-rose-600, .text-red-700, .text-red-600) {
+  color: #fda4af;
+}
+
+.dark .dashboard-theme :where(input, textarea, select) {
+  color: #f8fafc;
+}
+
+.dark .dashboard-theme :where(input, textarea, select)::placeholder {
+  color: #64748b;
+}
+
+.dark .dashboard-theme :where(.shadow-sm, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl) {
+  box-shadow: 0 16px 40px rgb(0 0 0 / 0.28);
+}
+
+.dark .dashboard-theme :where(.hover\:bg-white:hover, .hover\:bg-slate-50:hover, .hover\:bg-slate-100:hover) {
+  background-color: rgb(30 41 59 / 0.92);
 }
 
 .landing-hero-support {

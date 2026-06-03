@@ -7,28 +7,44 @@ import 'cropperjs/dist/cropper.css';
 import {
   ArrowLeft,
   ArrowRight,
+  BarChart3,
   CalendarDays,
   Camera,
   Check,
+  CheckCircle2,
   CircleUserRound,
   CreditCard,
+  Download,
   Dumbbell,
+  Eye,
+  EyeOff,
   FileBadge2,
   FileCheck2,
   GraduationCap,
+  Heart,
+  Hourglass,
   ImagePlus,
+  LockKeyhole,
+  Mail,
   MapPin,
   Minus,
+  Phone,
   Plus,
   RotateCcw,
   ShieldCheck,
   Sparkles,
+  Square,
+  SquareCheck,
+  TriangleAlert,
   Upload,
   UserRound,
+  Users,
   Video,
   X,
 } from 'lucide-react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
+import trainerOnboardingIllustration from '../../../assets/pt-onboard/Step-1-Illustration.png';
+import trainerWelcomeIllustration from '../../../assets/pt-onboard/Step-2-Illustration.png';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp';
@@ -74,9 +90,62 @@ import {
   verifyTrainerRegistrationOtp,
   type TrainerOtpChallenge,
 } from './trainerApplicationsApi';
+import { setCachedTrainerAccessStateFromApplication } from './trainerAccess';
 
 const reviewScreenIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === 'review');
 const successScreenIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === 'success');
+
+const trainerEntryShellBackground =
+  'radial-gradient(circle at 16% 12%, rgba(255,255,255,0.98) 0%, rgba(250,247,255,0.96) 32%, rgba(244,240,255,0.98) 100%)';
+
+const trainerEntryHeroBackground =
+  'radial-gradient(circle at 22% 18%, rgba(255,255,255,0.95) 0%, rgba(240,235,255,0.9) 38%, rgba(235,230,255,0.86) 100%)';
+
+const trainerEntryPanelBackground =
+  'radial-gradient(circle at 50% 8%, rgba(255,255,255,0.94) 0%, rgba(252,251,255,0.98) 100%)';
+
+const trainerEntryHighlights = [
+  {
+    title: 'Professional tools',
+    description: 'Everything you need to coach with confidence.',
+    icon: Sparkles,
+  },
+  {
+    title: 'Secure & private',
+    description: 'Your data and clients are always protected.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Grow your impact',
+    description: 'Help more people and build your brand.',
+    icon: Users,
+  },
+] as const;
+
+const trainerWelcomeHighlights = [
+  {
+    title: 'Professional profile',
+    description: 'Showcase your expertise with confidence.',
+    icon: CircleUserRound,
+  },
+  {
+    title: 'Client trust',
+    description: 'Build credibility and stronger relationships.',
+    icon: ShieldCheck,
+  },
+  {
+    title: 'Guided setup',
+    description: 'A simple step-by-step onboarding experience.',
+    icon: Sparkles,
+  },
+] as const;
+
+const trainerWelcomeGenderOptions = [
+  { label: 'Woman', value: 'Woman', icon: UserRound, tone: 'text-[#7c5cff]' },
+  { label: 'Man', value: 'Man', icon: UserRound, tone: 'text-[#7c5cff]' },
+  { label: 'Non-binary', value: 'Non-binary', icon: Sparkles, tone: 'text-[#2fc2bc]' },
+  { label: 'Prefer not to say', value: 'Prefer not to say', icon: LockKeyhole, tone: 'text-[#7c5cff]' },
+] as const;
 
 const animationIcons: Record<TrainerAnimationKey, typeof Sparkles> = {
   personalInfo: UserRound,
@@ -119,7 +188,10 @@ function readStoredState() {
         : 0;
 
     return {
-      values: mergeTrainerOnboardingValues(existingApplication?.values ?? parsed.values),
+      values: withPreservedPhotoPreview(
+        mergeTrainerOnboardingValues(existingApplication?.values ?? parsed.values),
+        parsed.values,
+      ),
       screenIndex: nextScreenIndex,
       submitted: Boolean(existingApplication ?? parsed.submitted),
       submittedAt: existingApplication?.submittedAt ?? parsed.submittedAt ?? null,
@@ -185,6 +257,51 @@ function formatSavedTime(value: string | null) {
   const parsed = new Date(value);
   if (Number.isNaN(parsed.getTime())) return 'Draft autosaved';
   return `Draft autosaved at ${parsed.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function withPreservedPhotoPreview(
+  nextValues: TrainerOnboardingFormValues,
+  fallbackValues?: Partial<TrainerOnboardingFormValues> | null,
+) {
+  const previewUrl = fallbackValues?.photo?.file?.previewUrl;
+  if (!previewUrl || !nextValues.photo.file || nextValues.photo.file.previewUrl) {
+    return nextValues;
+  }
+
+  return {
+    ...nextValues,
+    photo: {
+      ...nextValues.photo,
+      file: {
+        ...nextValues.photo.file,
+        previewUrl,
+      },
+    },
+  };
+}
+
+function toLocalPersistedValues(values: TrainerOnboardingFormValues) {
+  return withPreservedPhotoPreview(withoutTrainerUploadPreviews(values), values);
+}
+
+function getInitials(name: string) {
+  const parts = name
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2);
+
+  if (!parts.length) return 'PT';
+  return parts.map((part) => part[0]?.toUpperCase() ?? '').join('').slice(0, 2);
+}
+
+function formatCommaList(items: string[], fallback = 'Not added yet') {
+  return items.length ? items.join(', ') : fallback;
+}
+
+function formatAccountEnding(accountNumber: string) {
+  if (!accountNumber) return 'Not added yet';
+  return `**** ${accountNumber.slice(-4)}`;
 }
 
 async function readFileAsDataUrl(file: File) {
@@ -267,7 +384,7 @@ export default function TrainerOnboardingPage() {
         }
 
         const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === application.currentScreen);
-        form.reset(application.values);
+        form.reset(withPreservedPhotoPreview(application.values, restoredState.values));
         setApplicationId(application.applicationId);
         setApplicationStatus(application.status);
         setAdminRemarks(application.adminRemarks);
@@ -288,7 +405,7 @@ export default function TrainerOnboardingPage() {
     const payload: PersistedTrainerOnboardingState = {
       version: trainerOnboardingSchemaVersion,
       screenId: trainerOnboardingScreens[screenIndex].id,
-      values: withoutTrainerUploadPreviews(values ?? trainerOnboardingDefaultValues),
+      values: toLocalPersistedValues(values ?? trainerOnboardingDefaultValues),
       submitted,
       submittedAt,
       savedAt: new Date().toISOString(),
@@ -365,6 +482,7 @@ export default function TrainerOnboardingPage() {
     setSubmissionError('');
     setSubmissionIssues([]);
     const compactValues = withoutTrainerUploadPreviews(allValues);
+    const persistedValues = withPreservedPhotoPreview(compactValues, allValues);
     try {
       const application = await submitTrainerApplicationToApi({
         values: compactValues,
@@ -373,7 +491,7 @@ export default function TrainerOnboardingPage() {
       const payload: PersistedTrainerOnboardingState = {
         version: trainerOnboardingSchemaVersion,
         screenId: 'success',
-        values: compactValues,
+        values: persistedValues,
         submitted: true,
         submittedAt: application.submittedAt,
         savedAt: application.updatedAt,
@@ -387,6 +505,7 @@ export default function TrainerOnboardingPage() {
       setSubmitted(true);
       setSubmittedAt(application.submittedAt);
       setSavedAt(application.updatedAt);
+      setCachedTrainerAccessStateFromApplication(application);
       try {
         localStorage.setItem(trainerOnboardingStorageKey, JSON.stringify(payload));
       } catch {
@@ -506,79 +625,523 @@ export default function TrainerOnboardingPage() {
     return <div className="flex min-h-screen items-center justify-center bg-white text-sm font-medium text-slate-500">Loading your application...</div>;
   }
 
-  return (
-    <div className="min-h-screen overflow-x-hidden bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-0 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
-        <OnboardingHeader
-          isSuccess={currentScreen.id === 'success'}
-          onBack={moveBack}
-          onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
-        />
+  if (currentScreen.id === 'personalInfo') {
+    return (
+      <TrainerWelcomeScreen
+        form={form}
+        savedLabel={formatSavedTime(savedAt)}
+        draftError={draftError}
+        loading={isSubmitting || isSavingAndLeaving}
+        onBack={moveBack}
+        onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
+        onPrimaryAction={moveNext}
+        onSaveAndLogout={() => void saveAndLogout()}
+      />
+    );
+  }
 
-        <OnboardingLayout
-          animation={
-            <OnboardingAnimationPlaceholder
-              animationKey={currentScreen.animationKey}
-              title={currentScreen.title}
-              description={trainerAnimationMap[currentScreen.animationKey]}
-            />
+  if (currentScreen.id === 'review') {
+    return (
+      <TrainerFinalReviewScreen
+        values={values ?? trainerOnboardingDefaultValues}
+        applicationId={applicationId}
+        submittedAt={submittedAt}
+        savedLabel={formatSavedTime(savedAt)}
+        applicationStatus={applicationStatus}
+        adminRemarks={adminRemarks}
+        submissionError={submissionError}
+        submissionIssues={submissionIssues}
+        footerLabel={footerLabel}
+        loading={isSubmitting || isSavingAndLeaving}
+        disabled={applicationStatus === 'rejected'}
+        onBack={moveBack}
+        onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
+        onPrimaryAction={moveNext}
+        onSaveAndLogout={() => void saveAndLogout()}
+      />
+    );
+  }
+
+  return (
+    <TrainerApplicationScreenShell
+      screen={currentScreen}
+      prefersReducedMotion={prefersReducedMotion}
+      direction={direction}
+      savedLabel={formatSavedTime(savedAt)}
+      draftError={draftError}
+      footerLabel={footerLabel}
+      loading={isSubmitting || isSavingAndLeaving}
+      footerDisabled={applicationStatus === 'rejected' && currentScreen.id === 'review'}
+      onBack={moveBack}
+      onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
+      onPrimaryAction={moveNext}
+      onSaveAndLogout={() => void saveAndLogout()}
+    >
+      {renderCurrentScreen({
+        screen: currentScreen,
+        form,
+        values: values ?? trainerOnboardingDefaultValues,
+        reviewSections,
+        applicationStatus,
+        adminRemarks,
+        reviewHistory,
+        submitted,
+        submittedAt,
+        submissionError,
+        submissionIssues,
+        onSkipShowcase: () => {
+          setDirection(1);
+          setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
+        },
+        onJumpToScreen: (screenId) => {
+          const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === screenId);
+          if (nextIndex < 0) return;
+          setDirection(-1);
+          setScreenIndex(nextIndex);
+        },
+      })}
+    </TrainerApplicationScreenShell>
+  );
+}
+
+function TrainerFinalReviewScreen({
+  values,
+  applicationId,
+  submittedAt,
+  savedLabel,
+  applicationStatus,
+  adminRemarks,
+  submissionError,
+  submissionIssues,
+  footerLabel,
+  loading,
+  disabled,
+  onBack,
+  onClose,
+  onPrimaryAction,
+  onSaveAndLogout,
+}: {
+  values: TrainerOnboardingFormValues;
+  applicationId: string | null;
+  submittedAt: string | null;
+  savedLabel: string;
+  applicationStatus: TrainerApplicationStatus;
+  adminRemarks: string;
+  submissionError: string;
+  submissionIssues: TrainerSubmissionIssue[];
+  footerLabel: string;
+  loading: boolean;
+  disabled?: boolean;
+  onBack: () => void;
+  onClose: () => void;
+  onPrimaryAction: () => void;
+  onSaveAndLogout: () => void;
+}) {
+  const avatarSrc = values.photo.file?.previewUrl;
+  const fullName = values.profile.fullName || 'Personal Trainer';
+  const initials = getInitials(fullName);
+  const hasSubmitted = Boolean(submittedAt);
+
+  const statusConfig =
+    applicationStatus === 'needs_resubmission'
+      ? {
+          title: 'Needs updates',
+          description: 'Address the highlighted details, then resubmit your profile for review.',
+          Icon: TriangleAlert,
+          tone: 'text-amber-600',
+          surface: 'bg-amber-50',
+          border: 'border-amber-100',
+        }
+      : applicationStatus === 'rejected'
+        ? {
+            title: 'Application closed',
+            description: adminRemarks || 'This application is no longer eligible for approval.',
+            Icon: TriangleAlert,
+            tone: 'text-rose-600',
+            surface: 'bg-rose-50',
+            border: 'border-rose-100',
           }
-          content={
-            <>
-              <div className="flex-1 overflow-x-hidden overflow-y-auto pb-28 lg:pb-10">
-                <AnimatePresence custom={direction} initial={false} mode="wait">
-                  <motion.section
-                    key={currentScreen.id}
-                    custom={direction}
-                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction > 0 ? 28 : -28 }}
-                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
-                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction > 0 ? -20 : 20 }}
-                    transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                    className="mx-auto w-full max-w-[520px]"
-                  >
-                    <QuestionScreen screen={currentScreen}>
-                      {renderCurrentScreen({
-                        screen: currentScreen,
-                        form,
-                        values: values ?? trainerOnboardingDefaultValues,
-                        reviewSections,
-                        applicationStatus,
-                        adminRemarks,
-                        reviewHistory,
-                        submitted,
-                        submittedAt,
-                        submissionError,
-                        submissionIssues,
-                        onSkipShowcase: () => {
-                          setDirection(1);
-                          setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
-                        },
-                        onJumpToScreen: (screenId) => {
-                          const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === screenId);
-                          if (nextIndex < 0) return;
-                          setDirection(-1);
-                          setScreenIndex(nextIndex);
-                        },
-                      })}
-                    </QuestionScreen>
-                  </motion.section>
-                </AnimatePresence>
+        : hasSubmitted
+          ? {
+              title: 'Under review',
+              description: 'Our team is reviewing your profile. You’ll be notified once it’s approved.',
+              Icon: Hourglass,
+              tone: 'text-[#6d48ff]',
+              surface: 'bg-[#f5f1ff]',
+              border: 'border-[#e6dcff]',
+            }
+          : {
+              title: 'Ready to submit',
+              description: 'Everything looks polished. Submit this profile to send it to our review team.',
+              Icon: CheckCircle2,
+              tone: 'text-[#6d48ff]',
+              surface: 'bg-[#f5f1ff]',
+              border: 'border-[#e6dcff]',
+            };
+
+  const personalRows = [
+    { label: 'Full Name', value: fullName, icon: UserRound },
+    { label: 'Gender', value: values.profile.gender || 'Not added yet', icon: CircleUserRound },
+    { label: 'Date of Birth', value: formatDate(values.profile.dateOfBirth || ''), icon: CalendarDays },
+    { label: 'Email', value: values.profile.email || 'Not added yet', icon: Mail },
+    { label: 'Mobile', value: values.profile.mobile || 'Not added yet', icon: Phone },
+    {
+      label: 'Location',
+      value: values.profile.city && values.profile.state ? `${values.profile.city}, ${values.profile.state}` : 'Not added yet',
+      icon: MapPin,
+    },
+  ] as const;
+
+  const qualificationRows = [
+    { label: 'Certification Institute', value: values.certification.institute || 'Not added yet', icon: GraduationCap },
+    { label: 'Certification Type', value: values.certification.type || 'Not added yet', icon: ShieldCheck },
+    { label: 'Certificate', value: values.certification.certificate?.name || 'Not uploaded yet', icon: FileBadge2, downloadable: Boolean(values.certification.certificate) },
+    { label: 'Experience', value: values.experience.yearsExperience ? `${values.experience.yearsExperience} years` : 'Not added yet', icon: Hourglass },
+    { label: 'Expertise', value: formatCommaList(values.expertise), icon: Dumbbell },
+    { label: 'Clients Trained', value: values.experience.clientsTrained || 'Not added yet', icon: Users },
+  ] as const;
+
+  const coachingRows = [
+    { label: 'Training Philosophy', value: values.training.philosophy || 'Not added yet', icon: Sparkles, multiline: true },
+    { label: 'Training Modes', value: formatCommaList(values.availability.modes), icon: Dumbbell },
+    { label: 'Available Days', value: formatCommaList(values.availability.days), icon: CalendarDays, multiline: true },
+    { label: 'Per Session Rate', value: values.availability.perSessionRateInr ? `INR ${values.availability.perSessionRateInr}` : 'Not added yet', icon: CreditCard },
+    { label: 'Monthly Rate', value: values.availability.monthlyRateInr ? `INR ${values.availability.monthlyRateInr}` : 'Not added yet', icon: CreditCard },
+    {
+      label: 'Introduction Video',
+      value: values.training.introductionVideo?.name || 'Skipped for now',
+      icon: Video,
+      downloadable: Boolean(values.training.introductionVideo),
+      quiet: !values.training.introductionVideo,
+    },
+  ] as const;
+
+  const verificationRows = [
+    { label: 'PAN Card', value: values.identity.pan?.name || 'Not uploaded', icon: CreditCard, downloadable: Boolean(values.identity.pan), quiet: !values.identity.pan },
+    { label: 'Aadhaar', value: values.identity.aadhaar?.name || 'Not uploaded', icon: ShieldCheck, downloadable: Boolean(values.identity.aadhaar), quiet: !values.identity.aadhaar },
+    { label: 'Passport', value: values.identity.passport?.name || 'Not uploaded', icon: FileCheck2, downloadable: Boolean(values.identity.passport), quiet: !values.identity.passport },
+    { label: 'Driving Licence', value: values.identity.drivingLicense?.name || 'Not uploaded', icon: CreditCard, downloadable: Boolean(values.identity.drivingLicense), quiet: !values.identity.drivingLicense },
+    {
+      label: 'Transformation Photos',
+      value: values.showcase.transformationPhotos.length ? `${values.showcase.transformationPhotos.length} uploaded` : 'Skipped for now',
+      icon: ImagePlus,
+      quiet: !values.showcase.transformationPhotos.length,
+    },
+    {
+      label: 'Showcase Videos',
+      value: values.showcase.videos.length ? `${values.showcase.videos.length} uploaded` : 'Skipped for now',
+      icon: Video,
+      quiet: !values.showcase.videos.length,
+    },
+    { label: 'Bank Name', value: values.payout.bankName || 'Not added yet', icon: FileBadge2 },
+    { label: 'Account Number', value: formatAccountEnding(values.payout.accountNumber), icon: CreditCard },
+  ] as const;
+
+  return (
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
+      <div className="flex h-screen flex-col overflow-hidden bg-[#fcfbff]">
+        <header className="shrink-0 border-b border-[#ece7fb] bg-white/82 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="min-w-0 text-center">
+              <p className="text-[1.02rem] font-semibold tracking-[-0.02em] text-[#20277c] sm:text-[1.12rem]">Trainer onboarding</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Close onboarding"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-5 lg:px-6 lg:py-5">
+          <div className="min-h-0 flex-1 overflow-y-auto pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+            <section className="grid shrink-0 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
+            <div className="rounded-[26px] border border-[#e8e2fb] bg-white px-5 py-5 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
+              <div className="flex items-center gap-5">
+                <div className="flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#e5dbff] bg-[linear-gradient(145deg,#eef2ff,#f6f2ff)] text-[2.2rem] font-bold tracking-[0.08em] text-[#4830cc] shadow-[0_12px_30px_rgba(123,92,255,0.16)]">
+                  {avatarSrc ? <img src={avatarSrc} alt={fullName} className="h-full w-full object-cover" /> : initials}
+                </div>
+
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#6345ff]">
+                    {hasSubmitted ? 'Submitted Profile' : 'Profile Review'}
+                  </p>
+                  <h1 className="mt-2 text-[2.2rem] font-bold uppercase leading-none tracking-[-0.045em] text-[#182062]">
+                    {fullName}
+                  </h1>
+                  <p className="mt-4 text-[1.05rem] font-medium text-[#586695]">
+                    {applicationId ? `Application ${applicationId}` : 'Draft application'}
+                  </p>
+                  <div className="mt-3 inline-flex items-center gap-2 text-[1rem] font-medium text-[#59679a]">
+                    <CalendarDays className="h-4 w-4 text-[#7b5cff]" strokeWidth={2.1} />
+                    <span>{hasSubmitted && submittedAt ? `submitted on ${formatDate(submittedAt)}` : savedLabel}</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className={cn('rounded-[26px] border px-5 py-5 shadow-[0_18px_46px_rgba(102,75,212,0.08)]', statusConfig.border, statusConfig.surface)}>
+              <div className="flex items-start gap-4">
+                <div className={cn('inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/80', statusConfig.tone)}>
+                  <statusConfig.Icon size={30} strokeWidth={2} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className={cn('text-[1.8rem] font-semibold leading-tight tracking-[-0.03em]', statusConfig.tone)}>{statusConfig.title}</h2>
+                  <p className="mt-3 text-[1.05rem] leading-8 text-[#5b6697]">{statusConfig.description}</p>
+                </div>
+              </div>
+            </div>
+            </section>
+
+            {adminRemarks ? (
+              <div className={cn(
+                'mt-3 rounded-[18px] border px-4 py-3 text-sm font-medium',
+                applicationStatus === 'rejected' ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-amber-200 bg-amber-50 text-amber-700',
+              )}>
+                {adminRemarks}
+              </div>
+            ) : null}
+
+            {submissionError || submissionIssues.length ? (
+              <div className="mt-3 rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+                <p className="font-semibold">Review these items before submitting</p>
+                <p className="mt-1">{submissionError || submissionIssues[0]?.message}</p>
+              </div>
+            ) : null}
+
+            <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_1.95fr]">
+              <ReviewSummaryCard title="Personal Details" icon={UserRound}>
+                <div className="space-y-2">
+                  {personalRows.map((row) => (
+                    <ReviewInfoRow key={row.label} icon={row.icon} label={row.label} value={row.value} />
+                  ))}
+                </div>
+              </ReviewSummaryCard>
+
+              <ReviewSummaryCard title="Qualifications & Expertise" icon={GraduationCap}>
+                <div className="space-y-2">
+                  {qualificationRows.map((row) => (
+                    <ReviewInfoRow
+                      key={row.label}
+                      icon={row.icon}
+                      label={row.label}
+                      value={row.value}
+                      downloadable={row.downloadable}
+                    />
+                  ))}
+                </div>
+
+                <div className="mt-4 border-t border-[#ede9fb] pt-4">
+                  <div className="flex items-center gap-2 text-[#6d48ff]">
+                    <Sparkles size={18} strokeWidth={2.1} />
+                    <p className="text-[1rem] font-semibold text-[#1d256c]">Why clients should choose you</p>
+                  </div>
+                  <p className="mt-3 text-[0.98rem] leading-7 text-[#5d6898] [display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:4] overflow-hidden">
+                    {values.clientPitch || 'Not added yet'}
+                  </p>
+                </div>
+              </ReviewSummaryCard>
+
+              <div className="grid content-start gap-4">
+                <ReviewSummaryCard title="Coaching & Rates" icon={Dumbbell}>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {coachingRows.map((row) => (
+                      <ReviewStatTile
+                        key={row.label}
+                        icon={row.icon}
+                        label={row.label}
+                        value={row.value}
+                        multiline={row.multiline}
+                        downloadable={row.downloadable}
+                        quiet={row.quiet}
+                      />
+                    ))}
+                  </div>
+                </ReviewSummaryCard>
+
+                <ReviewSummaryCard title="Portfolio & Verification" icon={ShieldCheck}>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    {verificationRows.map((row) => (
+                      <ReviewFileTile
+                        key={row.label}
+                        icon={row.icon}
+                        label={row.label}
+                        value={row.value}
+                        downloadable={row.downloadable}
+                        quiet={row.quiet}
+                      />
+                    ))}
+                  </div>
+                </ReviewSummaryCard>
+              </div>
+            </section>
+          </div>
+
+          <footer className="mt-4 shrink-0 border-t border-[#ece7fb] pt-4">
+            <div className="flex items-center justify-between gap-4">
+              <div>
+                <p className="text-[0.96rem] font-medium text-[#6975a6]">Review the details once more, then submit your trainer profile.</p>
+                <button
+                  type="button"
+                  onClick={onSaveAndLogout}
+                  disabled={loading}
+                  className="mt-2 text-[1rem] font-semibold text-[#5a32ff] transition hover:text-[#4018e0] disabled:opacity-50"
+                >
+                  Save application &amp; Log out
+                </button>
               </div>
 
-              {currentScreen.id !== 'success' ? (
-                <OnboardingFooter
-                  label={footerLabel}
-                  savedLabel={formatSavedTime(savedAt)}
-                  error={draftError}
-                  onPrimaryAction={moveNext}
-                  onSaveAndLogout={() => void saveAndLogout()}
-                  loading={isSubmitting || isSavingAndLeaving}
-                  disabled={applicationStatus === 'rejected' && currentScreen.id === 'review'}
-                />
-              ) : null}
-            </>
-          }
-        />
+              <Button
+                type="button"
+                onClick={onPrimaryAction}
+                disabled={loading || disabled}
+                className="h-[60px] min-w-[280px] rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] px-8 text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+              >
+                {loading ? (
+                  'Please wait...'
+                ) : (
+                  <span className="inline-flex items-center gap-3">
+                    {footerLabel}
+                    <ArrowRight size={19} />
+                  </span>
+                )}
+              </Button>
+            </div>
+          </footer>
+        </main>
+      </div>
+    </div>
+  );
+}
+
+function ReviewSummaryCard({
+  title,
+  icon: Icon,
+  children,
+}: {
+  title: string;
+  icon: typeof Sparkles;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className="min-h-0 rounded-[24px] border border-[#e8e2fb] bg-white px-5 py-4 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
+      <div className="flex items-center gap-3">
+        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f1ff] text-[#6d48ff]">
+          <Icon size={21} strokeWidth={2} />
+        </div>
+        <h3 className="text-[1.1rem] font-semibold tracking-[-0.02em] text-[#1d256c]">{title}</h3>
+      </div>
+      <div className="mt-4 min-h-0">{children}</div>
+    </section>
+  );
+}
+
+function ReviewInfoRow({
+  icon: Icon,
+  label,
+  value,
+  downloadable,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  value: string;
+  downloadable?: boolean;
+}) {
+  return (
+    <div className="flex items-center justify-between gap-4 border-b border-[#f0ecfb] py-2.5 last:border-b-0">
+      <div className="flex min-w-0 items-center gap-3">
+        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+          <Icon size={18} strokeWidth={2} />
+        </div>
+        <p className="text-[0.97rem] font-medium text-[#6a749f]">{label}</p>
+      </div>
+      <div className="flex min-w-0 items-center gap-2">
+        <p className="truncate text-right text-[0.98rem] font-semibold text-[#182062]">{value}</p>
+        {downloadable ? <Download className="h-4 w-4 shrink-0 text-[#7352ff]" strokeWidth={2} /> : null}
+      </div>
+    </div>
+  );
+}
+
+function ReviewStatTile({
+  icon: Icon,
+  label,
+  value,
+  multiline,
+  downloadable,
+  quiet,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  value: string;
+  multiline?: boolean;
+  downloadable?: boolean;
+  quiet?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[88px] gap-3 rounded-[18px] border border-[#f0ecfb] bg-[#fcfbff] px-3.5 py-3">
+      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+        <Icon size={18} strokeWidth={2} />
+      </div>
+      <div className="min-w-0">
+        <p className="text-[0.92rem] font-medium text-[#7480ad]">{label}</p>
+        <div className="mt-1 flex min-w-0 items-start gap-2">
+          <p className={cn(
+            'min-w-0 text-[1rem] font-semibold text-[#1b246b]',
+            multiline && '[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden',
+            quiet && 'text-[#7f86aa]',
+          )}>
+            {value}
+          </p>
+          {downloadable ? <Download className="mt-0.5 h-4 w-4 shrink-0 text-[#7352ff]" strokeWidth={2} /> : null}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ReviewFileTile({
+  icon: Icon,
+  label,
+  value,
+  downloadable,
+  quiet,
+}: {
+  icon: typeof Sparkles;
+  label: string;
+  value: string;
+  downloadable?: boolean;
+  quiet?: boolean;
+}) {
+  return (
+    <div className="flex min-h-[76px] items-start gap-3 rounded-[18px] border border-[#f0ecfb] bg-[#fcfbff] px-3.5 py-3">
+      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+        <Icon size={18} strokeWidth={2} />
+      </div>
+      <div className="min-w-0 flex-1">
+        <p className="text-[0.92rem] font-medium text-[#7480ad]">{label}</p>
+        <div className="mt-1 flex items-center gap-2">
+          <span className={cn(
+            'inline-flex max-w-full items-center rounded-full px-3 py-1 text-[0.92rem] font-semibold',
+            quiet ? 'bg-[#efedf8] text-[#7f86aa]' : 'bg-[#f1ebff] text-[#5f3dff]',
+          )}>
+            <span className="truncate">{value}</span>
+          </span>
+          {downloadable ? <Download className="h-4 w-4 shrink-0 text-[#7352ff]" strokeWidth={2} /> : null}
+        </div>
       </div>
     </div>
   );
@@ -918,7 +1481,12 @@ function renderCurrentScreen({
               />
             )}
           />
+        </div>
+      );
 
+    case 'pricing':
+      return (
+        <div className="space-y-5">
           <FormTextArea
             label="Pricing notes (optional)"
             placeholder="Add package details, online coaching options, or other pricing notes."
@@ -1194,6 +1762,7 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [mobile, setMobile] = useState('');
   const [consent, setConsent] = useState(true);
   const [otp, setOtp] = useState('');
@@ -1211,6 +1780,7 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   const canResend = challenge ? new Date(challenge.resendAvailableAt).getTime() <= clock : false;
   const resendSeconds = challenge ? Math.max(0, Math.ceil((new Date(challenge.resendAvailableAt).getTime() - clock) / 1000)) : 0;
   const expired = challenge ? new Date(challenge.expiresAt).getTime() <= clock : false;
+  const isAccountDisabled = !consent || password.length < 8 || !name || !email || !mobile;
 
   async function sendOtp() {
     setLoading(true);
@@ -1264,121 +1834,678 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="min-h-screen overflow-x-hidden bg-white text-[var(--ds-text-primary)] lg:bg-[linear-gradient(90deg,_#f8fafc_0%,_#f8fafc_48%,_#ffffff_48%,_#ffffff_100%)]">
-      <div className="mx-auto flex min-h-screen max-w-7xl flex-col px-4 pb-0 pt-4 sm:px-6 lg:px-8 lg:pb-6 lg:pt-6">
-        <OnboardingHeader
-          isSuccess={false}
-          onBack={() => screen === 'otp' ? setScreen('account') : navigate('/')}
-          onClose={() => navigate('/')}
-        />
-        <OnboardingLayout
-          animation={
-            <OnboardingAnimationPlaceholder
-              animationKey="personalInfo"
-              title={screen === 'account' ? 'Begin your trainer journey' : 'Secure your profile'}
-              description={screen === 'account' ? 'Trainer application' : 'Mobile verification'}
-            />
-          }
-          content={
-            <>
-              <div className="flex-1 overflow-x-hidden overflow-y-auto pb-28 lg:pb-10">
-                <AnimatePresence mode="wait" initial={false}>
-                  <motion.section
-                    key={screen}
-                    initial={{ opacity: 0, x: 22 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -18 }}
-                    transition={{ duration: 0.25 }}
-                    className="mx-auto w-full max-w-[520px] px-0 py-3 sm:py-4"
-                  >
-                    {screen === 'account' ? (
-                      <>
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Personal trainer application</p>
-                          <h1 className="text-[1.9rem] font-semibold leading-tight text-slate-950 sm:text-[2.2rem]">Create your trainer account</h1>
-                          <p className="text-[15px] leading-7 text-slate-600">Set up your secure account before building your professional profile.</p>
-                        </div>
-                        <div className="mt-7 space-y-5">
-                          <FormInput label="Full name" placeholder="Your full name" value={name} onChange={(event) => setName(event.target.value)} />
-                          <FormInput label="Email" type="email" placeholder="you@example.com" value={email} onChange={(event) => setEmail(event.target.value)} />
-                          <FormInput label="Mobile number" type="tel" inputMode="tel" placeholder="+91 98765 43210" value={mobile} onChange={(event) => setMobile(event.target.value)} />
-                          <FormInput label="Password" type="password" placeholder="Minimum 8 characters" value={password} onChange={(event) => setPassword(event.target.value)} />
-                          <label className="flex items-start gap-3 text-sm text-slate-600">
-                            <input type="checkbox" checked={consent} onChange={(event) => setConsent(event.target.checked)} className="mt-1 h-4 w-4 accent-[var(--ds-brand)]" />
-                            <span>I agree to the terms and privacy policy.</span>
-                          </label>
-                          <p className="text-sm text-slate-600">
-                            Already started? <Link to="/login" className="font-semibold text-[var(--ds-brand)]">Sign in to continue</Link>
-                          </p>
-                        </div>
-                      </>
-                    ) : (
-                      <>
-                        <div className="space-y-3">
-                          <p className="text-xs font-semibold uppercase text-[var(--ds-brand)]">Mobile verification</p>
-                          <h1 className="text-[1.9rem] font-semibold leading-tight text-slate-950 sm:text-[2.2rem]">Enter verification code</h1>
-                          <p className="text-[15px] leading-7 text-slate-600">We sent a 6-digit code to <span className="font-semibold text-slate-900">{challenge?.maskedMobile}</span>.</p>
-                        </div>
-                        <div className="mt-9 space-y-6">
-                          <InputOTP
-                            maxLength={6}
-                            value={otp}
-                            onChange={(value) => setOtp(value.replace(/\D/g, ''))}
-                            inputMode="numeric"
-                            containerClassName="justify-center"
-                          >
-                            <InputOTPGroup className="gap-2">
-                              {[0, 1, 2, 3, 4, 5].map((index) => (
-                                <InputOTPSlot key={index} index={index} className="h-14 w-12 rounded-lg border text-xl" />
-                              ))}
-                            </InputOTPGroup>
-                          </InputOTP>
-                          <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm">
-                            <button type="button" onClick={() => { setScreen('account'); setNotice(''); }} className="font-semibold text-slate-600 hover:text-slate-900">Change mobile number</button>
-                            <button type="button" onClick={() => void resendOtp()} disabled={!canResend || loading || expired} className="font-semibold text-[var(--ds-brand)] disabled:text-slate-400">
-                              {canResend ? 'Resend code' : `Resend in ${resendSeconds}s`}
-                            </button>
-                          </div>
-                          {expired ? <p className="text-center text-sm text-rose-600">This code has expired. Return and request a new code.</p> : null}
-                        </div>
-                      </>
-                    )}
-                    {notice ? <p className="mt-6 rounded-lg bg-rose-50 px-3 py-3 text-sm text-rose-700">{notice}</p> : null}
-                  </motion.section>
-                </AnimatePresence>
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] px-0 py-0 text-[#090B3F]">
+      <div
+        className="flex h-screen flex-col overflow-hidden bg-white"
+        style={{ background: trainerEntryShellBackground }}
+      >
+        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+            <button
+              type="button"
+              onClick={() => (screen === 'otp' ? setScreen('account') : navigate('/'))}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="min-w-0 text-center">
+              <p className="text-[1.02rem] font-semibold tracking-[-0.02em] text-[#20277c] sm:text-[1.12rem]">Trainer onboarding</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => navigate('/')}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Close onboarding"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.08fr_0.92fr]">
+          <section
+            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            style={{ background: trainerEntryHeroBackground }}
+          >
+            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
+              <div className="relative mx-auto w-full max-w-[680px]">
+                <div className="pointer-events-none absolute left-[10%] top-[20%] hidden h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(182,161,255,0.25)_0%,_rgba(182,161,255,0)_72%)] blur-xl lg:block" />
+                <div className="pointer-events-none absolute right-[8%] top-[10%] hidden h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,0.95)_0%,_rgba(255,255,255,0)_72%)] blur-xl lg:block" />
+
+                <div className="relative overflow-visible">
+                  <img
+                    src={trainerOnboardingIllustration}
+                    alt="Personal trainer onboarding illustration"
+                    className="relative z-10 mx-auto w-full max-w-[760px] object-contain"
+                  />
+
+                  <TrainerEntryHeroBadge
+                    className="left-[6%] top-[34%] hidden md:flex lg:left-[10%] lg:top-[27%]"
+                    icon={BarChart3}
+                    label="Analytics"
+                  />
+                  <TrainerEntryHeroBadge
+                    className="right-[10%] top-[28%] hidden md:flex lg:right-[12%] lg:top-[22%]"
+                    icon={Heart}
+                    label="Care"
+                  />
+                  <TrainerEntryHeroBadge
+                    className="right-[2%] top-[50%] hidden md:flex lg:right-[6%] lg:top-[44%]"
+                    icon={CircleUserRound}
+                    label="Profile"
+                  />
+                </div>
               </div>
-              <TrainerEntryFooter
-                label={screen === 'account' ? 'Send verification code' : 'Verify & start application'}
-                loading={loading}
-                disabled={screen === 'account' ? !consent || password.length < 8 || !name || !email || !mobile : otp.length !== 6 || expired}
-                onAction={() => void (screen === 'account' ? sendOtp() : verifyOtp())}
-              />
-            </>
-          }
-        />
+
+              <div className="mx-auto mt-2 max-w-[620px] text-center">
+                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.45rem]">
+                  {screen === 'account' ? 'Start your trainer journey' : 'Secure your trainer journey'}
+                </h2>
+                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                  {screen === 'account'
+                    ? 'Empower lives, build lasting habits, and grow your impact with tools designed for your success.'
+                    : 'Confirm your mobile number to unlock the full trainer application and continue building your profile.'}
+                </p>
+              </div>
+
+              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:mt-8 xl:grid-cols-3">
+                {trainerEntryHighlights.map(({ title, description, icon: Icon }) => (
+                  <div
+                    key={title}
+                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                  >
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
+                      <Icon size={20} strokeWidth={2.1} />
+                    </div>
+                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
+                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="flex min-h-0 items-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
+            <div
+              className="mx-auto flex h-full w-full max-w-[760px] flex-col justify-center"
+              style={{ background: trainerEntryPanelBackground }}
+            >
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.section
+                  key={screen}
+                  initial={{ opacity: 0, x: 22 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -18 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  {screen === 'account' ? (
+                    <>
+                      <div className="space-y-3">
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6345ff]">Personal trainer application</p>
+                        <h1 className="text-[2rem] font-bold leading-[1.03] tracking-[-0.045em] text-[#12186d] sm:text-[2.6rem] xl:text-[2.9rem]">
+                          Create your trainer account
+                        </h1>
+                        <p className="max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] sm:text-[1.04rem]">
+                          Set up your secure account before building your professional profile.
+                        </p>
+                      </div>
+
+                      <div className="mt-7 space-y-4.5">
+                        <FormInput
+                          label="Full name"
+                          placeholder="Your full name"
+                          value={name}
+                          onChange={(event) => setName(event.target.value)}
+                          icon={<UserRound className="h-5 w-5" strokeWidth={2.05} />}
+                          inputProps={{ autoComplete: 'name' }}
+                        />
+                        <FormInput
+                          label="Email"
+                          type="email"
+                          placeholder="you@example.com"
+                          value={email}
+                          onChange={(event) => setEmail(event.target.value)}
+                          icon={<Mail className="h-5 w-5" strokeWidth={2.05} />}
+                          inputProps={{ autoComplete: 'email' }}
+                        />
+                        <FormInput
+                          label="Mobile number"
+                          type="tel"
+                          inputMode="tel"
+                          placeholder="+91 98765 43210"
+                          value={mobile}
+                          onChange={(event) => setMobile(event.target.value)}
+                          icon={<Phone className="h-5 w-5" strokeWidth={2.05} />}
+                          inputProps={{ autoComplete: 'tel' }}
+                        />
+                        <FormInput
+                          label="Password"
+                          type={showPassword ? 'text' : 'password'}
+                          placeholder="Minimum 8 characters"
+                          value={password}
+                          onChange={(event) => setPassword(event.target.value)}
+                          icon={<LockKeyhole className="h-5 w-5" strokeWidth={2.05} />}
+                          inputProps={{ autoComplete: 'new-password' }}
+                          trailing={
+                            <button
+                              type="button"
+                              onClick={() => setShowPassword((value) => !value)}
+                              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#6f63b7] transition hover:bg-[#f3efff] hover:text-[#4c2cff]"
+                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                              {showPassword ? <EyeOff className="h-5 w-5" strokeWidth={2} /> : <Eye className="h-5 w-5" strokeWidth={2} />}
+                            </button>
+                          }
+                        />
+
+                        <button
+                          type="button"
+                          onClick={() => setConsent((value) => !value)}
+                          className="inline-flex items-start gap-3 text-left text-[0.98rem] text-[#566497]"
+                        >
+                          <span className="pt-0.5 text-[#7b5cff]">
+                            {consent ? <SquareCheck className="h-5 w-5" strokeWidth={2} /> : <Square className="h-5 w-5" strokeWidth={2} />}
+                          </span>
+                          <span>
+                            I agree to the{' '}
+                            <Link to="/terms-of-service" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
+                              terms
+                            </Link>{' '}
+                            and{' '}
+                            <Link to="/privacy-policy" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
+                              privacy policy
+                            </Link>
+                            .
+                          </span>
+                        </button>
+
+                        <p className="text-[0.98rem] text-[#566497]">
+                          Already started?{' '}
+                          <Link to="/login" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
+                            Sign in to continue
+                          </Link>
+                        </p>
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      <div className="space-y-3 text-center">
+                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6345ff]">Mobile verification</p>
+                        <h1 className="text-[1.9rem] font-bold leading-[1.03] tracking-[-0.04em] text-[#12186d] sm:text-[2.35rem] xl:text-[2.55rem]">
+                          Enter verification code
+                        </h1>
+                        <p className="mx-auto max-w-[460px] text-[1rem] font-medium leading-7 text-[#5b6697] sm:text-[1.06rem]">
+                          We sent a 6-digit code to <span className="font-semibold text-[#182062]">{challenge?.maskedMobile}</span>.
+                        </p>
+                      </div>
+
+                      <div className="mt-8 space-y-6">
+                        <InputOTP
+                          maxLength={6}
+                          value={otp}
+                          onChange={(value) => setOtp(value.replace(/\D/g, ''))}
+                          inputMode="numeric"
+                          containerClassName="justify-center"
+                        >
+                          <InputOTPGroup className="gap-2 sm:gap-3">
+                            {[0, 1, 2, 3, 4, 5].map((index) => (
+                              <InputOTPSlot
+                                key={index}
+                                index={index}
+                                className="h-14 w-11 rounded-2xl border border-[#d8d9ee] bg-white text-xl text-[#151a5f] shadow-[0_10px_22px_rgba(123,92,255,0.08)] sm:h-16 sm:w-12"
+                              />
+                            ))}
+                          </InputOTPGroup>
+                        </InputOTP>
+
+                        <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3 text-sm">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setScreen('account');
+                              setNotice('');
+                            }}
+                            className="font-semibold text-[#6b7298] transition hover:text-[#182062]"
+                          >
+                            Change mobile number
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => void resendOtp()}
+                            disabled={!canResend || loading || expired}
+                            className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0] disabled:text-slate-400"
+                          >
+                            {canResend ? 'Resend code' : `Resend in ${resendSeconds}s`}
+                          </button>
+                        </div>
+
+                        {expired ? <p className="text-center text-sm text-rose-600">This code has expired. Return and request a new code.</p> : null}
+                      </div>
+                    </>
+                  )}
+
+                  {notice ? (
+                    <p className="mt-6 rounded-[18px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                      {notice}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-7">
+                    <Button
+                      type="button"
+                      onClick={() => void (screen === 'account' ? sendOtp() : verifyOtp())}
+                      disabled={loading || (screen === 'account' ? isAccountDisabled : otp.length !== 6 || expired)}
+                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                    >
+                      {loading ? (
+                        'Please wait...'
+                      ) : (
+                        <span className="inline-flex items-center gap-3">
+                          {screen === 'account' ? 'Send verification code' : 'Verify & start application'}
+                          <ArrowRight size={19} />
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+                </motion.section>
+              </AnimatePresence>
+            </div>
+          </section>
+        </div>
       </div>
     </div>
   );
 }
 
-function TrainerEntryFooter({
-  label,
+function TrainerWelcomeScreen({
+  form,
+  savedLabel,
+  draftError,
   loading,
-  disabled,
-  onAction,
+  onBack,
+  onClose,
+  onPrimaryAction,
+  onSaveAndLogout,
 }: {
-  label: string;
+  form: ReturnType<typeof useForm<TrainerOnboardingFormValues>>;
+  savedLabel: string;
+  draftError: string;
   loading: boolean;
-  disabled: boolean;
-  onAction: () => void;
+  onBack: () => void;
+  onClose: () => void;
+  onPrimaryAction: () => void;
+  onSaveAndLogout: () => void;
+}) {
+  const {
+    register,
+    control,
+    formState: { errors },
+  } = form;
+
+  return (
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
+      <div className="flex h-screen flex-col overflow-hidden bg-white" style={{ background: trainerEntryShellBackground }}>
+        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="min-w-0 text-center">
+              <p className="text-[1.02rem] font-semibold tracking-[-0.02em] text-[#20277c] sm:text-[1.12rem]">Trainer onboarding</p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Close onboarding"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.06fr_0.94fr]">
+          <section
+            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            style={{ background: trainerEntryHeroBackground }}
+          >
+            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
+              <div className="relative mx-auto w-full max-w-[720px]">
+                <img
+                  src={trainerWelcomeIllustration}
+                  alt="Trainer onboarding welcome illustration"
+                  className="mx-auto w-full max-w-[760px] object-contain"
+                />
+              </div>
+
+              <div className="mx-auto mt-3 max-w-[620px] text-center">
+                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.5rem]">
+                  Let&apos;s begin your trainer journey
+                </h2>
+                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                  Create a polished and trustworthy profile that helps clients know who you are and how you can help.
+                </p>
+              </div>
+
+              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:grid-cols-3">
+                {trainerWelcomeHighlights.map(({ title, description, icon: Icon }) => (
+                  <div
+                    key={title}
+                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                  >
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
+                      <Icon size={20} strokeWidth={2.1} />
+                    </div>
+                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
+                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="flex min-h-0 items-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
+            <div className="mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.section
+                  key="trainer-welcome-step"
+                  initial={{ opacity: 0, x: 22 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -18 }}
+                  transition={{ duration: 0.25 }}
+                >
+                  <div className="space-y-3">
+                    <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6345ff]">Welcome</p>
+                    <h1 className="text-[2rem] font-bold leading-[1.03] tracking-[-0.045em] text-[#12186d] sm:text-[2.6rem] xl:text-[2.9rem]">
+                      Let&apos;s get started
+                    </h1>
+                    <p className="max-w-[560px] text-[0.98rem] font-medium leading-7 text-[#5b6697] sm:text-[1.04rem]">
+                      We&apos;ll help you create a trainer profile that feels polished, trustworthy, and easy for clients to understand.
+                    </p>
+                    <p className="text-[0.98rem] font-medium text-[#5b6697]">Two quick details to begin.</p>
+                  </div>
+
+                  <div className="mt-7 space-y-5">
+                    <FormInput
+                      label="Full name"
+                      placeholder="Enter your full name"
+                      inputProps={register('profile.fullName')}
+                      error={findErrorMessage(errors, 'profile.fullName')}
+                      icon={<UserRound className="h-5 w-5" strokeWidth={2.05} />}
+                    />
+
+                    <Controller
+                      control={control}
+                      name="profile.gender"
+                      render={({ field }) => (
+                        <WelcomeChoiceGrid
+                          label="Gender"
+                          value={field.value}
+                          options={trainerWelcomeGenderOptions}
+                          onChange={field.onChange}
+                          error={findErrorMessage(errors, 'profile.gender')}
+                        />
+                      )}
+                    />
+                  </div>
+
+                  <div className="mt-7 flex items-center gap-4">
+                    <div className="h-px flex-1 bg-[#ddd5f6]" />
+                    <div className="inline-flex items-center gap-2 text-[0.92rem] font-medium text-[#7582b3]">
+                      <ShieldCheck className="h-4 w-4 text-[#7b5cff]" strokeWidth={2.1} />
+                      <span>{savedLabel}</span>
+                    </div>
+                    <div className="h-px flex-1 bg-[#ddd5f6]" />
+                  </div>
+
+                  {draftError ? (
+                    <p className="mt-4 rounded-[18px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                      {draftError}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-7">
+                    <Button
+                      type="button"
+                      onClick={onPrimaryAction}
+                      disabled={loading}
+                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                    >
+                      {loading ? (
+                        'Please wait...'
+                      ) : (
+                        <span className="inline-flex items-center gap-3">
+                          Continue
+                          <ArrowRight size={19} />
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="mt-5 text-center">
+                    <button
+                      type="button"
+                      onClick={onSaveAndLogout}
+                      disabled={loading}
+                      className="text-[1rem] font-semibold text-[#5a32ff] transition hover:text-[#4018e0] disabled:opacity-50"
+                    >
+                      Save application &amp; Log out
+                    </button>
+                  </div>
+                </motion.section>
+              </AnimatePresence>
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function TrainerApplicationScreenShell({
+  screen,
+  prefersReducedMotion,
+  direction,
+  savedLabel,
+  draftError,
+  footerLabel,
+  loading,
+  footerDisabled,
+  onBack,
+  onClose,
+  onPrimaryAction,
+  onSaveAndLogout,
+  children,
+}: {
+  screen: TrainerOnboardingScreen;
+  prefersReducedMotion: boolean | undefined;
+  direction: number;
+  savedLabel: string;
+  draftError: string;
+  footerLabel: string;
+  loading: boolean;
+  footerDisabled?: boolean;
+  onBack: () => void;
+  onClose: () => void;
+  onPrimaryAction: () => void;
+  onSaveAndLogout: () => void;
+  children: React.ReactNode;
 }) {
   return (
-    <div className="fixed inset-x-0 bottom-0 z-20 border-t border-slate-200 bg-white px-4 pb-[calc(1rem+env(safe-area-inset-bottom))] pt-3 lg:static lg:mt-6 lg:px-0 lg:py-4">
-      <div className="mx-auto w-full max-w-[520px]">
-        <Button type="button" onClick={onAction} disabled={loading || disabled} className="h-14 w-full rounded-full bg-[var(--ds-brand)] text-base font-semibold text-white hover:bg-[var(--ds-brand-strong)]">
-          {loading ? 'Please wait...' : <span className="inline-flex items-center gap-2">{label} <ArrowRight size={18} /></span>}
-        </Button>
+    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
+      <div className="flex h-screen flex-col overflow-hidden bg-white" style={{ background: trainerEntryShellBackground }}>
+        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
+          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+            <button
+              type="button"
+              onClick={onBack}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Go back"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <div className="min-w-0 text-center">
+              <p className={cn('text-[1.02rem] font-semibold tracking-[-0.02em] text-[#20277c] sm:text-[1.12rem]', screen.id === 'success' && 'text-emerald-600')}>
+                {screen.id === 'success' ? 'Application complete' : 'Trainer onboarding'}
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              aria-label="Close onboarding"
+            >
+              <X size={20} />
+            </button>
+          </div>
+        </header>
+
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.06fr_0.94fr]">
+          <section
+            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            style={{ background: trainerEntryHeroBackground }}
+          >
+            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
+              <div className="relative mx-auto w-full max-w-[720px]">
+                <img
+                  src={trainerWelcomeIllustration}
+                  alt="Trainer onboarding illustration"
+                  className="mx-auto w-full max-w-[760px] object-contain"
+                />
+              </div>
+
+              <div className="mx-auto mt-3 max-w-[620px] text-center">
+                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.5rem]">
+                  {screen.id === 'success' ? 'Your trainer application is in' : "Let's build your trainer profile"}
+                </h2>
+                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                  {screen.id === 'success'
+                    ? 'You&apos;re all set. Our team will review your details and guide you through the next step shortly.'
+                    : 'Complete each step to create a polished and trustworthy profile clients can understand quickly.'}
+                </p>
+              </div>
+
+              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:grid-cols-3">
+                {trainerWelcomeHighlights.map(({ title, description, icon: Icon }) => (
+                  <div
+                    key={title}
+                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                  >
+                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
+                      <Icon size={20} strokeWidth={2.1} />
+                    </div>
+                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
+                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="flex min-h-0 overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
+            <div className="mx-auto flex h-full w-full max-w-[760px] flex-col">
+              <div className="min-h-0 flex-1 overflow-y-scroll pr-1 [scrollbar-gutter:stable] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+                <AnimatePresence custom={direction} initial={false} mode="wait">
+                  <motion.section
+                    key={screen.id}
+                    custom={direction}
+                    initial={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction > 0 ? 28 : -28 }}
+                    animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
+                    exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction > 0 ? -20 : 20 }}
+                    transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
+                    className="mx-auto w-full max-w-[760px] pb-6"
+                  >
+                    <QuestionScreen screen={screen}>{children}</QuestionScreen>
+                  </motion.section>
+                </AnimatePresence>
+              </div>
+
+              {screen.id !== 'success' ? (
+                <div className="shrink-0 pt-4">
+                  <div className="flex items-center gap-4">
+                    <div className="h-px flex-1 bg-[#ddd5f6]" />
+                    <div className="inline-flex items-center gap-2 text-[0.92rem] font-medium text-[#7582b3]">
+                      <ShieldCheck className="h-4 w-4 text-[#7b5cff]" strokeWidth={2.1} />
+                      <span>{savedLabel}</span>
+                    </div>
+                    <div className="h-px flex-1 bg-[#ddd5f6]" />
+                  </div>
+
+                  {draftError ? (
+                    <p className="mt-4 rounded-[18px] border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-medium text-rose-700">
+                      {draftError}
+                    </p>
+                  ) : null}
+
+                  <div className="mt-5">
+                    <Button
+                      type="button"
+                      onClick={onPrimaryAction}
+                      disabled={loading || footerDisabled}
+                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                    >
+                      {loading ? (
+                        'Please wait...'
+                      ) : (
+                        <span className="inline-flex items-center gap-3">
+                          {footerLabel}
+                          <ArrowRight size={19} />
+                        </span>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 text-center">
+                    <button
+                      type="button"
+                      onClick={onSaveAndLogout}
+                      disabled={loading}
+                      className="text-[1rem] font-semibold text-[#5a32ff] transition hover:text-[#4018e0] disabled:opacity-50"
+                    >
+                      Save application &amp; Log out
+                    </button>
+                  </div>
+                </div>
+              ) : null}
+            </div>
+          </section>
+        </div>
       </div>
+    </div>
+  );
+}
+
+function TrainerEntryHeroBadge({
+  className,
+  icon: Icon,
+  label,
+}: {
+  className?: string;
+  icon: typeof Sparkles;
+  label: string;
+}) {
+  return (
+    <div
+      className={cn(
+        'absolute z-20 h-16 w-16 items-center justify-center rounded-[22px] border border-white/70 bg-white/86 text-[#7b5cff] shadow-[0_18px_36px_rgba(123,92,255,0.16)] backdrop-blur-md',
+        className,
+      )}
+      aria-hidden="true"
+      title={label}
+    >
+      <Icon size={28} strokeWidth={1.9} />
     </div>
   );
 }
@@ -1553,6 +2680,8 @@ function FormInput({
   inputProps,
   value,
   onChange,
+  icon,
+  trailing,
 }: {
   label: string;
   error?: string;
@@ -1562,22 +2691,33 @@ function FormInput({
   inputProps?: React.InputHTMLAttributes<HTMLInputElement>;
   value?: string;
   onChange?: React.ChangeEventHandler<HTMLInputElement>;
+  icon?: React.ReactNode;
+  trailing?: React.ReactNode;
 }) {
   return (
     <label className="block space-y-2">
       <span className="text-sm font-semibold text-slate-800">{label}</span>
-      <Input
-        type={type}
-        inputMode={inputMode}
-        placeholder={placeholder}
+      <div
         className={cn(
-          'h-14 rounded-xl border-slate-300 bg-white px-4 text-base transition focus-visible:ring-[3px] focus-visible:ring-[rgba(47,79,136,0.12)]',
-          error && 'border-rose-300 focus-visible:ring-[rgba(244,63,94,0.12)]',
+          'group flex min-h-14 items-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition focus-within:border-[#8d6bff] focus-within:ring-4 focus-within:ring-[#7c5cff1a]',
+          error && 'border-rose-300 focus-within:ring-[rgba(244,63,94,0.12)]',
         )}
-        value={onChange || value !== undefined ? (value ?? '') : undefined}
-        onChange={onChange}
-        {...inputProps}
-      />
+      >
+        {icon ? <span className="shrink-0 text-[#7b5cff]">{icon}</span> : null}
+        <Input
+          type={type}
+          inputMode={inputMode}
+          placeholder={placeholder}
+          className={cn(
+            'h-auto flex-1 border-0 bg-transparent px-0 py-0 text-base font-medium text-[#151a5f] shadow-none placeholder:text-[#9aa3c2] focus-visible:ring-0',
+            trailing ? 'pr-0' : '',
+          )}
+          value={onChange || value !== undefined ? (value ?? '') : undefined}
+          onChange={onChange}
+          {...inputProps}
+        />
+        {trailing ? <div className="shrink-0">{trailing}</div> : null}
+      </div>
       {error ? <p className="text-sm text-rose-600">{error}</p> : null}
     </label>
   );
@@ -1651,7 +2791,7 @@ function ChoiceCardGroup({
   );
 }
 
-function ChipSelector({
+function WelcomeChoiceGrid({
   label,
   options,
   value,
@@ -1659,10 +2799,69 @@ function ChipSelector({
   error,
 }: {
   label: string;
-  options: readonly string[];
-  value: string[];
-  onChange: (value: string[]) => void;
+  options: readonly {
+    label: string;
+    value: TrainerOnboardingFormValues['profile']['gender'];
+    icon: typeof Sparkles;
+    tone: string;
+  }[];
+  value?: TrainerOnboardingFormValues['profile']['gender'];
+  onChange: (value: TrainerOnboardingFormValues['profile']['gender']) => void;
   error?: string;
+}) {
+  return (
+    <div className="space-y-2.5">
+      <p className="text-sm font-semibold text-slate-800">{label}</p>
+      <div className="grid gap-3 sm:grid-cols-2">
+        {options.map((option) => {
+          const active = option.value === value;
+          const Icon = option.icon;
+
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => onChange(option.value)}
+              className={cn(
+                'flex min-h-[72px] items-center justify-between rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition',
+                active ? 'border-[#b297ff] bg-[#fcfaff]' : 'border-slate-200 hover:border-[#d6cbff]',
+              )}
+            >
+              <span className="flex items-center gap-3">
+                <span className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ff]', option.tone)}>
+                  <Icon size={20} strokeWidth={2} />
+                </span>
+                <span className="text-[1rem] font-semibold text-[#182062]">{option.label}</span>
+              </span>
+              <span
+                className={cn(
+                  'inline-flex h-7 w-7 items-center justify-center rounded-full border text-transparent transition',
+                  active ? 'border-[#7b5cff] bg-[#7b5cff] text-white' : 'border-[#d8d9ee] bg-white',
+                )}
+              >
+                <Check size={15} strokeWidth={2.5} />
+              </span>
+            </button>
+          );
+        })}
+      </div>
+      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+    </div>
+  );
+}
+
+function ChipSelector({
+  label,
+  options,
+  value,
+  onChange,
+  error,
+}: {
+            label: string;
+            options: readonly string[];
+            value: string[];
+            onChange: (value: string[]) => void;
+            error?: string;
 }) {
   return (
     <div className="space-y-2">
@@ -1678,7 +2877,9 @@ function ChipSelector({
               onClick={() => onChange(active ? value.filter((item) => item !== option) : [...value, option])}
               className={cn(
                 'rounded-full border px-4 py-3 text-sm font-semibold transition',
-                active ? 'border-[var(--ds-brand)] bg-transparent text-[var(--ds-brand)]' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
+                active
+                  ? 'border-[#6b3dff] bg-[linear-gradient(135deg,#6b3dff_0%,#7f52ff_100%)] text-white shadow-[0_10px_22px_rgba(107,61,255,0.24)]'
+                  : 'border-slate-300 bg-white text-slate-700 hover:border-[#c7bbff] hover:bg-[#faf8ff]',
               )}
             >
               {option}

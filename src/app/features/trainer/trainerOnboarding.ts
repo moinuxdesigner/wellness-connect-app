@@ -252,6 +252,7 @@ export type TrainerOnboardingScreenId =
   | 'showcase'
   | 'training'
   | 'availability'
+  | 'pricing'
   | 'identity'
   | 'payout'
   | 'review'
@@ -383,11 +384,21 @@ export const trainerOnboardingScreens: TrainerOnboardingScreen[] = [
     id: 'availability',
     animationKey: 'availability',
     eyebrow: 'Schedule',
-    title: 'Availability and pricing',
-    description: 'This helps us understand how you deliver sessions and what offer structure makes sense for you.',
-    helper: 'Add your standard rates in INR; package notes are optional.',
+    title: 'When are you available?',
+    description: 'Tell us how you deliver training and which days clients can typically book you.',
+    helper: 'Choose every mode and day that you actively support.',
     buttonLabel: 'Next',
-    fields: ['availability.modes', 'availability.days', 'availability.perSessionRateInr', 'availability.monthlyRateInr'],
+    fields: ['availability.modes', 'availability.days'],
+  },
+  {
+    id: 'pricing',
+    animationKey: 'availability',
+    eyebrow: 'Pricing',
+    title: 'Set your pricing',
+    description: 'Add your standard offer structure so clients and reviewers can understand your pricing clearly.',
+    helper: 'Standard rates are required; package notes are optional.',
+    buttonLabel: 'Next',
+    fields: ['availability.perSessionRateInr', 'availability.monthlyRateInr'],
   },
   {
     id: 'identity',
