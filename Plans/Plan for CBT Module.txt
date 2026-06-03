@@ -1,0 +1,2337 @@
+Do not create a new separate app.
+Create the CBT module inside the existing WellnessConnect project.
+Use existing database, existing auth, existing users, roles, practitioners, client_profiles, notifications, and activity_events.
+
+We need to build a CBT module for the existing WellnessConnect project.
+
+
+
+Important context:
+
+- Existing frontend is React Vite.
+
+- Existing backend is PHP/Laravel running in Docker.
+
+- Existing database is MariaDB.
+
+- Existing app already has users, roles, permissions, practitioners, client_profiles, appointments, sessions, notifications, and activity_events tables.
+
+- Do not create a separate app database.
+
+- Do not duplicate users, clients, or practitioners.
+
+- CBT must be designed as a merge-friendly module that can be developed standalone first and integrated into the existing project later.
+
+
+
+Goal:
+
+Create a CBT clinical module where psychologists and psychiatrists can create CBT care plans, assign CBT exercises/homework to clients, review completed exercises, and track client progress. Clients should be able to view assigned CBT plans, complete exercises, receive feedback, and track progress.
+
+
+
+Architecture:
+
+- Frontend module path: src/modules/cbt
+
+- Backend API route group: /api/cbt
+
+- Use existing auth and roles later.
+
+- In prototype mode, use mock currentUser and mock API data.
+
+- Keep all API calls inside src/modules/cbt/services/cbtApi.ts.
+
+- Keep all TypeScript types inside src/modules/cbt/types/cbt.types.ts.
+
+
+
+Frontend structure:
+
+src/modules/cbt/
+
+  pages/client/
+
+    ClientCbtDashboard.tsx
+
+    MyCbtPlan.tsx
+
+    MyExercises.tsx
+
+    CompleteExercise.tsx
+
+    MyProgress.tsx
+
+  pages/practitioner/
+
+    PractitionerCbtDashboard.tsx
+
+    ClientCbtOverview.tsx
+
+    CreateCbtPlan.tsx
+
+    AssignExercise.tsx
+
+    ReviewResponses.tsx
+
+    CbtProgressReport.tsx
+
+  pages/admin/
+
+    ExerciseTemplateLibrary.tsx
+
+    CreateExerciseTemplate.tsx
+
+  components/
+
+    CbtPlanCard.tsx
+
+    ExerciseCard.tsx
+
+    ExerciseFormRenderer.tsx
+
+    ProgressChart.tsx
+
+    RiskAlertBadge.tsx
+
+    ReviewPanel.tsx
+
+  data/
+
+    mockCbtData.ts
+
+  services/
+
+    cbtApi.ts
+
+  types/
+
+    cbt.types.ts
+
+  routes/
+
+    cbtRoutes.tsx
+
+
+
+Database:
+
+Create Laravel migrations for:
+
+1. cbt_exercise_categories
+
+2. cbt_exercise_templates
+
+3. cbt_care_plans
+
+4. cbt_plan_goals
+
+5. cbt_plan_exercises
+
+6. cbt_exercise_instances
+
+7. cbt_exercise_responses
+
+8. cbt_practitioner_reviews
+
+9. cbt_progress_snapshots
+
+10. cbt_risk_events
+
+
+
+Important:
+
+- Reuse existing users table for clients and practitioners.
+
+- Reuse existing practitioners and client_profiles tables if available.
+
+- Reuse existing notifications table.
+
+- Reuse existing activity_events/audit system.
+
+- Do not create cbt_users or duplicate auth tables.
+
+
+
+Functional flow:
+
+1. Practitioner selects client.
+
+2. Practitioner creates CBT care plan.
+
+3. Practitioner assigns one or more CBT exercises.
+
+4. System creates scheduled exercise instances.
+
+5. Client completes exercise.
+
+6. Response is saved as response_json.
+
+7. Practitioner reviews response and gives feedback.
+
+8. Dashboard shows progress using completion rate, mood trend, anxiety before/after, and common cognitive distortions.
+
+
+
+MVP exercise templates:
+
+1. Mood Check-in
+
+2. Thought Record
+
+3. Behavioral Activation
+
+4. Cognitive Distortion Practice
+
+5. Problem Solving Worksheet
+
+
+
+Use dynamic form rendering:
+
+- Store exercise form structure in template_schema_json.
+
+- Store client answers in response_json.
+
+- Create ExerciseFormRenderer that renders fields based on schema.
+
+- Support field types: text, textarea, select, multi_select, slider, date, time, checkbox, radio.
+
+
+
+API routes:
+
+Admin:
+
+GET /api/cbt/categories
+
+POST /api/cbt/categories
+
+GET /api/cbt/exercise-templates
+
+POST /api/cbt/exercise-templates
+
+PUT /api/cbt/exercise-templates/{id}
+
+
+
+Practitioner:
+
+GET /api/cbt/clients/{clientId}/plans
+
+POST /api/cbt/clients/{clientId}/plans
+
+GET /api/cbt/plans/{planId}
+
+PUT /api/cbt/plans/{planId}
+
+POST /api/cbt/plans/{planId}/exercises
+
+GET /api/cbt/plans/{planId}/progress
+
+GET /api/cbt/plans/{planId}/responses
+
+POST /api/cbt/responses/{responseId}/review
+
+
+
+Client:
+
+GET /api/cbt/my-plan
+
+GET /api/cbt/my-exercises
+
+GET /api/cbt/exercise-instances/{id}
+
+POST /api/cbt/exercise-instances/{id}/start
+
+POST /api/cbt/exercise-instances/{id}/submit
+
+GET /api/cbt/my-progress
+
+
+
+UI requirement:
+
+Use WellnessConnect existing design style:
+
+- Soft lavender/white background
+
+- Purple primary buttons
+
+- Rounded cards
+
+- Clean responsive layout
+
+- Client-friendly language
+
+- Professional clinical dashboard for practitioners
+
+
+
+Deliverables:
+
+1. Create frontend CBT module with mock data first.
+
+2. Create backend migrations and seeders.
+
+3. Create Laravel models/controllers/routes.
+
+4. Keep all code modular and merge-friendly.
+
+5. Do not disturb existing screens or routes.
+
+
+
+
+
+CBT App Core Concept
+
+App Name Idea: CBT Companion / ThoughtCare / Mind Balance CBT
+
+Purpose:
+Help users identify distressing situations, recognize automatic thoughts, evaluate those thoughts, develop balanced alternatives, and practice behavioral change through structured exercises.
+
+This app should not behave like a “chatbot therapist” replacing a psychologist. It should work as a guided CBT self-help and therapist-support tool.
+
+1. Onboarding & Assessment
+Features
+1. User Profile Setup
+
+Collect basic details:
+
+Name
+Age
+Gender
+Main concern: anxiety, depression, stress, panic, anger, sleep, low confidence
+Therapy status: self-help / working with therapist / referred by therapist
+Emergency contact optional
+2. Initial Mental Health Screening
+
+Use validated tools:
+
+PHQ-9 for depression
+GAD-7 for anxiety
+PSS for stress
+Sleep quality check
+Mood baseline
+3. Goal Setting
+
+CBT is usually problem-focused and goal-oriented. Public CBT literature describes CBT as time-limited, problem-oriented, and collaborative.
+
+Examples:
+
+“Reduce panic attacks”
+“Improve sleep”
+“Manage office anxiety”
+“Reduce negative thinking”
+“Increase daily activity”
+“Improve confidence”
+2. CBT Dashboard
+
+The dashboard should show:
+
+Today’s mood
+Current active goal
+Pending CBT exercise
+Thought record shortcut
+Homework task
+Progress graph
+Crisis help button
+Suggested Layout
+
+Top card:
+“Hi Khaja, how are you feeling today?”
+
+Mood selector:
+😄 Good | 🙂 Okay | 😟 Anxious | 😞 Low | 😡 Angry
+
+Main actions:
+
+Record a Thought
+Calm Down Now
+Start CBT Exercise
+View Progress
+Therapist Notes
+3. Thought Record Module
+
+This is the heart of a Beck-style CBT app.
+
+Thought Record Steps
+Step 1: Situation
+
+“What happened?”
+
+Example:
+“My manager called me suddenly.”
+
+Step 2: Emotion
+
+“What did you feel?”
+
+Anxiety
+Sadness
+Anger
+Guilt
+Shame
+Fear
+
+Also ask intensity: 0–100%
+
+Step 3: Automatic Thought
+
+“What went through your mind?”
+
+Example:
+“I will make a mistake and they will blame me.”
+
+Beck’s model gives major importance to automatic thoughts and how people interpret situations, not only the situation itself.
+
+Step 4: Evidence For
+
+“What makes this thought feel true?”
+
+Step 5: Evidence Against
+
+“What facts show this may not be fully true?”
+
+Step 6: Balanced Thought
+
+“What is a more realistic way to see this?”
+
+Example:
+“I may feel nervous, but I have handled similar work before. I can ask for clarification.”
+
+Step 7: Re-rate Emotion
+
+“How intense is the emotion now?”
+
+This gives the user visible proof that thinking differently can reduce emotional intensity.
+
+4. Cognitive Distortion Detector
+
+The app can help the user identify thinking errors.
+
+Common CBT Distortions
+All-or-nothing thinking
+Catastrophizing
+Mind reading
+Fortune telling
+Overgeneralization
+Emotional reasoning
+Personalization
+Should statements
+Discounting positives
+Labeling
+Feature Example
+
+User writes:
+“I always fail in meetings.”
+
+App detects:
+Possible distortion: Overgeneralization
+CBT question: “Is it true that you always fail, or are there times you managed well?”
+
+5. Guided Discovery / Socratic Questions
+
+CBT should not simply tell the user “think positive.” It should help the user discover a more balanced view.
+
+CBT commonly uses guided discovery and Socratic questioning as cognitive techniques.
+
+App Questions
+What is the evidence?
+Is there another explanation?
+What would you tell a friend in this situation?
+Are you confusing possibility with probability?
+What is the worst, best, and most realistic outcome?
+Will this matter after one month?
+What action can you take now?
+
+This feature can be built as a guided question flow, not a free random chatbot.
+
+6. Behavioral Activation Module
+
+For depression, low motivation, and fatigue, the app should include activity scheduling.
+
+Features
+Activity Planner
+Pleasant activities
+Mastery activities
+Social activities
+Health activities
+Spiritual/values-based activities
+
+Example:
+
+Time	Activity	Type
+7:00 AM	10-min walk	Health
+8:00 PM	Call friend	Social
+9:30 PM	Relaxation	Sleep
+Mood Before / After
+
+Ask:
+
+Mood before activity: 0–10
+Mood after activity: 0–10
+
+This helps users see the connection between behavior and mood.
+
+7. Behavioral Experiments
+
+This is powerful for anxiety, fear, low confidence, and avoidance.
+
+Feature Flow
+Step 1: Prediction
+
+“What do you think will happen?”
+
+Example:
+“If I ask a question in a meeting, people will think I am foolish.”
+
+Step 2: Experiment
+
+“What small action will you try?”
+
+Example:
+“I will ask one simple clarification question.”
+
+Step 3: Result
+
+“What actually happened?”
+
+Step 4: Learning
+
+“What did you learn?”
+
+CBT includes behavioral experiments and activity scheduling as behavioral techniques.
+
+8. Problem-Solving Module
+
+Useful for users who are overwhelmed.
+
+Steps
+Define the problem clearly
+List possible solutions
+Rate pros and cons
+Choose one solution
+Make an action plan
+Review outcome
+
+Example:
+
+Problem:
+“I am stressed because my work and health are clashing.”
+
+Possible solutions:
+
+Ask for flexible timing
+Request WFH
+Reduce non-essential commitments
+Break tasks into smaller parts
+Seek medical documentation
+9. Core Belief & Intermediate Belief Work
+
+This should be an advanced module, preferably unlocked after basic thought records.
+
+Core Belief Examples
+“I am weak”
+“I am unsafe”
+“I am not good enough”
+“People will reject me”
+Intermediate Beliefs
+“If I make one mistake, I am a failure”
+“I must please everyone”
+“I should never show weakness”
+Features
+Belief identification
+Downward arrow technique
+Belief strength rating
+New belief development
+Evidence log for new belief
+
+Example:
+
+Old belief:
+“I am helpless.”
+
+New belief:
+“I have limitations, but I can still take meaningful action.”
+
+10. Mood & Symptom Tracking
+Daily Check-in
+
+Track:
+
+Mood
+Anxiety
+Sleep
+Energy
+Irritability
+Physical symptoms
+Medication taken
+Exercise
+Social contact
+Visual Progress
+
+Show:
+
+Weekly mood graph
+Anxiety trend
+Sleep trend
+Thought record frequency
+Goal progress
+PHQ-9 / GAD-7 change over time
+11. Homework Module
+
+CBT strongly depends on between-session practice.
+
+Features
+Therapist assigns homework
+User completes homework
+Reminder notifications
+Completion streak
+Reflection after homework
+
+Examples:
+
+Complete one thought record
+Practice breathing twice daily
+Walk for 10 minutes
+Do one avoided task
+Record automatic thoughts during office stress
+12. Coping Skills Library
+Categories
+Anxiety Tools
+Box breathing
+Grounding 5-4-3-2-1
+Worry postponement
+Panic cycle education
+Exposure ladder
+Depression Tools
+Activity scheduling
+Self-compassion exercise
+Small wins tracker
+Values-based action
+Anger Tools
+Pause plan
+Trigger log
+Thought check
+Assertive communication
+Sleep Tools
+Sleep diary
+Stimulus control
+Wind-down routine
+Thought parking
+13. Psychoeducation Library
+
+Short lessons should explain CBT simply.
+
+Lesson Topics
+What is CBT?
+Thought–feeling–behavior connection
+Automatic thoughts
+Cognitive distortions
+Behavioral activation
+Anxiety cycle
+Avoidance cycle
+Panic cycle
+Core beliefs
+Relapse prevention
+
+Beck Institute states CBT is based on the idea that perception of a situation is more closely connected to reaction than the situation itself.
+
+14. Therapist / Psychologist Panel
+
+Since you are building a wellness platform, this is very important.
+
+Therapist Features
+View client dashboard
+View mood trends
+View thought records
+Assign CBT homework
+Add session notes
+Create treatment goals
+Track PHQ-9 / GAD-7 scores
+Review risk alerts
+Send secure messages
+Schedule sessions
+Session Structure Template
+
+A Beck-style CBT session can be structured like:
+
+Mood check
+Agenda setting
+Review previous homework
+Discuss key problem
+CBT exercise
+Assign homework
+Session summary
+Feedback
+15. Safety & Crisis Features
+
+This is mandatory.
+
+Features
+Crisis button always visible
+Emergency contact
+Suicide/self-harm screening
+“I need urgent help” page
+Local helpline information
+Therapist alert for high-risk responses
+Disclaimer: app is not emergency service
+Risk Alert Examples
+
+If user enters:
+
+“I want to die”
+“I will harm myself”
+“No reason to live”
+
+Then app should immediately show crisis support and alert therapist if consent and system rules allow.
+
+16. AI Features — Use Carefully
+
+AI can help, but should not diagnose or replace therapist judgment.
+
+Safe AI Features
+Suggest cognitive distortions
+Generate Socratic questions
+Summarize thought records
+Suggest balanced thought drafts
+Recommend coping tools
+Detect repeated patterns
+Create weekly reflection summary
+Avoid
+“You have depression”
+“Stop medication”
+“Your therapist is wrong”
+“This is definitely trauma”
+Unsupervised crisis handling
+17. Recommended MVP Feature Set
+
+For your first version, don’t build everything. Build this:
+
+MVP Phase 1
+Onboarding
+Mood check-in
+PHQ-9 and GAD-7
+Thought record
+Cognitive distortion helper
+Balanced thought generator
+Behavioral activation planner
+Homework reminders
+Progress graph
+Therapist dashboard
+
+That is enough for a strong CBT-based wellness MVP.
+
+18. Feature Modules Summary
+Module	Purpose
+Onboarding	Understand user concern and goals
+Assessment	Baseline anxiety/depression/stress
+Thought Record	Identify and restructure automatic thoughts
+Distortion Detector	Help users recognize thinking patterns
+Guided Discovery	Ask CBT-style reflective questions
+Behavioral Activation	Improve mood through planned activity
+Behavioral Experiments	Test feared predictions
+Homework	Practice between sessions
+Progress Tracking	Show improvement over time
+Therapist Panel	Support professional-guided CBT
+Crisis Safety	Protect high-risk users
+Psychoeducation	Teach CBT concepts clearly
+Best Product Positioning
+
+Use this positioning:
+
+“A structured CBT companion that helps users understand their thoughts, manage emotions, practice healthier behaviors, and work better with their therapist.”
+
+That is much safer and more professional than saying:
+
+“AI therapist app.”
+
+For your Aura Wellness Connect, CBT can become one dedicated program inside the psychology module:
+
+Aura CBT Care Program
+
+6-week anxiety program
+6-week depression support program
+Stress management program
+Sleep and worry program
+Therapist-guided CBT plan
+
+
+Recommended Strategy
+Phase 1: Create a standalone React Vite “Home Page Prototype”
+
+Purpose: build the homepage exactly like the mock image without disturbing your main WellnessConnect app.
+
+Create a separate project:
+
+npm create vite@latest wellness-homepage-prototype -- --template react-ts
+cd wellness-homepage-prototype
+npm install
+npm run dev
+
+Use this project only for:
+
+Home page layout
+Hero section
+Header/navbar
+Cards
+CTA banner
+Mascot/illustration assets
+Responsive desktop/mobile design
+Animation experiments
+Final UI polishing
+
+This keeps your main app safe.
+
+Phase 2: Build the Homepage as Components
+
+Do not code everything inside one App.tsx.
+
+Use this structure:
+
+src/
+  assets/
+    images/
+    icons/
+  components/
+    layout/
+      Header.tsx
+      Footer.tsx
+    home/
+      HeroSection.tsx
+      FloatingFeatureCard.tsx
+      MissionVisionValues.tsx
+      WhatWeOffer.tsx
+      StatsStrip.tsx
+      WhyWellnessConnect.tsx
+      BottomCTA.tsx
+  data/
+    homePageData.ts
+  pages/
+    HomePage.tsx
+  App.tsx
+
+This is important because later you can copy/import the same components into your main WellnessConnect app easily.
+
+Phase 3: Use Static Data First
+
+Create all content in one data file:
+
+src/data/homePageData.ts
+
+Example:
+
+export const services = [
+  {
+    title: "Mental Wellness",
+    description: "Mindfulness, therapy resources, and emotional well-being support.",
+    icon: "brain",
+  },
+  {
+    title: "Fitness & Personal Training",
+    description: "Workouts and coaching plans for all fitness levels.",
+    icon: "dumbbell",
+  },
+  {
+    title: "Nutrition Support",
+    description: "Personalized meal plans and healthy habits guidance.",
+    icon: "apple",
+  },
+];
+
+Later, when your backend is ready, you can replace this static data with API data without redesigning the UI.
+
+Phase 4: Decide Styling System Now
+
+For your WellnessConnect app, I strongly suggest:
+
+Best option: Tailwind CSS + custom reusable components
+
+Because your designs have:
+
+Rounded cards
+Gradient backgrounds
+Responsive layouts
+Soft shadows
+Repeated cards
+Icon circles
+CTA buttons
+
+Tailwind will be faster and cleaner than writing large CSS files.
+
+Install Tailwind in the prototype and use the same setup later in the main app.
+
+Phase 5: Asset Strategy
+
+For the mascot and illustration, do not keep everything as one big background image.
+
+Better split assets like this:
+
+assets/
+  images/
+    mascot-heart.png
+    hero-bg-glow.svg
+    plant-left.png
+    plant-right.png
+    books-mug.png
+  icons/
+    brain.svg
+    dumbbell.svg
+    apple.svg
+    shield.svg
+    chart.svg
+
+Why?
+
+Because later you can animate them separately:
+
+Mascot floating animation
+Cards subtle movement
+Sparkles
+CTA hover effects
+Lottie/Rive animation later
+
+For MVP, use PNG/SVG. Later, convert mascot to Lottie/Rive if needed.
+
+Phase 6: Make It Responsive Early
+
+Do not design only desktop first.
+
+Build three breakpoints from the beginning:
+
+Device	Layout
+Desktop	Hero text left, mascot right
+Tablet	Hero stacked slightly
+Mobile	Header simplified, hero stacked, cards scroll/stack
+
+For mobile:
+
+Hide full nav
+Show hamburger menu
+Stack hero content
+Use 1-column cards
+Reduce mascot size
+Keep CTA buttons full width or stacked
+Phase 7: Integration into Main WellnessConnect App
+
+After the prototype is approved, move only these folders into your main app:
+
+components/home/
+components/layout/Header.tsx
+data/homePageData.ts
+assets/images/
+assets/icons/
+pages/HomePage.tsx
+
+Then add route in your main app:
+
+<Route path="/" element={<HomePage />} />
+
+If your current app already has authentication, dashboard, admin, client, trainer routes, keep homepage separate from logged-in app.
+
+Recommended route structure:
+
+Public Website
+/
+ /features
+ /how-it-works
+ /about
+ /careers
+ /signin
+
+Authenticated App
+/app/client
+/app/trainer
+/app/admin
+
+This separation is very important.
+
+Best Architecture
+
+Use this model:
+
+WellnessConnect
+│
+├── Public Marketing Website
+│   ├── Home
+│   ├── Features
+│   ├── How It Works
+│   ├── About Us
+│   ├── Careers
+│   └── Sign In
+│
+└── Authenticated App
+    ├── Client Dashboard
+    ├── Trainer Dashboard
+    ├── Psychologist Dashboard
+    └── Admin Dashboard
+
+Your homepage should not be mixed with dashboard logic.
+
+My Strong Recommendation
+
+Build this homepage as a public marketing module, not as part of the logged-in app.
+
+Meaning:
+
+src/modules/public/
+  pages/
+    HomePage.tsx
+    AboutPage.tsx
+    FeaturesPage.tsx
+    HowItWorksPage.tsx
+  components/
+    PublicHeader.tsx
+    PublicFooter.tsx
+
+And logged-in app separately:
+
+src/modules/app/
+  client/
+  trainer/
+  admin/
+  psychologist/
+
+This will save you from confusion later.
+
+Best Development Order
+
+Use this order:
+
+Create Vite React TypeScript app
+Install Tailwind CSS
+Create design tokens: colors, fonts, shadows, radius
+Build Header
+Build Hero section
+Add mascot and floating cards
+Build Mission/Vision/Values
+Build What We Offer
+Build Stats strip
+Build Why WellnessConnect
+Build Bottom CTA
+Make responsive
+Polish animations
+Move into main WellnessConnect app
+Prompt to Give Codex
+
+Use this:
+
+Create a standalone React Vite TypeScript app for a WellnessConnect public homepage prototype.
+
+Goal:
+Build a high-fidelity responsive landing page matching the attached mock image style.
+
+Tech:
+- React
+- Vite
+- TypeScript
+- Tailwind CSS
+- Component-based architecture
+- No backend integration for now
+- Use static data from src/data/homePageData.ts
+
+Design style:
+- Premium wellness platform
+- White to soft lavender background
+- Purple primary color
+- Rounded cards
+- Soft shadows
+- Clean typography
+- Friendly 3D wellness mascot area
+- Floating feature cards
+- Desktop-first but fully responsive
+
+Create this structure:
+
+src/
+  assets/
+    images/
+    icons/
+  components/
+    layout/
+      PublicHeader.tsx
+      PublicFooter.tsx
+    home/
+      HeroSection.tsx
+      FloatingFeatureCard.tsx
+      MissionVisionValues.tsx
+      WhatWeOffer.tsx
+      StatsStrip.tsx
+      WhyWellnessConnect.tsx
+      BottomCTA.tsx
+  data/
+    homePageData.ts
+  pages/
+    HomePage.tsx
+  App.tsx
+
+Sections required:
+1. Public header with logo, nav links, Careers, Sign In, Get Started
+2. Hero section with large headline, trust badge, paragraph, CTA buttons
+3. Right-side mascot illustration area with floating cards
+4. Mission, Vision, Values cards
+5. What We Offer service cards
+6. Stats strip
+7. Why WellnessConnect cards
+8. Bottom CTA banner
+
+Important:
+- Keep all text/content configurable from homePageData.ts
+- Use reusable Card and Button styles where possible
+- Avoid hardcoding repeated content directly inside components
+- Make layout responsive for desktop, tablet, and mobile
+- Use placeholder assets if exact images are not available
+- Keep the code clean so this module can later be copied into the main WellnessConnect app
+Final Direction
+
+Your best path is:
+
+Prototype separately → polish UI → make reusable components → integrate into main app as public website module.
+
+Do not directly build this inside your main WellnessConnect app first. It will slow you down and may disturb existing dashboard screens.
+
+this is the existing project structure using php mariadb as backend with docker container, i want to create this CBT app to merge later in this project, without complex procedure to merge and want to use existing database.  When i merge the app, the psychologists and psychatrist should have an option to create plan/prescribe these exercises to patients/clients, and client should able to complete those exercises, which facilitates progress tracking of both client and pyschologist.  Now plan the better solution like a Solutions Architect, or Enterprise Architect
+Thought for a second
+
+Excellent. Your thinking is correct: do not create a totally separate CBT app with a separate database if the final goal is to merge it into your existing WellnessConnect project.
+
+The best architecture is:
+
+Build CBT as a standalone React Vite module first, but design its frontend, routes, data models, and API contracts exactly as a future WellnessConnect module. Backend should use your existing Laravel/PHP + MariaDB database through new CBT-specific tables.
+
+This gives you both benefits: easy development now, easy merge later.
+
+1. Recommended Enterprise Architecture
+
+Your existing project already has:
+
+React Vite frontend
+PHP/Laravel backend
+MariaDB database
+Docker environment
+Existing users table
+Existing roles/permissions
+Existing appointments/sessions/practitioners tables
+
+So CBT should become a new clinical module, not a separate product.
+
+Recommended structure:
+
+WellnessConnect
+│
+├── Public Website
+│   ├── Home
+│   ├── Features
+│   ├── About
+│   └── Careers
+│
+├── Authenticated App
+│   ├── Client Dashboard
+│   ├── Psychologist Dashboard
+│   ├── Psychiatrist Dashboard
+│   ├── Trainer Dashboard
+│   └── Admin Dashboard
+│
+└── Clinical Modules
+    ├── CBT Module
+    ├── Assessments Module
+    ├── Session Notes Module
+    ├── Care Plans Module
+    └── Progress Tracking Module
+
+The CBT app should be treated as one module inside the clinical system.
+
+2. Best Development Strategy
+Build standalone, but not isolated
+
+Create a new React Vite app only for faster UI development:
+
+cbt-module-prototype/
+
+But follow the same structure, naming, routes, and API logic that your main app will use later.
+
+Do not create:
+
+separate login
+separate users
+separate roles
+separate client database
+separate psychologist database
+
+Instead, assume these already come from WellnessConnect.
+
+In prototype mode, you can use mock auth like:
+
+const currentUser = {
+  id: 1,
+  role: "psychologist",
+  name: "Dr. User"
+}
+
+Later, replace this mock auth with your existing app authentication.
+
+3. User Roles Required
+
+For CBT module, you mainly need these roles:
+
+1. Admin
+
+Can manage:
+
+CBT exercise library
+Default CBT programs
+Categories
+Risk settings
+Clinical templates
+Access permissions
+2. Psychologist
+
+Can:
+
+View assigned clients
+Create CBT care plans
+Prescribe CBT exercises
+Review completed exercises
+Track progress
+Add therapist notes
+Modify plan based on response
+3. Psychiatrist
+
+Can:
+
+View CBT progress
+Prescribe selected exercises if allowed
+Review mood/symptom trends
+Add clinical notes
+Coordinate with psychologist
+
+Important: psychiatrist prescription usually means medicine, but in your app use the safer term:
+
+Assign CBT Exercise or Prescribe Therapeutic Exercise
+
+4. Client / Patient
+
+Can:
+
+View assigned CBT plan
+Complete daily/weekly exercises
+Submit thought records
+Track mood
+See progress
+Receive reminders
+Share progress with psychologist
+4. Core Product Flow
+
+The workflow should be:
+
+Psychologist/Psychiatrist
+        ↓
+Select Client
+        ↓
+Create CBT Plan
+        ↓
+Assign Exercises
+        ↓
+Client Completes Exercises
+        ↓
+System Calculates Progress
+        ↓
+Psychologist Reviews
+        ↓
+Plan Updated
+
+This is the right clinical workflow.
+
+5. CBT Module Main Features
+A. CBT Exercise Library
+
+This is the master library.
+
+Examples:
+
+Thought Record
+Cognitive Distortion Identification
+Behavioral Activation
+Worry Time
+Problem Solving
+Exposure Hierarchy
+Behavioral Experiment
+Core Belief Worksheet
+Gratitude Log
+Sleep Thought Parking
+Panic Cycle Reflection
+Anger Trigger Log
+
+Each exercise should have:
+
+Title
+Description
+Category
+Difficulty
+Estimated time
+Target condition
+Question structure
+Scoring logic
+Active/inactive status
+
+This allows admin/psychologist to reuse exercises.
+
+B. CBT Plan Builder
+
+Psychologist creates a structured plan for a client.
+
+Example:
+
+Client: Ahmed
+Program: Anxiety CBT Plan
+Duration: 6 weeks
+Goal: Reduce work-related anxiety
+Assigned by: Psychologist
+Review frequency: Weekly
+
+Plan contains multiple exercises:
+
+Week 1: Mood Check-in + Thought Record
+Week 2: Cognitive Distortion Practice
+Week 3: Behavioral Activation
+Week 4: Behavioral Experiment
+Week 5: Core Belief Work
+Week 6: Relapse Prevention
+C. Assign / Prescribe Exercise
+
+Psychologist can assign:
+
+Exercise: Thought Record
+Frequency: Daily
+Start date: 04-Jun-2026
+End date: 10-Jun-2026
+Due time: 8:00 PM
+Instructions: Complete when you feel anxious at work
+Priority: High
+
+Client sees it as:
+
+Today’s CBT Exercise
+Thought Record
+Due by 8:00 PM
+Status: Pending
+D. Client Exercise Completion
+
+Client completes structured forms.
+
+Example Thought Record:
+
+Situation
+Emotion
+Emotion intensity before
+Automatic thought
+Evidence for
+Evidence against
+Balanced thought
+Emotion intensity after
+Reflection
+
+System stores the response.
+
+E. Progress Tracking
+
+Progress should be visible to both client and psychologist.
+
+Track:
+
+Exercise completion %
+Mood trend
+Anxiety intensity before/after
+Depression score trend
+GAD-7 trend
+PHQ-9 trend
+Thought pattern frequency
+Most common cognitive distortions
+Weekly improvement
+Missed exercises
+Therapist review status
+
+Example:
+
+Thought Record Completion: 82%
+Average Anxiety Before: 78/100
+Average Anxiety After: 46/100
+Improvement: 32 points
+Most Common Distortion: Catastrophizing
+
+This is very valuable clinically and commercially.
+
+6. Best Database Strategy
+
+Since you already have MariaDB and Laravel, create new tables only for CBT.
+
+Do not disturb existing tables.
+
+Existing tables you should reuse
+
+Based on your screenshots, you already have tables like:
+
+users
+practitioners
+practitioner_specialties
+appointments
+sessions
+client_profiles
+service_catalog
+workflow_cases
+notifications
+permissions
+roles
+role_permissions
+
+So CBT should reference these.
+
+7. Recommended CBT Tables
+1. cbt_exercise_categories
+
+Stores categories.
+
+id
+name
+slug
+description
+sort_order
+is_active
+created_at
+updated_at
+
+Examples:
+
+Cognitive Restructuring
+Behavioral Activation
+Exposure
+Problem Solving
+Relaxation
+Sleep
+Relapse Prevention
+2. cbt_exercise_templates
+
+Master exercise templates.
+
+id
+category_id
+title
+slug
+description
+clinical_purpose
+instructions
+difficulty_level
+estimated_minutes
+target_conditions
+template_schema_json
+scoring_schema_json
+is_active
+created_by
+created_at
+updated_at
+
+Important field:
+
+template_schema_json
+
+This stores the exercise questions dynamically.
+
+Example:
+
+{
+  "fields": [
+    {
+      "key": "situation",
+      "label": "What happened?",
+      "type": "textarea",
+      "required": true
+    },
+    {
+      "key": "emotion",
+      "label": "What emotion did you feel?",
+      "type": "multi_select",
+      "options": ["Anxiety", "Sadness", "Anger", "Fear", "Guilt"]
+    },
+    {
+      "key": "emotion_before",
+      "label": "Emotion intensity before",
+      "type": "slider",
+      "min": 0,
+      "max": 100
+    }
+  ]
+}
+
+This is powerful because you can add new CBT exercises without creating new tables each time.
+
+3. cbt_care_plans
+
+A CBT plan created for a client.
+
+id
+client_id
+primary_practitioner_id
+created_by
+title
+description
+primary_goal
+status
+start_date
+end_date
+review_frequency
+risk_level
+created_at
+updated_at
+
+Status values:
+
+draft
+active
+paused
+completed
+cancelled
+4. cbt_plan_goals
+
+Specific goals inside plan.
+
+id
+care_plan_id
+goal_title
+goal_description
+baseline_score
+target_score
+current_score
+status
+created_at
+updated_at
+
+Example:
+
+Reduce work anxiety from 80/100 to 40/100
+Improve sleep from 4 hours to 6.5 hours
+Complete 5 thought records per week
+5. cbt_plan_exercises
+
+Exercises assigned inside a care plan.
+
+id
+care_plan_id
+exercise_template_id
+assigned_by
+assigned_to
+title_override
+instructions_override
+frequency
+start_date
+end_date
+due_time
+priority
+status
+created_at
+updated_at
+
+Frequency examples:
+
+once
+daily
+weekly
+as_needed
+custom
+6. cbt_exercise_instances
+
+Actual scheduled occurrences.
+
+This is important.
+
+If a thought record is assigned daily for 7 days, you should create 7 instances.
+
+id
+plan_exercise_id
+client_id
+scheduled_date
+due_at
+status
+completed_at
+created_at
+updated_at
+
+Status:
+
+pending
+in_progress
+completed
+missed
+reviewed
+7. cbt_exercise_responses
+
+Stores client answers.
+
+id
+exercise_instance_id
+client_id
+response_json
+score_json
+emotion_before
+emotion_after
+client_reflection
+submitted_at
+created_at
+updated_at
+
+This flexible JSON response allows you to store different exercise types.
+
+8. cbt_practitioner_reviews
+
+Psychologist/psychiatrist review of completed exercise.
+
+id
+exercise_response_id
+reviewed_by
+review_status
+clinical_notes
+feedback_to_client
+risk_flag
+next_action
+reviewed_at
+created_at
+updated_at
+
+Review status:
+
+pending_review
+reviewed
+needs_follow_up
+escalated
+9. cbt_progress_snapshots
+
+Weekly or periodic progress summary.
+
+id
+care_plan_id
+client_id
+period_start
+period_end
+completion_rate
+average_mood
+average_anxiety_before
+average_anxiety_after
+improvement_score
+most_common_distortions_json
+summary_json
+created_at
+updated_at
+
+This helps dashboard performance because you do not calculate everything live every time.
+
+10. cbt_risk_events
+
+For high-risk responses.
+
+id
+client_id
+care_plan_id
+exercise_response_id
+risk_type
+risk_level
+trigger_text
+action_taken
+alerted_practitioner_id
+status
+created_at
+updated_at
+
+Risk examples:
+
+self_harm
+suicidal_ideation
+violence_risk
+severe_depression
+panic_escalation
+
+Very important for clinical safety.
+
+8. Database Relationship Overview
+users
+ ├── client_profiles
+ ├── practitioners
+ │
+ └── cbt_care_plans
+        ├── cbt_plan_goals
+        ├── cbt_plan_exercises
+        │      ├── cbt_exercise_instances
+        │      │      └── cbt_exercise_responses
+        │      │              └── cbt_practitioner_reviews
+        │
+        └── cbt_progress_snapshots
+
+Exercise templates:
+
+cbt_exercise_categories
+        └── cbt_exercise_templates
+
+Risk tracking:
+
+cbt_exercise_responses
+        └── cbt_risk_events
+9. API Architecture
+
+Create CBT-specific API routes in Laravel.
+
+Recommended route group:
+
+/api/cbt
+Admin APIs
+GET    /api/cbt/categories
+POST   /api/cbt/categories
+PUT    /api/cbt/categories/{id}
+
+GET    /api/cbt/exercise-templates
+POST   /api/cbt/exercise-templates
+GET    /api/cbt/exercise-templates/{id}
+PUT    /api/cbt/exercise-templates/{id}
+Practitioner APIs
+GET    /api/cbt/clients/{clientId}/plans
+POST   /api/cbt/clients/{clientId}/plans
+GET    /api/cbt/plans/{planId}
+PUT    /api/cbt/plans/{planId}
+
+POST   /api/cbt/plans/{planId}/exercises
+GET    /api/cbt/plans/{planId}/progress
+GET    /api/cbt/plans/{planId}/responses
+POST   /api/cbt/responses/{responseId}/review
+Client APIs
+GET    /api/cbt/my-plan
+GET    /api/cbt/my-exercises
+GET    /api/cbt/exercise-instances/{id}
+POST   /api/cbt/exercise-instances/{id}/start
+POST   /api/cbt/exercise-instances/{id}/submit
+GET    /api/cbt/my-progress
+10. Frontend Architecture
+
+In your standalone React Vite CBT prototype, use this structure:
+
+src/
+  modules/
+    cbt/
+      pages/
+        client/
+          ClientCbtDashboard.tsx
+          MyCbtPlan.tsx
+          MyExercises.tsx
+          CompleteExercise.tsx
+          MyProgress.tsx
+
+        practitioner/
+          PractitionerCbtDashboard.tsx
+          ClientCbtOverview.tsx
+          CreateCbtPlan.tsx
+          AssignExercise.tsx
+          ReviewResponses.tsx
+          CbtProgressReport.tsx
+
+        admin/
+          ExerciseTemplateLibrary.tsx
+          CreateExerciseTemplate.tsx
+
+      components/
+        CbtPlanCard.tsx
+        ExerciseCard.tsx
+        ExerciseFormRenderer.tsx
+        ProgressChart.tsx
+        RiskAlertBadge.tsx
+        ReviewPanel.tsx
+
+      data/
+        mockCbtData.ts
+
+      services/
+        cbtApi.ts
+
+      types/
+        cbt.types.ts
+
+      routes/
+        cbtRoutes.tsx
+
+This is merge-friendly.
+
+Later, copy the whole modules/cbt folder into your existing project.
+
+11. Best UI Screens to Build First
+Client Side
+1. Client CBT Dashboard
+
+Show:
+
+Active plan
+Today’s exercise
+Completion streak
+Mood check-in
+Progress score
+Therapist feedback
+2. My CBT Plan
+
+Show:
+
+Plan goal
+Assigned exercises
+Weekly schedule
+Status
+Next review date
+3. Complete Exercise Screen
+
+Dynamic form renderer based on template_schema_json.
+
+This screen is the most important technically.
+
+4. My Progress
+
+Show:
+
+Completion %
+Mood trend
+Anxiety before/after
+Distortion patterns
+Weekly summary
+Practitioner Side
+1. CBT Client Overview
+
+Show:
+
+Client profile
+Active CBT plan
+Latest exercise submissions
+Risk alerts
+Progress graph
+Review pending count
+2. Create CBT Plan
+
+Plan builder screen.
+
+3. Assign Exercise
+
+Select from library and assign frequency.
+
+4. Review Client Exercise
+
+Psychologist reads response and gives feedback.
+
+Admin Side
+1. CBT Exercise Library
+
+Manage master templates.
+
+2. Create Exercise Template
+
+Dynamic form builder or JSON editor initially.
+
+For MVP, don’t build complex drag-and-drop form builder. Start with predefined templates.
+
+12. Key Architectural Decision: Dynamic Forms
+
+This is the most important decision.
+
+You should not create a separate database table for every CBT exercise.
+
+Bad approach:
+
+thought_records table
+behavioral_activation table
+worry_logs table
+exposure_logs table
+core_belief_table
+
+This becomes complex.
+
+Better approach:
+
+cbt_exercise_templates
+cbt_exercise_responses
+
+Use JSON schema for questions and responses.
+
+This allows:
+
+New CBT worksheets later
+Easy app expansion
+Less migration headache
+Faster MVP
+Therapist-customized exercises
+Same renderer for all exercises
+13. How Existing Database Can Be Used
+
+From your current tables, I can see your system already has a good foundation.
+
+Use existing:
+
+users
+roles
+permissions
+practitioners
+client_profiles
+appointments
+sessions
+notifications
+workflow_cases
+service_catalog
+
+Add only CBT-specific tables.
+
+Do not create duplicate:
+
+cbt_users
+cbt_clients
+cbt_practitioners
+
+That would create future merge problems.
+
+14. Merge Strategy Later
+
+When the CBT prototype is ready:
+
+Step 1: Move frontend module
+
+From:
+
+cbt-module-prototype/src/modules/cbt
+
+To:
+
+wellness-connect-app/src/modules/cbt
+Step 2: Add CBT routes
+/client/cbt
+/client/cbt/exercises
+/client/cbt/progress
+
+/practitioner/cbt
+/practitioner/cbt/clients/:clientId
+/practitioner/cbt/plans/:planId
+
+/admin/cbt/exercise-library
+Step 3: Replace mock API
+
+In prototype:
+
+import { mockCbtData } from "../data/mockCbtData";
+
+After merge:
+
+import { cbtApi } from "../services/cbtApi";
+Step 4: Run Laravel migrations
+
+Add CBT tables through Laravel migrations.
+
+Step 5: Seed CBT templates
+
+Seed initial CBT exercises into database.
+
+15. MVP Scope: Do Not Overbuild
+
+For first CBT MVP, build only this:
+
+Practitioner
+View client
+Create CBT plan
+Assign exercise
+Review completed exercise
+See progress summary
+Client
+View assigned plan
+Complete exercise
+See progress
+Receive feedback
+Admin
+View/manage exercise templates
+Exercise Types for MVP
+
+Start with only 5:
+
+1. Thought Record
+2. Mood Check-in
+3. Behavioral Activation
+4. Cognitive Distortion Practice
+5. Problem Solving Worksheet
+
+Do not start with 20 exercises. First make the assignment-completion-review loop perfect.
+
+16. Suggested First CBT Exercises
+1. Mood Check-in
+
+Fields:
+
+Mood score 0–10
+Anxiety score 0–10
+Energy score 0–10
+Sleep quality 0–10
+Main emotion
+Short note
+2. Thought Record
+
+Fields:
+
+Situation
+Emotion
+Emotion intensity before
+Automatic thought
+Cognitive distortion
+Evidence for
+Evidence against
+Balanced thought
+Emotion intensity after
+Learning
+3. Behavioral Activation
+
+Fields:
+
+Planned activity
+Activity type
+Mood before
+Mood after
+Difficulty
+What helped?
+4. Cognitive Distortion Practice
+
+Fields:
+
+Automatic thought
+Selected distortion
+Why this distortion?
+Balanced replacement thought
+Confidence rating
+5. Problem Solving Worksheet
+
+Fields:
+
+Problem
+Possible solutions
+Best solution
+First step
+Obstacle
+Plan B
+17. Dashboard Metrics
+Client dashboard
+Today’s pending exercises
+Completed this week
+Mood trend
+Current plan progress
+Latest therapist feedback
+Next appointment
+Psychologist dashboard
+Clients with pending reviews
+Clients with missed exercises
+Risk flagged clients
+Average completion rate
+Recent submissions
+Progress improved / declined
+Admin dashboard
+Total CBT templates
+Active CBT plans
+Exercise completion rate
+Risk events
+Most used exercises
+18. Security and Privacy
+
+Because this is mental health data, treat CBT responses as sensitive clinical data.
+
+Add:
+
+Role-based access control
+Client can see only own CBT data
+Psychologist can see only assigned clients
+Admin should not casually view clinical responses unless required
+Audit logs for viewing sensitive records
+Encryption at rest for highly sensitive fields if possible
+Consent for sharing CBT data with practitioner
+Crisis disclaimer
+
+Also add audit events:
+
+cbt_plan_created
+cbt_exercise_assigned
+cbt_response_submitted
+cbt_response_reviewed
+cbt_risk_flag_created
+
+You already have activity_events, so reuse that.
+
+19. Notification Strategy
+
+Use existing notifications table.
+
+Trigger notifications when:
+
+Exercise assigned
+Exercise due today
+Exercise overdue
+Practitioner reviewed response
+Risk alert generated
+Weekly progress summary ready
+
+No need to create new CBT notification table unless required.
+
+20. Naming Recommendation
+
+Use this wording in the UI:
+
+Instead of:
+
+Prescription
+
+Use:
+
+Care Plan
+Assigned Exercise
+Therapeutic Practice
+CBT Homework
+
+For psychologists:
+
+Assign CBT Exercise
+Create CBT Care Plan
+Review Client Practice
+
+For clients:
+
+My CBT Plan
+Today’s Practice
+Complete Exercise
+My Progress
+
+This feels less medical-heavy and better for a wellness app.
+
+21. Enterprise-Level Final Architecture
+Frontend: React Vite
+Backend: Laravel/PHP API
+Database: Existing MariaDB
+Auth: Existing auth
+Roles: Existing roles/permissions
+CBT: New module
+Notifications: Existing notification system
+Audit: Existing activity_events
+Reports: CBT progress snapshots
+Future AI: Add later as service layer
+
+This is the cleanest architecture.
+
+22. Implementation Roadmap
+Sprint 1: Database + Seed Data
+Add CBT migrations
+Create seeders for 5 CBT exercises
+Create API models/controllers
+Add permissions
+Sprint 2: Client CBT Screens
+Client CBT dashboard
+My exercises
+Complete exercise
+My progress
+Sprint 3: Practitioner CBT Screens
+Client CBT overview
+Create plan
+Assign exercise
+Review response
+Sprint 4: Progress and Notifications
+Completion rate
+Before/after emotional intensity
+Weekly progress snapshot
+Notifications
+Sprint 5: Safety + Polish
+Risk keywords
+Alerts
+Audit logs
+Responsive UI
+Final integration
+23. Best Prompt to Give Codex
+
+Use this:
+
+We need to build a CBT module for the existing WellnessConnect project.
+
+Important context:
+- Existing frontend is React Vite.
+- Existing backend is PHP/Laravel running in Docker.
+- Existing database is MariaDB.
+- Existing app already has users, roles, permissions, practitioners, client_profiles, appointments, sessions, notifications, and activity_events tables.
+- Do not create a separate app database.
+- Do not duplicate users, clients, or practitioners.
+- CBT must be designed as a merge-friendly module that can be developed standalone first and integrated into the existing project later.
+
+Goal:
+Create a CBT clinical module where psychologists and psychiatrists can create CBT care plans, assign CBT exercises/homework to clients, review completed exercises, and track client progress. Clients should be able to view assigned CBT plans, complete exercises, receive feedback, and track progress.
+
+Architecture:
+- Frontend module path: src/modules/cbt
+- Backend API route group: /api/cbt
+- Use existing auth and roles later.
+- In prototype mode, use mock currentUser and mock API data.
+- Keep all API calls inside src/modules/cbt/services/cbtApi.ts.
+- Keep all TypeScript types inside src/modules/cbt/types/cbt.types.ts.
+
+Frontend structure:
+src/modules/cbt/
+  pages/client/
+    ClientCbtDashboard.tsx
+    MyCbtPlan.tsx
+    MyExercises.tsx
+    CompleteExercise.tsx
+    MyProgress.tsx
+  pages/practitioner/
+    PractitionerCbtDashboard.tsx
+    ClientCbtOverview.tsx
+    CreateCbtPlan.tsx
+    AssignExercise.tsx
+    ReviewResponses.tsx
+    CbtProgressReport.tsx
+  pages/admin/
+    ExerciseTemplateLibrary.tsx
+    CreateExerciseTemplate.tsx
+  components/
+    CbtPlanCard.tsx
+    ExerciseCard.tsx
+    ExerciseFormRenderer.tsx
+    ProgressChart.tsx
+    RiskAlertBadge.tsx
+    ReviewPanel.tsx
+  data/
+    mockCbtData.ts
+  services/
+    cbtApi.ts
+  types/
+    cbt.types.ts
+  routes/
+    cbtRoutes.tsx
+
+Database:
+Create Laravel migrations for:
+1. cbt_exercise_categories
+2. cbt_exercise_templates
+3. cbt_care_plans
+4. cbt_plan_goals
+5. cbt_plan_exercises
+6. cbt_exercise_instances
+7. cbt_exercise_responses
+8. cbt_practitioner_reviews
+9. cbt_progress_snapshots
+10. cbt_risk_events
+
+Important:
+- Reuse existing users table for clients and practitioners.
+- Reuse existing practitioners and client_profiles tables if available.
+- Reuse existing notifications table.
+- Reuse existing activity_events/audit system.
+- Do not create cbt_users or duplicate auth tables.
+
+Functional flow:
+1. Practitioner selects client.
+2. Practitioner creates CBT care plan.
+3. Practitioner assigns one or more CBT exercises.
+4. System creates scheduled exercise instances.
+5. Client completes exercise.
+6. Response is saved as response_json.
+7. Practitioner reviews response and gives feedback.
+8. Dashboard shows progress using completion rate, mood trend, anxiety before/after, and common cognitive distortions.
+
+MVP exercise templates:
+1. Mood Check-in
+2. Thought Record
+3. Behavioral Activation
+4. Cognitive Distortion Practice
+5. Problem Solving Worksheet
+
+Use dynamic form rendering:
+- Store exercise form structure in template_schema_json.
+- Store client answers in response_json.
+- Create ExerciseFormRenderer that renders fields based on schema.
+- Support field types: text, textarea, select, multi_select, slider, date, time, checkbox, radio.
+
+API routes:
+Admin:
+GET /api/cbt/categories
+POST /api/cbt/categories
+GET /api/cbt/exercise-templates
+POST /api/cbt/exercise-templates
+PUT /api/cbt/exercise-templates/{id}
+
+Practitioner:
+GET /api/cbt/clients/{clientId}/plans
+POST /api/cbt/clients/{clientId}/plans
+GET /api/cbt/plans/{planId}
+PUT /api/cbt/plans/{planId}
+POST /api/cbt/plans/{planId}/exercises
+GET /api/cbt/plans/{planId}/progress
+GET /api/cbt/plans/{planId}/responses
+POST /api/cbt/responses/{responseId}/review
+
+Client:
+GET /api/cbt/my-plan
+GET /api/cbt/my-exercises
+GET /api/cbt/exercise-instances/{id}
+POST /api/cbt/exercise-instances/{id}/start
+POST /api/cbt/exercise-instances/{id}/submit
+GET /api/cbt/my-progress
+
+UI requirement:
+Use WellnessConnect existing design style:
+- Soft lavender/white background
+- Purple primary buttons
+- Rounded cards
+- Clean responsive layout
+- Client-friendly language
+- Professional clinical dashboard for practitioners
+
+Deliverables:
+1. Create frontend CBT module with mock data first.
+2. Create backend migrations and seeders.
+3. Create Laravel models/controllers/routes.
+4. Keep all code modular and merge-friendly.
+5. Do not disturb existing screens or routes.
+My Final Recommendation
+
+Build CBT as a module-first system, not a separate app.
+
+The smartest path is:
+
+Standalone React prototype for UI speed
+        ↓
+Same folder/module structure as final app
+        ↓
+Use mock API first
+        ↓
+Create Laravel CBT tables in existing MariaDB
+        ↓
+Replace mock data with real /api/cbt endpoints
+        ↓
+Merge module into WellnessConnect
+
+This gives you a professional, scalable architecture without future merge pain.
+
+So, i need to provide this prompt outside the wellness connect folder, or within the wellnessconnect folder? answer in simple words
+Thought for a second
+
+Use it within the existing wellness-connect-app folder, not outside.
+
+Because your goal is to use the existing Laravel backend, MariaDB database, roles, users, and project structure.
+
+Best way:
+
+Open VS Code in your existing project:
+sample-project/wellness-connect-app
+Give Codex the prompt inside this project.
+Tell Codex clearly:
+Do not create a new separate app.
+Create the CBT module inside the existing WellnessConnect project.
+Use existing database, existing auth, existing users, roles, practitioners, client_profiles, notifications, and activity_events.
+
+So the correct approach is:
+
+sample-project/
+  wellness-connect-app/
+    src/modules/cbt/        ✅ create CBT frontend here
+    backend/                ✅ create Laravel CBT migrations/API here
+    docker-compose.yml
+
+Only create outside folder when you want pure UI experiment only.
+But for your case, since you want easy merging and existing database, create it inside wellness-connect-app.
