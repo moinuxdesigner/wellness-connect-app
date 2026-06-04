@@ -1,5 +1,26 @@
 import { useEffect, useMemo, useReducer, useState } from 'react';
-import { ArrowLeft, ArrowRight, Check, UserRound } from 'lucide-react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  BadgeCheck,
+  BriefcaseBusiness,
+  CalendarDays,
+  Check,
+  ChevronDown,
+  Globe2,
+  Headphones,
+  Heart,
+  LockKeyhole,
+  Monitor,
+  RotateCcw,
+  Search,
+  ShieldCheck,
+  Sparkles,
+  Star,
+  UserCheck,
+  UserRound,
+  X,
+} from 'lucide-react';
 import { useNavigate } from 'react-router';
 import {
   bookAppointmentRequest,
@@ -139,10 +160,99 @@ function upcomingSlotWindow() {
   };
 }
 
-function practitionerLabel(type: PractitionerItem['type']) {
+function practitionerLabel(type: PractitionerItem['type'] | string | undefined) {
   if (type === 'trainer') return 'Fitness trainer';
   if (type === 'counsellor') return 'Psychologist';
   return 'Coach';
+}
+
+function practitionerProfileMeta(practitioner: PractitionerItem | undefined) {
+  if (!practitioner) {
+    return {
+      description: 'Supports your wellness goals with personalized care.',
+      experience: '6+ years exp.',
+      languages: ['English'],
+      modes: ['Online'],
+      price: '₹1,200',
+      reviews: 80,
+    };
+  }
+
+  if (practitioner.type === 'trainer') {
+    return {
+      description: 'Builds sustainable routines with strength, mobility, and habit coaching.',
+      experience: '6+ years exp.',
+      languages: ['English', 'Hindi'],
+      modes: ['Online', 'In-person'],
+      price: '₹1,200',
+      reviews: 96,
+    };
+  }
+
+  if (practitioner.type === 'coach') {
+    return {
+      description: 'Helps you build sustainable habits and improve everyday resilience.',
+      experience: '6+ years exp.',
+      languages: ['English', 'Hindi'],
+      modes: ['Online'],
+      price: '₹1,200',
+      reviews: 96,
+    };
+  }
+
+  return {
+    description: 'Specializes in anxiety, burnout and stress management using evidence-based therapies.',
+    experience: '8+ years exp.',
+    languages: ['English', 'Hindi'],
+    modes: ['Online', 'In-person'],
+    price: '₹1,500',
+    reviews: 128,
+  };
+}
+
+function practitionerAvatarGradient(type: PractitionerItem['type'] | string | undefined, index: number) {
+  const gradients = {
+    counsellor: ['from-rose-100 via-slate-50 to-indigo-100', 'from-violet-100 via-white to-emerald-100'],
+    trainer: ['from-amber-100 via-white to-sky-100', 'from-emerald-100 via-white to-indigo-100'],
+    coach: ['from-sky-100 via-white to-purple-100', 'from-lime-100 via-white to-teal-100'],
+  };
+  const palette = type && type in gradients ? gradients[type as keyof typeof gradients] : gradients.coach;
+
+  return palette[index % palette.length];
+}
+
+function formatNextAvailability(slot: SlotItem | undefined) {
+  if (!slot) return 'No slots available';
+
+  const date = new Date(slot.starts_at);
+  const today = new Date();
+  const tomorrow = new Date();
+  tomorrow.setDate(today.getDate() + 1);
+  const sameDay = (a: Date, b: Date) => a.toDateString() === b.toDateString();
+  const dayLabel = sameDay(date, today) ? 'Today' : sameDay(date, tomorrow) ? 'Tomorrow' : date.toLocaleDateString(undefined, { weekday: 'short' });
+
+  return `${dayLabel} ${date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}`;
+}
+
+function compactSpecialtyLabel(value: string) {
+  return value.replace(/_/g, ' ');
+}
+
+function practitionerInitials(name: string | null | undefined) {
+  const initials = String(name ?? 'WC Practitioner')
+    .split(' ')
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2);
+
+  return initials || 'WC';
+}
+
+function numericRating(value: PractitionerItem['rating']) {
+  const rating = Number(value);
+
+  return Number.isFinite(rating) ? rating : 4.8;
 }
 
 export default function ClientIntakeFlowPage() {
@@ -155,6 +265,13 @@ export default function ClientIntakeFlowPage() {
   const [slots, setSlots] = useState<SlotItem[]>([]);
   const [psychologistSlots, setPsychologistSlots] = useState<SlotItem[]>([]);
   const [trainerSlots, setTrainerSlots] = useState<SlotItem[]>([]);
+  const [pickerSlots, setPickerSlots] = useState<Record<number, SlotItem[]>>({});
+  const [practitionerSearch, setPractitionerSearch] = useState('');
+  const [specialtyFilter, setSpecialtyFilter] = useState('');
+  const [modeFilter, setModeFilter] = useState('');
+  const [languageFilter, setLanguageFilter] = useState('');
+  const [availabilityFilter, setAvailabilityFilter] = useState('');
+  const [savedPractitionerIds, setSavedPractitionerIds] = useState<number[]>([]);
   const [confirmation, setConfirmation] = useState<{ state: string; message?: string } | null>(null);
   const [memberships, setMemberships] = useState<ClientMembership[]>([]);
   const [useCredits, setUseCredits] = useState(false);
@@ -193,6 +310,45 @@ export default function ClientIntakeFlowPage() {
     if (pickerMode === 'trainer') return practitioners.filter((p) => p.type === 'trainer');
     return singlePractitioners;
   }, [pickerMode, practitioners, singlePractitioners]);
+
+  const filteredPickerPractitioners = useMemo(() => {
+    if (!pickerMode) return [];
+
+    const query = practitionerSearch.trim().toLowerCase();
+
+    return pickerPractitioners.filter((practitioner) => {
+      const meta = practitionerProfileMeta(practitioner);
+      const searchable = [
+        practitioner.name ?? '',
+        practitionerLabel(practitioner.type),
+        meta.description,
+        meta.languages.join(' '),
+        meta.modes.join(' '),
+        ...(practitioner.specialties ?? []),
+      ].join(' ').toLowerCase();
+      const slotsForPractitioner = pickerSlots[practitioner.id] ?? [];
+
+      if (query && !searchable.includes(query)) return false;
+      if (specialtyFilter && !(practitioner.specialties ?? []).includes(specialtyFilter)) return false;
+      if (modeFilter && !meta.modes.includes(modeFilter)) return false;
+      if (languageFilter && !meta.languages.includes(languageFilter)) return false;
+      if (availabilityFilter === 'available' && !slotsForPractitioner.length) return false;
+
+      return true;
+    });
+  }, [availabilityFilter, languageFilter, modeFilter, pickerMode, pickerPractitioners, pickerSlots, practitionerSearch, specialtyFilter]);
+
+  const availableSpecialties = useMemo(() => {
+    if (!pickerMode) return [];
+
+    return Array.from(new Set(pickerPractitioners.flatMap((practitioner) => practitioner.specialties ?? []))).sort();
+  }, [pickerMode, pickerPractitioners]);
+
+  const availableLanguages = useMemo(() => {
+    if (!pickerMode) return [];
+
+    return Array.from(new Set(pickerPractitioners.flatMap((practitioner) => practitionerProfileMeta(practitioner).languages))).sort();
+  }, [pickerMode, pickerPractitioners]);
 
   useEffect(() => {
     if (state.step < 3 || !state.flowId) return;
@@ -242,6 +398,29 @@ export default function ClientIntakeFlowPage() {
       dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: null } });
     });
   }, [state.selectedTrainerId, state.selectedTrainerSlotId]);
+
+  useEffect(() => {
+    if (!pickerMode || !pickerPractitioners.length) return;
+
+    let cancelled = false;
+    const window = upcomingSlotWindow();
+
+    Promise.all(
+      pickerPractitioners.map((practitioner) => (
+        getPractitionerSlots(practitioner.id, window.from, window.to)
+          .then((items) => [practitioner.id, items] as const)
+          .catch(() => [practitioner.id, []] as const)
+      ))
+    ).then((entries) => {
+      if (!cancelled) {
+        setPickerSlots(Object.fromEntries(entries));
+      }
+    });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pickerMode, pickerPractitioners]);
 
   async function onContinueFromService() {
     setLoading(true);
@@ -353,6 +532,128 @@ export default function ClientIntakeFlowPage() {
     }
 
     setPickerMode(null);
+  }
+
+  function clearPractitionerFilters() {
+    setPractitionerSearch('');
+    setSpecialtyFilter('');
+    setModeFilter('');
+    setLanguageFilter('');
+    setAvailabilityFilter('');
+  }
+
+  function toggleSavedPractitioner(practitionerId: number) {
+    setSavedPractitionerIds((current) => (
+      current.includes(practitionerId)
+        ? current.filter((id) => id !== practitionerId)
+        : [...current, practitionerId]
+    ));
+  }
+
+  function renderFilterSelect(label: string, value: string, onChange: (value: string) => void, options: string[]) {
+    return (
+      <label className="relative min-w-36">
+        <span className="sr-only">{label}</span>
+        <select
+          className="h-12 w-full appearance-none rounded-xl border border-indigo-100 bg-white px-4 pr-10 text-sm font-semibold text-slate-900 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        >
+          <option value="">{label}</option>
+          {options.map((option) => <option key={option} value={option}>{compactSpecialtyLabel(option)}</option>)}
+        </select>
+        <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-700" aria-hidden="true" />
+      </label>
+    );
+  }
+
+  function renderPractitionerPickerCard(practitioner: PractitionerItem, index: number) {
+    const meta = practitionerProfileMeta(practitioner);
+    const nextSlot = pickerSlots[practitioner.id]?.[0];
+    const selected = practitioner.id === state.selectedPractitionerId || practitioner.id === state.selectedPsychologistId || practitioner.id === state.selectedTrainerId;
+    const saved = savedPractitionerIds.includes(practitioner.id);
+    const rating = numericRating(practitioner.rating);
+    const match = Math.max(86, Math.round(rating * 20) - (index * 2));
+    const name = practitioner.name ?? 'Wellness Practitioner';
+    const specialties = practitioner.specialties ?? [];
+
+    return (
+      <article
+        key={practitioner.id}
+        className={`relative grid gap-5 rounded-2xl border bg-white p-5 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-200 hover:shadow-lg lg:grid-cols-[1fr_250px_210px] ${
+          selected ? 'border-indigo-300 ring-4 ring-indigo-100' : 'border-slate-200'
+        }`}
+      >
+        {index === 0 ? (
+          <div className="absolute -top-3 left-6 inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-3 py-1 text-xs font-semibold text-white shadow-md">
+            <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" aria-hidden="true" />
+            Recommended for you
+          </div>
+        ) : null}
+
+        <div className="grid gap-4 sm:grid-cols-[132px_1fr]">
+          <div className={`flex aspect-square h-32 w-32 items-center justify-center rounded-full bg-gradient-to-br ${practitionerAvatarGradient(practitioner.type, index)} shadow-inner`}>
+            <span className="grid h-24 w-24 place-items-center rounded-full bg-white/70 text-3xl font-bold text-indigo-700 shadow-sm">
+              {practitionerInitials(name)}
+            </span>
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="text-xl font-bold text-slate-950">{name}</h3>
+              <BadgeCheck className="h-5 w-5 fill-indigo-600 text-white" aria-hidden="true" />
+            </div>
+            <p className="mt-1 text-sm font-medium text-slate-600">{practitionerLabel(practitioner.type)}</p>
+            <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-700">{meta.description}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {specialties.slice(0, 5).map((specialty) => (
+                <span key={specialty} className="rounded-full bg-indigo-50 px-3 py-1 text-xs font-semibold capitalize text-indigo-700">
+                  {compactSpecialtyLabel(specialty)}
+                </span>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-x-7 gap-y-2 text-sm font-medium text-slate-600">
+              <span className="inline-flex items-center gap-2"><BriefcaseBusiness className="h-4 w-4" aria-hidden="true" />{meta.experience}</span>
+              <span className="inline-flex items-center gap-2"><Globe2 className="h-4 w-4" aria-hidden="true" />{meta.languages.join(', ')}</span>
+              <span className="inline-flex items-center gap-2"><Monitor className="h-4 w-4" aria-hidden="true" />{meta.modes.join(' • ')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid content-center gap-4 border-slate-200 lg:border-l lg:pl-6">
+          <div className="w-fit justify-self-start rounded-full bg-emerald-50 px-3 py-1 text-sm font-bold text-emerald-700 lg:justify-self-end">{match}% match</div>
+          <div className="rounded-xl border border-emerald-100 bg-gradient-to-r from-emerald-50 to-white px-4 py-3">
+            <p className="flex items-center gap-2 text-xs font-semibold text-emerald-700"><CalendarDays className="h-4 w-4" aria-hidden="true" />Next available</p>
+            <p className="mt-1 text-sm font-bold text-emerald-800">{formatNextAvailability(nextSlot)}</p>
+          </div>
+          <p className="flex items-center gap-2 text-sm text-slate-700"><Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />{rating.toFixed(1)} ({meta.reviews} reviews)</p>
+          <p className="text-lg font-extrabold text-slate-950">{meta.price}<span className="text-sm font-semibold text-slate-600"> / session</span></p>
+        </div>
+
+        <div className="grid content-center gap-3 border-slate-200 lg:border-l lg:pl-6">
+          <button
+            type="button"
+            onClick={() => selectPractitioner(practitioner)}
+            className="h-12 rounded-xl bg-indigo-600 px-4 text-sm font-bold text-white shadow-md shadow-indigo-200 transition hover:bg-indigo-700 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          >
+            {selected ? 'Selected' : 'Select Practitioner'}
+          </button>
+          <button
+            type="button"
+            className="h-12 rounded-xl border border-indigo-300 bg-white px-4 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          >
+            View Profile
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleSavedPractitioner(practitioner.id)}
+            className="inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+          >
+            <Heart className={`h-4 w-4 ${saved ? 'fill-indigo-600' : ''}`} aria-hidden="true" />
+            {saved ? 'Saved' : 'Save'}
+          </button>
+        </div>
+      </article>
+    );
   }
 
   function renderPractitionerButton(mode: PickerMode, practitioner: PractitionerItem | undefined, title: string, hint: string) {
@@ -596,35 +897,120 @@ export default function ClientIntakeFlowPage() {
         ) : null}
 
         <Dialog open={pickerMode !== null} onOpenChange={(open) => setPickerMode(open ? pickerMode : null)}>
-          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-white p-4 dark:bg-slate-950 sm:max-w-none sm:p-6">
-            <DialogHeader className="max-w-3xl">
-              <DialogTitle>{pickerMode === 'trainer' ? 'Select Fitness Trainer' : pickerMode === 'psychologist' ? 'Select Psychologist' : 'Select practitioner'}</DialogTitle>
-              <DialogDescription>
-                {pickerMode === 'trainer' ? 'Choose a trainer for your fitness session.' : pickerMode === 'psychologist' ? 'Choose a psychologist for your counselling session.' : 'Choose a practitioner from your recommended matches.'}
-              </DialogDescription>
-            </DialogHeader>
-            <div className="mx-auto grid w-full max-w-3xl gap-3 pb-6">
-              {pickerPractitioners.length ? pickerPractitioners.map((practitioner) => {
-                const selected = practitioner.id === state.selectedPractitionerId || practitioner.id === state.selectedPsychologistId || practitioner.id === state.selectedTrainerId;
+          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-[#fbfaff] p-0 text-slate-950 sm:max-w-none">
+            <div className="relative min-h-dvh overflow-hidden px-4 py-6 sm:px-8 lg:px-12">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_65%_0%,rgba(124,58,237,0.16),transparent_38%),linear-gradient(180deg,rgba(238,234,255,0.72),rgba(255,255,255,0))]" />
+              <div className="pointer-events-none absolute right-0 top-12 h-28 w-1/2 rounded-bl-[100%] bg-white/60" />
 
-                return (
-                  <button
-                    key={practitioner.id}
-                    type="button"
-                    onClick={() => selectPractitioner(practitioner)}
-                    className={`flex items-start justify-between gap-3 rounded-xl border px-4 py-3 text-left transition ${selected ? 'border-[var(--ds-brand)] bg-indigo-50 dark:bg-indigo-500/15' : 'border-slate-200 bg-white hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800'}`}
-                  >
-                    <span className="min-w-0">
-                      <span className="block text-sm font-semibold text-slate-900">{practitioner.name}</span>
-                      <span className="mt-0.5 block text-xs text-slate-500">{practitionerLabel(practitioner.type)}</span>
-                      {practitioner.specialties.length ? <span className="mt-2 block text-xs text-slate-600">{practitioner.specialties.join(', ')}</span> : null}
+              <div className="relative mx-auto max-w-[1780px]">
+                <DialogHeader className="mb-8 space-y-4 pr-16 text-left">
+                  <div className="flex items-center gap-3">
+                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100">
+                      <Heart className="h-4 w-4" aria-hidden="true" />
                     </span>
-                    {selected ? <Check className="h-5 w-5 shrink-0 text-[var(--ds-brand)]" aria-hidden="true" /> : null}
+                    <span className="text-xl font-extrabold tracking-tight text-slate-950">WellnessConnect</span>
+                  </div>
+                  <div>
+                    <DialogTitle className="text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
+                      {pickerMode === 'trainer' ? 'Select fitness trainer' : pickerMode === 'psychologist' ? 'Select psychologist' : 'Select practitioner'}
+                    </DialogTitle>
+                    <DialogDescription className="mt-3 text-lg font-medium text-slate-600">
+                      {pickerMode === 'trainer' ? 'Choose a trainer for your fitness session.' : pickerMode === 'psychologist' ? 'Choose a psychologist from your recommended matches.' : 'Choose a practitioner from your recommended matches.'}
+                    </DialogDescription>
+                  </div>
+                </DialogHeader>
+
+                <button
+                  type="button"
+                  onClick={() => setPickerMode(null)}
+                  className="absolute right-0 top-0 grid h-12 w-12 place-items-center rounded-full bg-white text-slate-950 shadow-sm transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                  aria-label="Close practitioner selector"
+                >
+                  <X className="h-6 w-6" aria-hidden="true" />
+                </button>
+
+                <div className="mb-6 flex flex-wrap items-center gap-3">
+                  <label className="relative min-w-72 flex-1 lg:max-w-[520px]">
+                    <span className="sr-only">Search practitioners</span>
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                    <input
+                      value={practitionerSearch}
+                      onChange={(event) => setPractitionerSearch(event.target.value)}
+                      placeholder="Search by name, specialty, or keyword"
+                      className="h-12 w-full rounded-xl border border-indigo-100 bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                    />
+                  </label>
+                  {renderFilterSelect('Specialty', specialtyFilter, setSpecialtyFilter, availableSpecialties)}
+                  {renderFilterSelect('Session Mode', modeFilter, setModeFilter, ['Online', 'In-person'])}
+                  {renderFilterSelect('Language', languageFilter, setLanguageFilter, availableLanguages)}
+                  {renderFilterSelect('Availability', availabilityFilter, setAvailabilityFilter, ['available'])}
+                  <button
+                    type="button"
+                    onClick={clearPractitionerFilters}
+                    className="inline-flex h-12 items-center gap-2 rounded-xl px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                  >
+                    <RotateCcw className="h-4 w-4" aria-hidden="true" />
+                    Clear filters
                   </button>
-                );
-              }) : (
-                <p className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-300">No practitioners are available for this selection yet.</p>
-              )}
+                </div>
+
+                <div className="grid gap-8 xl:grid-cols-[1fr_310px]">
+                  <div className="grid gap-4">
+                    {filteredPickerPractitioners.length ? filteredPickerPractitioners.map(renderPractitionerPickerCard) : (
+                      <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
+                        <p className="text-lg font-bold text-slate-950">No practitioners match these filters.</p>
+                        <p className="mt-2 text-sm text-slate-600">Clear filters or try a broader search term.</p>
+                      </div>
+                    )}
+                  </div>
+
+                  <aside className="h-fit rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur xl:sticky xl:top-6">
+                    <div className="grid justify-items-center border-b border-slate-100 pb-6 text-center">
+                      <div className="grid h-24 w-24 place-items-center rounded-3xl bg-indigo-50">
+                        <Sparkles className="h-12 w-12 text-indigo-600" aria-hidden="true" />
+                      </div>
+                    </div>
+                    <div className="mt-6">
+                      <h3 className="text-lg font-extrabold text-slate-950">Personalized recommendations</h3>
+                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                        These recommendations are based on your intake responses, goals, and preferences.
+                      </p>
+                    </div>
+                    <div className="mt-8 grid gap-7">
+                      <div className="grid grid-cols-[48px_1fr] gap-4">
+                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
+                        <div>
+                          <p className="font-bold text-slate-950">Verified professionals</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">All practitioners are background-checked and verified.</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[48px_1fr] gap-4">
+                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><LockKeyhole className="h-6 w-6" aria-hidden="true" /></span>
+                        <div>
+                          <p className="font-bold text-slate-950">Your privacy matters</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">Your information is secure and confidential.</p>
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-[48px_1fr] gap-4">
+                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><UserCheck className="h-6 w-6" aria-hidden="true" /></span>
+                        <div>
+                          <p className="font-bold text-slate-950">You're in control</p>
+                          <p className="mt-1 text-sm leading-6 text-slate-600">You can change your selection anytime.</p>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-8 border-t border-slate-100 pt-6">
+                      <div className="grid grid-cols-[40px_1fr] gap-3">
+                        <span className="grid h-10 w-10 place-items-center rounded-full bg-indigo-50 text-indigo-700"><Headphones className="h-5 w-5" aria-hidden="true" /></span>
+                        <div>
+                          <p className="font-bold text-slate-950">Need help choosing?</p>
+                          <button type="button" className="mt-1 text-sm font-bold text-indigo-700">Chat with our care team</button>
+                        </div>
+                      </div>
+                    </div>
+                  </aside>
+                </div>
+              </div>
             </div>
           </DialogContent>
         </Dialog>

@@ -43,7 +43,7 @@ class AvailabilitySlotSeeder extends Seeder
 
     private function upcomingDates(): array
     {
-        return collect(range(0, 13))
+        return collect(range(0, 30))
             ->map(fn (int $offset) => today()->addDays($offset))
             ->reject(fn (Carbon $date) => $date->isSunday())
             ->values()
