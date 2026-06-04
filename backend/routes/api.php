@@ -7,6 +7,10 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\ClientDashboardController;
+use App\Http\Controllers\Api\CounsellorClientController;
+use App\Http\Controllers\Api\CounsellorDashboardController;
+use App\Http\Controllers\Api\CounsellorNotificationController;
+use App\Http\Controllers\Api\CounsellorSessionController;
 use App\Http\Controllers\Api\CbtController;
 use App\Http\Controllers\Api\IntakeFlowController;
 use App\Http\Controllers\Api\PractitionerController;
@@ -54,6 +58,7 @@ Route::prefix('v1')->group(function (): void {
         Route::put('/account/profile', [AccountProfileController::class, 'update']);
 
         Route::prefix('cbt')->group(function (): void {
+            Route::get('/dashboard', [CbtController::class, 'dashboard'])->middleware('permission:counsellor.cbt.view');
             Route::get('/categories', [CbtController::class, 'categories'])->middleware('permission:admin.cbt_templates.manage,counsellor.cbt.view');
             Route::post('/categories', [CbtController::class, 'storeCategory'])->middleware('permission:admin.cbt_templates.manage');
             Route::get('/exercise-templates', [CbtController::class, 'templates'])->middleware('permission:admin.cbt_templates.manage,counsellor.cbt.view');
@@ -102,6 +107,23 @@ Route::prefix('v1')->group(function (): void {
             Route::post('/memberships/checkout/verify', [ClientMembershipController::class, 'verify']);
             Route::get('/memberships', [ClientMembershipController::class, 'index']);
             Route::get('/receipts/{receipt}', [ClientMembershipController::class, 'receipt']);
+        });
+
+        Route::get('/counsellor/dashboard', [CounsellorDashboardController::class, 'show'])
+            ->middleware('permission:counsellor.dashboard.view');
+        Route::get('/counsellor/clients', [CounsellorClientController::class, 'index'])
+            ->middleware('permission:counsellor.dashboard.view,counsellor.clients.view');
+        Route::get('/counsellor/notifications', [CounsellorNotificationController::class, 'index'])
+            ->middleware('permission:counsellor.dashboard.view');
+        Route::prefix('counsellor/sessions')->middleware('permission:counsellor.dashboard.view,counsellor.sessions.view')->group(function (): void {
+            Route::get('/', [CounsellorSessionController::class, 'index']);
+            Route::get('/{appointment}', [CounsellorSessionController::class, 'show']);
+            Route::post('/{appointment}/start', [CounsellorSessionController::class, 'start']);
+            Route::put('/{appointment}/notes', [CounsellorSessionController::class, 'saveNotes']);
+            Route::post('/{appointment}/complete', [CounsellorSessionController::class, 'complete']);
+            Route::post('/{appointment}/follow-up', [CounsellorSessionController::class, 'followUp']);
+            Route::post('/{appointment}/escalate', [CounsellorSessionController::class, 'escalate']);
+            Route::post('/{appointment}/assessments', [CounsellorSessionController::class, 'storeAssessment']);
         });
 
         Route::get('/trainer/access-status', [TrainerWorkspaceController::class, 'accessStatus'])->middleware('permission:trainer.dashboard.view');

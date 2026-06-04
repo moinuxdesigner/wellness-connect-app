@@ -1,7 +1,9 @@
+import { useEffect, useState } from 'react';
 import type { Role } from '../../types';
 import { Panel, StatCard, ToneBadge } from '../shared/components/Ui';
 import { getRoleShellTitle } from './RoleDashboardLayout';
 import { getRoleScenario } from '../demo/demoScenarios';
+import { getCounsellorDashboardRequest, type CounsellorDashboardResponse } from '../shared/services/api';
 
 const rolePageCopy: Record<Role, { heading: string; subtitle: string; metrics: Array<{ title: string; value: string; hint: string }>; actions: string[] }> = {
   admin: {
@@ -76,7 +78,57 @@ function toneFromStatus(status: 'not_started' | 'in_progress' | 'completed' | 'e
 
 export function RoleDashboardPage({ role }: { role: Role }) {
   const page = rolePageCopy[role];
-  const scenario = coreRoles.includes(role) ? getRoleScenario(role as 'client' | 'counsellor' | 'trainer' | 'helpdesk' | 'admin' | 'content') : undefined;
+  const [counsellorDashboard, setCounsellorDashboard] = useState<CounsellorDashboardResponse | null>(null);
+  const [loadingCounsellorDashboard, setLoadingCounsellorDashboard] = useState(role === 'counsellor');
+  const [counsellorDashboardError, setCounsellorDashboardError] = useState<string | null>(null);
+  const scenario = role !== 'counsellor' && coreRoles.includes(role) ? getRoleScenario(role as 'client' | 'trainer' | 'helpdesk' | 'admin' | 'content') : undefined;
+  const counsellorLoadingMetrics = [
+    { title: "Today's Sessions", value: '...', hint: 'Loading live sessions' },
+    { title: 'Assigned Clients', value: '...', hint: 'Loading client assignments' },
+    { title: 'Risk Flags', value: '...', hint: 'Loading risk flags' },
+  ];
+  const counsellorErrorMetrics = [
+    { title: "Today's Sessions", value: '-', hint: 'Unable to load live data' },
+    { title: 'Assigned Clients', value: '-', hint: 'Unable to load live data' },
+    { title: 'Risk Flags', value: '-', hint: 'Unable to load live data' },
+  ];
+  const metrics = role === 'counsellor'
+    ? (counsellorDashboard?.metrics ?? (loadingCounsellorDashboard ? counsellorLoadingMetrics : counsellorErrorMetrics))
+    : page.metrics;
+  const actions = role === 'counsellor'
+    ? (counsellorDashboard?.actions ?? (loadingCounsellorDashboard ? ['Loading dashboard actions'] : ['Refresh dashboard data']))
+    : page.actions;
+  const flowReadiness = role === 'counsellor' ? counsellorDashboard?.flowReadiness : scenario;
+
+  useEffect(() => {
+    if (role !== 'counsellor') {
+      setCounsellorDashboard(null);
+      setLoadingCounsellorDashboard(false);
+      setCounsellorDashboardError(null);
+      return;
+    }
+
+    let isMounted = true;
+    setLoadingCounsellorDashboard(true);
+    setCounsellorDashboardError(null);
+
+    getCounsellorDashboardRequest()
+      .then((dashboard) => {
+        if (isMounted) setCounsellorDashboard(dashboard);
+      })
+      .catch((error: unknown) => {
+        if (!isMounted) return;
+        setCounsellorDashboardError(error instanceof Error ? error.message : 'Unable to load counsellor dashboard');
+        setCounsellorDashboard(null);
+      })
+      .finally(() => {
+        if (isMounted) setLoadingCounsellorDashboard(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [role]);
 
   return (
     <div className="space-y-6">
@@ -86,18 +138,24 @@ export function RoleDashboardPage({ role }: { role: Role }) {
         <p className="mt-1 text-sm text-slate-600">{page.subtitle}</p>
       </div>
 
-      {page.metrics.length ? (
+      {counsellorDashboardError ? (
+        <div className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+          {counsellorDashboardError}
+        </div>
+      ) : null}
+
+      {metrics.length ? (
         <section className="grid gap-4 md:grid-cols-3">
-          {page.metrics.map((item) => (
+          {metrics.map((item) => (
             <StatCard key={item.title} title={item.title} value={item.value} hint={item.hint} />
           ))}
         </section>
       ) : null}
 
-      {page.actions.length ? (
+      {actions.length ? (
         <Panel title="Next Actions">
           <div className="grid gap-2 sm:grid-cols-3">
-            {page.actions.map((action) => (
+            {actions.map((action) => (
               <div key={action} className="rounded-xl border border-slate-200 px-3 py-2 text-sm text-slate-700">
                 {action}
               </div>
@@ -106,13 +164,13 @@ export function RoleDashboardPage({ role }: { role: Role }) {
         </Panel>
       ) : null}
 
-      {scenario ? (
+      {flowReadiness ? (
         <Panel title="Flow Readiness">
           <div className="space-y-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Happy path</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {scenario.happyPath.map((step) => (
+                {flowReadiness.happyPath.map((step) => (
                   <ToneBadge key={step.id} tone={toneFromStatus(step.status)}>{step.title}</ToneBadge>
                 ))}
               </div>
@@ -120,7 +178,7 @@ export function RoleDashboardPage({ role }: { role: Role }) {
             <div>
               <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exception path</p>
               <div className="mt-2 flex flex-wrap gap-2">
-                {scenario.exceptionPath.map((step) => (
+                {flowReadiness.exceptionPath.map((step) => (
                   <ToneBadge key={step.id} tone={toneFromStatus(step.status)}>{step.title}</ToneBadge>
                 ))}
               </div>

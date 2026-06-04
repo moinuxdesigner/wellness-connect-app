@@ -133,3 +133,25 @@ export interface CbtProgress {
   averageAnxietyAfter?: number | null;
   improvementScore?: number | null;
 }
+
+export interface PractitionerCbtDashboardPlan {
+  id: number;
+  clientId: number;
+  clientName?: string | null;
+  title: string;
+  status: CbtCarePlan['status'];
+  riskLevel: CbtCarePlan['riskLevel'];
+  completionRate: number;
+  pendingReviews: number;
+  exerciseCount: number;
+  updatedAt?: string | null;
+}
+
+export interface PractitionerCbtDashboardResponse {
+  stats: {
+    activePlans: number;
+    completionRate: number;
+    pendingReviews: number;
+  };
+  plans: PractitionerCbtDashboardPlan[];
+}

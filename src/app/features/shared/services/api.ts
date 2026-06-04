@@ -132,6 +132,109 @@ export interface AccountProfileResponse {
   roleDetails: AccountProfileRoleDetails;
 }
 
+export interface CounsellorClientItem {
+  id: number;
+  name: string;
+  email?: string | null;
+  phone?: string | null;
+  primaryGoal?: string | null;
+  lastSession?: string | null;
+  nextSession?: string | null;
+  risk: 'normal' | 'watch' | 'high' | string;
+  nextAction: string;
+}
+
+export interface CounsellorDashboardResponse {
+  metrics: Array<{
+    title: string;
+    value: string;
+    hint: string;
+  }>;
+  actions: string[];
+  flowReadiness: {
+    happyPath: Array<{
+      id: string;
+      title: string;
+      status: 'not_started' | 'in_progress' | 'completed' | 'escalated';
+    }>;
+    exceptionPath: Array<{
+      id: string;
+      title: string;
+      status: 'not_started' | 'in_progress' | 'completed' | 'escalated';
+    }>;
+  };
+}
+
+export type CounsellorSessionWorkflowState = 'upcoming' | 'client_waiting' | 'in_progress' | 'notes_pending' | 'follow_up_required' | 'escalated' | 'completed';
+export type CounsellorAssessmentType = 'phq_9' | 'gad_7' | 'dass_21' | 'pss' | 'bdi_ii';
+
+export interface CounsellorSessionQueueItem {
+  id: number;
+  startsAt?: string | null;
+  endsAt?: string | null;
+  time?: string | null;
+  clientId: number;
+  clientName: string;
+  sessionType: string;
+  mode: string;
+  appointmentStatus: string;
+  workflowState: CounsellorSessionWorkflowState;
+  actionLabel: string;
+  riskLevel?: string | null;
+}
+
+export interface CounsellorSessionNotes {
+  id: number;
+  workflowState: CounsellorSessionWorkflowState;
+  subjective?: string | null;
+  objective?: string | null;
+  assessment?: string | null;
+  plan?: string | null;
+  nextAction?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+  followUpRequestedAt?: string | null;
+  escalatedAt?: string | null;
+}
+
+export interface CounsellorAssessmentResult {
+  id: number;
+  assessmentType: CounsellorAssessmentType;
+  score: number;
+  severity?: string | null;
+  administeredAt?: string | null;
+}
+
+export interface CounsellorSessionWorkspace {
+  session: CounsellorSessionQueueItem;
+  client: {
+    id: number;
+    name: string;
+    email?: string | null;
+    phone?: string | null;
+    age?: number | null;
+    gender?: string | null;
+    occupation?: string | null;
+    riskFlags: Array<{ id: number; label: string; level: string }>;
+    previousDiagnoses: string[];
+    previousSessionSummary?: string | null;
+    treatmentPlan: string[];
+  };
+  notes: CounsellorSessionNotes;
+  assessments: CounsellorAssessmentResult[];
+  cbt: {
+    activePlan?: {
+      id: number;
+      title: string;
+      status: string;
+      riskLevel: string;
+      exerciseCount: number;
+    } | null;
+    homeworkTemplates: Array<{ id: number; title: string; slug: string }>;
+  };
+  documents: Array<unknown>;
+}
+
 async function readJson(response: Response) {
   const contentType = response.headers.get('content-type') ?? '';
   if (contentType.includes('application/json')) {
@@ -452,6 +555,133 @@ export async function getClientAppointmentsRequest() {
   const data = await readJson(response);
   if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch appointments'));
   return (data.appointments ?? []) as ClientAppointment[];
+}
+
+export async function getCounsellorClientsRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/clients`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch assigned clients'));
+  return (data.clients ?? []) as CounsellorClientItem[];
+}
+
+export async function getCounsellorDashboardRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/dashboard`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch counsellor dashboard'));
+  return data as CounsellorDashboardResponse;
+}
+
+export async function getCounsellorSessionsRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch counsellor sessions'));
+  return (data.sessions ?? []) as CounsellorSessionQueueItem[];
+}
+
+export async function getCounsellorSessionWorkspaceRequest(appointmentId: number) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch session workspace'));
+  return data as CounsellorSessionWorkspace;
+}
+
+export async function startCounsellorSessionRequest(appointmentId: number) {
+  return counsellorSessionActionRequest(appointmentId, 'start');
+}
+
+export async function saveCounsellorSessionNotesRequest(appointmentId: number, payload: { subjective?: string; objective?: string; assessment?: string; plan?: string }) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}/notes`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to save session notes'));
+  return data as CounsellorSessionWorkspace;
+}
+
+export async function completeCounsellorSessionRequest(appointmentId: number) {
+  return counsellorSessionActionRequest(appointmentId, 'complete');
+}
+
+export async function followUpCounsellorSessionRequest(appointmentId: number, nextAction = 'Schedule follow-up appointment.') {
+  return counsellorSessionActionRequest(appointmentId, 'follow-up', { next_action: nextAction });
+}
+
+export async function escalateCounsellorSessionRequest(appointmentId: number, reason = 'Clinical escalation requested from session workspace.') {
+  return counsellorSessionActionRequest(appointmentId, 'escalate', { reason, risk_level: 'high' });
+}
+
+export async function createCounsellorAssessmentRequest(appointmentId: number, payload: { assessment_type: CounsellorAssessmentType; score?: number; severity?: string; answers_json?: Record<string, unknown> }) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}/assessments`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to record assessment'));
+  return data as { assessment: CounsellorAssessmentResult; workspace: CounsellorSessionWorkspace };
+}
+
+export async function assignCounsellorCbtHomeworkRequest(planId: number, templateId: number) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/cbt/plans/${planId}/exercises`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify({
+      exercise_template_id: templateId,
+      frequency: 'once',
+      start_date: new Date().toISOString().slice(0, 10),
+      priority: 'medium',
+    }),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to send CBT homework'));
+  return data;
+}
+
+export async function createCounsellorCbtPlanRequest(clientId: number, payload: {
+  title: string;
+  primary_goal: string;
+  description: string;
+  status: 'active';
+  start_date: string;
+  review_frequency: 'weekly';
+  risk_level: 'low';
+  goals: Array<{
+    goal_title: string;
+    goal_description: string;
+    baseline_score: number;
+    target_score: number;
+  }>;
+}) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/cbt/clients/${clientId}/plans`, {
+    method: 'POST',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to create CBT plan'));
+  return data;
+}
+
+async function counsellorSessionActionRequest(appointmentId: number, action: 'start' | 'complete' | 'follow-up' | 'escalate', payload?: Record<string, unknown>) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}/${action}`, {
+    method: 'POST',
+    headers: authHeaders(token, Boolean(payload)),
+    body: payload ? JSON.stringify(payload) : undefined,
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to update session'));
+  return data as CounsellorSessionWorkspace;
 }
 
 export async function getClientDashboardRequest() {

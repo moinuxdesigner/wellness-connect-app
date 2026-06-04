@@ -24,6 +24,38 @@ export type NotificationMarkAllReadResponse = {
   unreadCount: number;
 };
 
+export type CounsellorNotificationCategory = 'sessions' | 'clients' | 'cbt_care' | 'urgent' | 'system';
+export type CounsellorNotificationPriority = 'critical' | 'high' | 'medium' | 'low';
+
+export type CounsellorNotificationSummary = {
+  unread: number;
+  clientActivity: number;
+  todaysReminders: number;
+  urgentAlerts: number;
+};
+
+export type CounsellorNotificationItem = {
+  id: string;
+  source: string;
+  notificationId: number | null;
+  category: CounsellorNotificationCategory;
+  priority: CounsellorNotificationPriority;
+  title: string;
+  message: string;
+  clientName: string | null;
+  clientId: number | null;
+  relatedId: number | string | null;
+  read: boolean;
+  createdAt: string | null;
+  actionLabel: string;
+  actionRoute: string | null;
+};
+
+export type CounsellorNotificationsResponse = {
+  summary: CounsellorNotificationSummary;
+  items: CounsellorNotificationItem[];
+};
+
 function headers(withJson = false): HeadersInit {
   const token = getAuthState().token;
   if (!token) throw new Error('Missing authenticated session token.');
@@ -83,6 +115,10 @@ export function getRoleNotificationsPath(role: Role): string {
 
 export async function getNotifications() {
   return request<NotificationsResponse>('notifications');
+}
+
+export async function getCounsellorNotifications() {
+  return request<CounsellorNotificationsResponse>('counsellor/notifications');
 }
 
 export async function markAllNotificationsRead() {

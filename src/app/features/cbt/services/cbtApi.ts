@@ -1,6 +1,6 @@
 import { getAuthState } from '../../auth/auth';
 import { mockCbtCategories, mockCbtInstances, mockCbtPlan, mockCbtProgress, mockCbtResponses, mockCbtTemplates } from '../data/mockCbtData';
-import type { CbtCarePlan, CbtCategory, CbtExerciseInstance, CbtExerciseResponse, CbtExerciseTemplate, CbtProgress } from '../types/cbt.types';
+import type { CbtCarePlan, CbtCategory, CbtExerciseInstance, CbtExerciseResponse, CbtExerciseTemplate, CbtProgress, PractitionerCbtDashboardResponse } from '../types/cbt.types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
@@ -53,6 +53,10 @@ export async function saveCbtTemplate(payload: Partial<CbtExerciseTemplate> & { 
     method: id ? 'PUT' : 'POST',
     body: JSON.stringify(body),
   }, { template: { ...mockCbtTemplates[0], id: id ?? Date.now(), title: payload.title } })).template;
+}
+
+export async function getPractitionerCbtDashboard() {
+  return request<PractitionerCbtDashboardResponse>('dashboard');
 }
 
 export async function getClientCbtPlans(clientId: number) {

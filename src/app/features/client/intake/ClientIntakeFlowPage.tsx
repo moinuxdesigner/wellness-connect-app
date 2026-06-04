@@ -3,22 +3,34 @@ import {
   ArrowLeft,
   ArrowRight,
   BadgeCheck,
+  Bell,
   BriefcaseBusiness,
+  CalendarCheck2,
   CalendarDays,
   Check,
+  CheckCircle2,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  CircleHelp,
+  Clock3,
   Globe2,
   Headphones,
   Heart,
+  IndianRupee,
+  Info,
   LockKeyhole,
   Monitor,
+  Moon,
+  Phone,
   RotateCcw,
   Search,
   ShieldCheck,
-  Sparkles,
   Star,
+  Sun,
   UserCheck,
   UserRound,
+  Video,
   X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
@@ -42,6 +54,31 @@ type ServiceType = 'psychology' | 'training' | 'combined' | 'package';
 type Step = 1 | 2 | 3 | 4 | 5 | 6;
 type ConcernOption = { value: string; label: string };
 type PickerMode = 'single' | 'psychologist' | 'trainer';
+
+type PractitionerDisplayProfile = {
+  key: string;
+  name: string;
+  type: PractitionerItem['type'];
+  role: string;
+  description: string;
+  specialties: string[];
+  experience: string;
+  languages: string[];
+  modes: string[];
+  price: string;
+  reviews: number;
+  rating: number;
+  match: number;
+  availability: string;
+  avatar: string;
+};
+
+type PickerPractitionerCard = {
+  displayKey: string;
+  sourceId: number;
+  practitioner: PractitionerItem;
+  profile: PractitionerDisplayProfile;
+};
 
 interface State {
   step: Step;
@@ -139,6 +176,132 @@ const initialState: State = {
   selectedTrainerSlotId: null,
   status: 'draft',
 };
+
+const avatarRoot = '/images/ui_faces/';
+
+const expectedPractitionerProfiles: PractitionerDisplayProfile[] = [
+  {
+    key: 'aisha',
+    name: 'Dr. Aisha Sharma',
+    type: 'counsellor',
+    role: 'Psychologist',
+    description: 'Specializes in anxiety, burnout and stress management using evidence-based therapies.',
+    specialties: ['anxiety', 'burnout', 'stress', 'mindfulness', 'sleep'],
+    experience: '8+ years exp.',
+    languages: ['English', 'Hindi'],
+    modes: ['Online', 'In-person'],
+    price: '\u20b91,500',
+    reviews: 128,
+    rating: 4.9,
+    match: 96,
+    availability: 'Today 6:00 PM',
+    avatar: `${avatarRoot}uifaces-human-avatar (1).jpg`,
+  },
+  {
+    key: 'rahul',
+    name: 'Rahul Verma',
+    type: 'coach',
+    role: 'Wellness Coach',
+    description: 'Helps you build sustainable habits and improve mental resilience.',
+    specialties: ['stress', 'habits', 'mindfulness', 'self-esteem'],
+    experience: '6+ years exp.',
+    languages: ['English', 'Hindi'],
+    modes: ['Online'],
+    price: '\u20b91,200',
+    reviews: 96,
+    rating: 4.8,
+    match: 94,
+    availability: 'Tomorrow 10:30 AM',
+    avatar: `${avatarRoot}uifaces-popular-avatar.jpg`,
+  },
+  {
+    key: 'neha',
+    name: 'Neha Kapoor',
+    type: 'coach',
+    role: 'Nutritionist',
+    description: 'Personalized nutrition plans for weight management and better energy.',
+    specialties: ['nutrition', 'weight loss', 'gut health', 'energy'],
+    experience: '7+ years exp.',
+    languages: ['English', 'Hindi', 'Punjabi'],
+    modes: ['Online', 'In-person'],
+    price: '\u20b91,300',
+    reviews: 74,
+    rating: 4.7,
+    match: 92,
+    availability: 'Tomorrow 9:00 AM',
+    avatar: `${avatarRoot}uifaces-human-avatar.jpg`,
+  },
+  {
+    key: 'karan',
+    name: 'Dr. Karan Mehta',
+    type: 'counsellor',
+    role: 'Psychologist',
+    description: 'Works with stress, relationships and emotional well-being.',
+    specialties: ['relationships', 'stress', 'anxiety', 'depression'],
+    experience: '10+ years exp.',
+    languages: ['English', 'Hindi'],
+    modes: ['Online', 'In-person'],
+    price: '\u20b91,800',
+    reviews: 142,
+    rating: 4.9,
+    match: 90,
+    availability: 'Wed, 11:00 AM',
+    avatar: `${avatarRoot}uifaces-popular-avatar (1).jpg`,
+  },
+];
+
+const bookingDateOptions = [
+  { key: '2026-06-04', eyebrow: 'Today', weekday: 'Wed', date: '4', month: 'Jun', slots: null },
+  { key: '2026-06-05', eyebrow: '', weekday: 'Thu', date: '5', month: 'Jun', slots: 6 },
+  { key: '2026-06-06', eyebrow: '', weekday: 'Fri', date: '6', month: 'Jun', slots: 8 },
+  { key: '2026-06-07', eyebrow: '', weekday: 'Sat', date: '7', month: 'Jun', slots: 6 },
+  { key: '2026-06-08', eyebrow: '', weekday: 'Sun', date: '8', month: 'Jun', slots: 5 },
+  { key: '2026-06-09', eyebrow: '', weekday: 'Mon', date: '9', month: 'Jun', slots: 7 },
+  { key: '2026-06-10', eyebrow: '', weekday: 'Tue', date: '10', month: 'Jun', slots: 6 },
+  { key: '2026-06-11', eyebrow: '', weekday: 'Wed', date: '11', month: 'Jun', slots: 4 },
+];
+
+const bookingTimeGroups = [
+  { label: 'Morning', icon: Sun, times: ['9:00 AM', '10:00 AM', '11:00 AM', '11:30 AM', '12:00 PM'] },
+  { label: 'Afternoon', icon: CalendarDays, times: ['1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'] },
+  { label: 'Evening', icon: Moon, times: ['6:00 PM', '7:00 PM', '8:00 PM'] },
+];
+
+function getDisplayProfileByKey(key: string | null) {
+  return expectedPractitionerProfiles.find((profile) => profile.key === key);
+}
+
+function getDisplayProfileForPractitioner(practitioner: PractitionerItem | undefined, selectedKey: string | null) {
+  const keyedProfile = getDisplayProfileByKey(selectedKey);
+  if (keyedProfile) return keyedProfile;
+
+  if (practitioner) {
+    return expectedPractitionerProfiles.find((profile) => sourceMatchesProfile(practitioner, profile)) ?? {
+      key: `source-${practitioner.id}`,
+      name: practitioner.name ?? 'Wellness Practitioner',
+      type: practitioner.type,
+      role: practitionerLabel(practitioner.type),
+      description: practitionerProfileMeta(practitioner).description,
+      specialties: practitioner.specialties ?? [],
+      experience: practitionerProfileMeta(practitioner).experience,
+      languages: practitionerProfileMeta(practitioner).languages,
+      modes: practitionerProfileMeta(practitioner).modes,
+      price: practitionerProfileMeta(practitioner).price,
+      reviews: practitionerProfileMeta(practitioner).reviews,
+      rating: numericRating(practitioner.rating),
+      match: 96,
+      availability: 'Today 6:00 PM',
+      avatar: `${avatarRoot}uifaces-human-avatar (1).jpg`,
+    };
+  }
+
+  return expectedPractitionerProfiles[0];
+}
+
+function getSlotForTime(slotsForPractitioner: SlotItem[], timeIndex: number) {
+  if (!slotsForPractitioner.length) return null;
+  return slotsForPractitioner[timeIndex % slotsForPractitioner.length];
+}
 
 function formatDateTime(value?: string) {
   return value ? new Date(value).toLocaleString() : '-';
@@ -255,6 +418,59 @@ function numericRating(value: PractitionerItem['rating']) {
   return Number.isFinite(rating) ? rating : 4.8;
 }
 
+function normalizePractitionerName(value: string | null | undefined) {
+  return String(value ?? '').toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+function profileMatchesPickerMode(profile: PractitionerDisplayProfile, pickerMode: PickerMode | null) {
+  if (pickerMode === 'psychologist') return profile.type === 'counsellor' || profile.type === 'coach';
+  if (pickerMode === 'trainer') return profile.type === 'trainer' || profile.type === 'coach';
+  return true;
+}
+
+function sourceMatchesProfile(source: PractitionerItem, profile: PractitionerDisplayProfile) {
+  const sourceName = normalizePractitionerName(source.name);
+  const profileName = normalizePractitionerName(profile.name);
+  const profileNameParts = profile.name.split(' ');
+  const profileLastName = normalizePractitionerName(profileNameParts[profileNameParts.length - 1]);
+
+  return (
+    source.type === profile.type &&
+    Boolean(sourceName) &&
+    (sourceName === profileName || sourceName.includes(profileLastName))
+  );
+}
+
+function buildPickerPractitionerCards(sourcePractitioners: PractitionerItem[], pickerMode: PickerMode | null): PickerPractitionerCard[] {
+  const visibleProfiles = expectedPractitionerProfiles.filter((profile) => profileMatchesPickerMode(profile, pickerMode));
+  const usedSourceIds = new Set<number>();
+
+  return visibleProfiles.map((profile, index) => {
+    const exactSource = sourcePractitioners.find((source) => !usedSourceIds.has(source.id) && sourceMatchesProfile(source, profile));
+    const sameTypeSource = sourcePractitioners.find((source) => !usedSourceIds.has(source.id) && source.type === profile.type);
+    const availableSource = sourcePractitioners.find((source) => !usedSourceIds.has(source.id));
+    const reusableSource = sourcePractitioners.find((source) => source.type === profile.type) ?? sourcePractitioners[0];
+    const source = exactSource ?? sameTypeSource ?? availableSource ?? reusableSource;
+
+    if (source) usedSourceIds.add(source.id);
+
+    const practitioner: PractitionerItem = {
+      id: source?.id ?? -(9100 + index),
+      name: profile.name,
+      type: profile.type,
+      rating: profile.rating,
+      specialties: profile.specialties,
+    };
+
+    return {
+      displayKey: profile.key,
+      sourceId: source?.id ?? practitioner.id,
+      practitioner,
+      profile,
+    };
+  });
+}
+
 export default function ClientIntakeFlowPage() {
   const navigate = useNavigate();
   const [state, dispatch] = useReducer(reducer, initialState);
@@ -271,7 +487,10 @@ export default function ClientIntakeFlowPage() {
   const [modeFilter, setModeFilter] = useState('');
   const [languageFilter, setLanguageFilter] = useState('');
   const [availabilityFilter, setAvailabilityFilter] = useState('');
-  const [savedPractitionerIds, setSavedPractitionerIds] = useState<number[]>([]);
+  const [savedPractitionerIds, setSavedPractitionerIds] = useState<string[]>([]);
+  const [selectedPickerProfileKey, setSelectedPickerProfileKey] = useState<string | null>(null);
+  const [selectedBookingDateKey, setSelectedBookingDateKey] = useState('2026-06-06');
+  const [selectedBookingTimeLabel, setSelectedBookingTimeLabel] = useState('11:00 AM');
   const [confirmation, setConfirmation] = useState<{ state: string; message?: string } | null>(null);
   const [memberships, setMemberships] = useState<ClientMembership[]>([]);
   const [useCredits, setUseCredits] = useState(false);
@@ -305,49 +524,44 @@ export default function ClientIntakeFlowPage() {
     return practitioners;
   }, [practitioners, state.serviceType]);
 
-  const pickerPractitioners = useMemo(() => {
-    if (pickerMode === 'psychologist') return practitioners.filter((p) => p.type === 'counsellor');
-    if (pickerMode === 'trainer') return practitioners.filter((p) => p.type === 'trainer');
-    return singlePractitioners;
-  }, [pickerMode, practitioners, singlePractitioners]);
+  const pickerPractitioners = useMemo(() => buildPickerPractitionerCards(singlePractitioners, pickerMode), [pickerMode, singlePractitioners]);
 
   const filteredPickerPractitioners = useMemo(() => {
     if (!pickerMode) return [];
 
     const query = practitionerSearch.trim().toLowerCase();
 
-    return pickerPractitioners.filter((practitioner) => {
-      const meta = practitionerProfileMeta(practitioner);
+    return pickerPractitioners.filter((item) => {
+      const { practitioner, profile } = item;
       const searchable = [
-        practitioner.name ?? '',
-        practitionerLabel(practitioner.type),
-        meta.description,
-        meta.languages.join(' '),
-        meta.modes.join(' '),
-        ...(practitioner.specialties ?? []),
+        profile.name,
+        profile.role,
+        profile.description,
+        profile.languages.join(' '),
+        profile.modes.join(' '),
+        ...profile.specialties,
       ].join(' ').toLowerCase();
-      const slotsForPractitioner = pickerSlots[practitioner.id] ?? [];
 
       if (query && !searchable.includes(query)) return false;
-      if (specialtyFilter && !(practitioner.specialties ?? []).includes(specialtyFilter)) return false;
-      if (modeFilter && !meta.modes.includes(modeFilter)) return false;
-      if (languageFilter && !meta.languages.includes(languageFilter)) return false;
-      if (availabilityFilter === 'available' && !slotsForPractitioner.length) return false;
+      if (specialtyFilter && !profile.specialties.includes(specialtyFilter)) return false;
+      if (modeFilter && !profile.modes.includes(modeFilter)) return false;
+      if (languageFilter && !profile.languages.includes(languageFilter)) return false;
+      if (availabilityFilter === 'available' && !profile.availability) return false;
 
       return true;
     });
-  }, [availabilityFilter, languageFilter, modeFilter, pickerMode, pickerPractitioners, pickerSlots, practitionerSearch, specialtyFilter]);
+  }, [availabilityFilter, languageFilter, modeFilter, pickerMode, pickerPractitioners, practitionerSearch, specialtyFilter]);
 
   const availableSpecialties = useMemo(() => {
     if (!pickerMode) return [];
 
-    return Array.from(new Set(pickerPractitioners.flatMap((practitioner) => practitioner.specialties ?? []))).sort();
+    return Array.from(new Set(pickerPractitioners.flatMap((item) => item.profile.specialties))).sort();
   }, [pickerMode, pickerPractitioners]);
 
   const availableLanguages = useMemo(() => {
     if (!pickerMode) return [];
 
-    return Array.from(new Set(pickerPractitioners.flatMap((practitioner) => practitionerProfileMeta(practitioner).languages))).sort();
+    return Array.from(new Set(pickerPractitioners.flatMap((item) => item.profile.languages))).sort();
   }, [pickerMode, pickerPractitioners]);
 
   useEffect(() => {
@@ -362,6 +576,9 @@ export default function ClientIntakeFlowPage() {
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedPractitionerId, window.from, window.to).then((items) => {
       setSlots(items);
+      if (!state.selectedSlotId && items[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: items[0].id } });
+      }
       if (state.selectedSlotId && !items.some((slot) => slot.id === state.selectedSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: null } });
       }
@@ -376,6 +593,9 @@ export default function ClientIntakeFlowPage() {
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedPsychologistId, window.from, window.to).then((items) => {
       setPsychologistSlots(items);
+      if (!state.selectedPsychologistSlotId && items[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: items[0].id } });
+      }
       if (state.selectedPsychologistSlotId && !items.some((slot) => slot.id === state.selectedPsychologistSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: null } });
       }
@@ -390,6 +610,9 @@ export default function ClientIntakeFlowPage() {
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedTrainerId, window.from, window.to).then((items) => {
       setTrainerSlots(items);
+      if (!state.selectedTrainerSlotId && items[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: items[0].id } });
+      }
       if (state.selectedTrainerSlotId && !items.some((slot) => slot.id === state.selectedTrainerSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: null } });
       }
@@ -404,12 +627,13 @@ export default function ClientIntakeFlowPage() {
 
     let cancelled = false;
     const window = upcomingSlotWindow();
+    const sourceIds = Array.from(new Set(pickerPractitioners.map((item) => item.sourceId).filter((id) => id > 0)));
 
     Promise.all(
-      pickerPractitioners.map((practitioner) => (
-        getPractitionerSlots(practitioner.id, window.from, window.to)
-          .then((items) => [practitioner.id, items] as const)
-          .catch(() => [practitioner.id, []] as const)
+      sourceIds.map((sourceId) => (
+        getPractitionerSlots(sourceId, window.from, window.to)
+          .then((items) => [sourceId, items] as const)
+          .catch(() => [sourceId, []] as const)
       ))
     ).then((entries) => {
       if (!cancelled) {
@@ -519,18 +743,21 @@ export default function ClientIntakeFlowPage() {
     }
   }
 
-  function selectPractitioner(practitioner: PractitionerItem) {
+  function selectPractitioner(item: PickerPractitionerCard | PractitionerItem) {
+    const practitionerId = 'sourceId' in item ? item.sourceId : item.id;
+
     if (pickerMode === 'psychologist') {
-      dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistId: practitioner.id, selectedPsychologistSlotId: null } });
+      dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistId: practitionerId, selectedPsychologistSlotId: null } });
       setPsychologistSlots([]);
     } else if (pickerMode === 'trainer') {
-      dispatch({ type: 'SET_FIELD', payload: { selectedTrainerId: practitioner.id, selectedTrainerSlotId: null } });
+      dispatch({ type: 'SET_FIELD', payload: { selectedTrainerId: practitionerId, selectedTrainerSlotId: null } });
       setTrainerSlots([]);
     } else {
-      dispatch({ type: 'SET_FIELD', payload: { selectedPractitionerId: practitioner.id, selectedSlotId: null } });
+      dispatch({ type: 'SET_FIELD', payload: { selectedPractitionerId: practitionerId, selectedSlotId: null } });
       setSlots([]);
     }
 
+    setSelectedPickerProfileKey('displayKey' in item ? item.displayKey : String(item.id));
     setPickerMode(null);
   }
 
@@ -542,20 +769,22 @@ export default function ClientIntakeFlowPage() {
     setAvailabilityFilter('');
   }
 
-  function toggleSavedPractitioner(practitionerId: number) {
+  function toggleSavedPractitioner(practitionerId: string | number) {
+    const savedId = String(practitionerId);
+
     setSavedPractitionerIds((current) => (
-      current.includes(practitionerId)
-        ? current.filter((id) => id !== practitionerId)
-        : [...current, practitionerId]
+      current.includes(savedId)
+        ? current.filter((id) => id !== savedId)
+        : [...current, savedId]
     ));
   }
 
   function renderFilterSelect(label: string, value: string, onChange: (value: string) => void, options: string[]) {
     return (
-      <label className="relative min-w-36">
+      <label className="relative min-w-[118px]">
         <span className="sr-only">{label}</span>
         <select
-          className="h-12 w-full appearance-none rounded-xl border border-indigo-100 bg-white px-4 pr-10 text-sm font-semibold text-slate-900 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+          className="h-11 w-full appearance-none rounded-lg border border-[#cfd6e8] bg-white px-4 pr-9 text-[0.8rem] font-bold text-slate-950 shadow-sm outline-none transition focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
           value={value}
           onChange={(event) => onChange(event.target.value)}
         >
@@ -571,7 +800,7 @@ export default function ClientIntakeFlowPage() {
     const meta = practitionerProfileMeta(practitioner);
     const nextSlot = pickerSlots[practitioner.id]?.[0];
     const selected = practitioner.id === state.selectedPractitionerId || practitioner.id === state.selectedPsychologistId || practitioner.id === state.selectedTrainerId;
-    const saved = savedPractitionerIds.includes(practitioner.id);
+    const saved = savedPractitionerIds.includes(String(practitioner.id));
     const rating = numericRating(practitioner.rating);
     const match = Math.max(86, Math.round(rating * 20) - (index * 2));
     const name = practitioner.name ?? 'Wellness Practitioner';
@@ -656,6 +885,91 @@ export default function ClientIntakeFlowPage() {
     );
   }
 
+  function renderExpectedPractitionerPickerCard(item: PickerPractitionerCard, index: number) {
+    const { profile } = item;
+    const selectedById = item.sourceId === state.selectedPractitionerId || item.sourceId === state.selectedPsychologistId || item.sourceId === state.selectedTrainerId;
+    const selected = selectedPickerProfileKey === item.displayKey || (!selectedPickerProfileKey && selectedById);
+    const saved = savedPractitionerIds.includes(item.displayKey);
+
+    return (
+      <article
+        key={item.displayKey}
+        className={`relative grid content-start gap-4 rounded-lg border bg-white px-5 py-4 shadow-[0_8px_24px_rgba(51,65,85,0.05)] transition hover:border-indigo-200 hover:shadow-[0_14px_34px_rgba(79,70,229,0.10)] lg:grid-cols-[minmax(460px,1fr)_220px_184px] lg:items-center ${
+          selected ? 'border-indigo-300 ring-4 ring-indigo-100' : 'border-[#e1e5f2]'
+        }`}
+      >
+        {index === 0 ? (
+          <div className="absolute -top-3 left-9 inline-flex items-center gap-1 rounded-md bg-[#5b39f6] px-2.5 py-1 text-[0.72rem] font-bold text-white shadow-md shadow-indigo-200">
+            <Star className="h-3.5 w-3.5 fill-amber-300 text-amber-300" aria-hidden="true" />
+            Recommended for you
+          </div>
+        ) : null}
+
+        <div className="grid min-w-0 gap-4 sm:grid-cols-[116px_1fr] sm:items-center">
+          <div className="grid h-[116px] w-[116px] place-items-center overflow-hidden rounded-full bg-indigo-50 shadow-inner ring-1 ring-indigo-50">
+            <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
+          </div>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2 leading-tight">
+              <h3 className="text-[1.18rem] font-extrabold text-[#101735]">{profile.name}</h3>
+              <BadgeCheck className="h-4 w-4 fill-[#6849f5] text-white" aria-hidden="true" />
+            </div>
+            <p className="mt-1 text-[0.82rem] font-medium text-[#344160]">{profile.role}</p>
+            <p className="mt-1 max-w-[600px] text-[0.82rem] leading-5 text-[#1f2a44]">{profile.description}</p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {profile.specialties.slice(0, 5).map((specialty) => (
+                <span key={specialty} className="rounded-full bg-[#f0edff] px-3 py-1 text-[0.72rem] font-bold capitalize text-[#553ec5]">
+                  {compactSpecialtyLabel(specialty)}
+                </span>
+              ))}
+            </div>
+            <div className="mt-5 flex flex-wrap gap-x-7 gap-y-2 text-[0.78rem] font-medium text-[#435175]">
+              <span className="inline-flex items-center gap-2"><BriefcaseBusiness className="h-3.5 w-3.5" aria-hidden="true" />{profile.experience}</span>
+              <span className="inline-flex items-center gap-2"><Globe2 className="h-3.5 w-3.5" aria-hidden="true" />{profile.languages.join(', ')}</span>
+              <span className="inline-flex items-center gap-2"><Monitor className="h-3.5 w-3.5" aria-hidden="true" />{profile.modes.join(' \u2022 ')}</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid content-center gap-3 border-[#e4e8f2] lg:border-l lg:px-5">
+          {index === 0 ? (
+            <div className="w-fit justify-self-start rounded-full bg-[#dcf7ec] px-3 py-1 text-[0.72rem] font-extrabold text-[#00866d] lg:justify-self-end">{profile.match}% match</div>
+          ) : null}
+          <div className="rounded-lg border border-[#d6f0e5] bg-[linear-gradient(90deg,#eefcf6_0%,#fbfffd_100%)] px-3 py-2.5">
+            <p className="flex items-center gap-2 text-[0.72rem] font-semibold text-[#18875e]"><CalendarDays className="h-4 w-4" aria-hidden="true" />Next available</p>
+            <p className="mt-0.5 text-[0.82rem] font-extrabold text-[#007a51]">{profile.availability}</p>
+          </div>
+          <p className="flex items-center gap-2 text-[0.78rem] text-[#263352]"><Star className="h-4 w-4 fill-amber-400 text-amber-400" aria-hidden="true" />{profile.rating.toFixed(1)} ({profile.reviews} reviews)</p>
+          <p className="text-[0.98rem] font-extrabold text-[#101735]">{profile.price}<span className="text-[0.8rem] font-semibold text-[#263352]"> / session</span></p>
+        </div>
+
+        <div className="grid content-center gap-2.5 border-[#e4e8f2] lg:border-l lg:pl-5">
+          <button
+            type="button"
+            onClick={() => selectPractitioner(item)}
+            className="h-9 rounded-lg bg-[linear-gradient(90deg,#5a38f5_0%,#7048ea_100%)] px-4 text-[0.78rem] font-extrabold text-white shadow-md shadow-indigo-200 transition hover:brightness-105 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          >
+            {selected ? 'Selected' : 'Select Practitioner'}
+          </button>
+          <button
+            type="button"
+            className="h-9 rounded-lg border border-[#876df4] bg-white px-4 text-[0.78rem] font-extrabold text-[#5d3eda] transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+          >
+            View Profile
+          </button>
+          <button
+            type="button"
+            onClick={() => toggleSavedPractitioner(item.displayKey)}
+            className="inline-flex items-center justify-center gap-2 rounded-lg px-4 py-1.5 text-[0.78rem] font-bold text-[#5d3eda] transition hover:bg-indigo-50"
+          >
+            <Heart className={`h-4 w-4 ${saved ? 'fill-indigo-600' : ''}`} aria-hidden="true" />
+            {saved ? 'Saved' : 'Save'}
+          </button>
+        </div>
+      </article>
+    );
+  }
+
   function renderPractitionerButton(mode: PickerMode, practitioner: PractitionerItem | undefined, title: string, hint: string) {
     return (
       <button
@@ -707,6 +1021,277 @@ export default function ClientIntakeFlowPage() {
     );
   }
 
+  function renderDateTimeSelectionScreen({
+    practitioner,
+    slotsForPractitioner,
+    selectedSlotId,
+    onSelectSlot,
+    onBack,
+    onPrimary,
+    primaryLabel,
+    primaryDisabled,
+  }: {
+    practitioner: PractitionerItem | undefined;
+    slotsForPractitioner: SlotItem[];
+    selectedSlotId: number | null;
+    onSelectSlot: (slotId: number | null) => void;
+    onBack: () => void;
+    onPrimary: () => void;
+    primaryLabel: string;
+    primaryDisabled: boolean;
+  }) {
+    const profile = getDisplayProfileForPractitioner(practitioner, selectedPickerProfileKey);
+    const selectedDate = bookingDateOptions.find((date) => date.key === selectedBookingDateKey) ?? bookingDateOptions[2];
+    const totalTimeSlots = bookingTimeGroups.reduce((count, group) => count + group.times.length, 0);
+
+    return (
+      <div className="min-h-[calc(100vh-150px)] rounded-lg bg-[linear-gradient(135deg,#ffffff_0%,#fbfaff_48%,#f8f7ff_100%)] px-3 py-4 text-[#101735] sm:px-5 lg:px-7">
+        <div className="mb-6 flex flex-col gap-4 border-b border-[#e3e7f2] pb-5 lg:flex-row lg:items-center lg:justify-between">
+          <button
+            type="button"
+            onClick={onBack}
+            className="inline-flex w-fit items-center gap-2 rounded-lg px-2 py-2 text-sm font-semibold text-[#435175] transition hover:bg-white"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back
+          </button>
+          <div className="flex flex-wrap items-center gap-4 text-xs font-semibold text-[#5d6885]">
+            <span className="inline-flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#eeeaff] text-[#6746e8]"><Check className="h-4 w-4" /></span>
+              Choose Practitioner
+            </span>
+            <span className="hidden h-px w-14 bg-[#d8dded] sm:block" />
+            <span className="inline-flex items-center gap-2 text-[#101735]">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#6746e8] text-white">2</span>
+              Choose Date & Time
+            </span>
+            <span className="hidden h-px w-14 bg-[#d8dded] sm:block" />
+            <span className="inline-flex items-center gap-2">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]">3</span>
+              Confirm & Pay
+            </span>
+          </div>
+          <button type="button" onClick={() => navigate('/client')} className="w-fit rounded-lg px-3 py-2 text-sm font-semibold text-[#435175] transition hover:bg-white">
+            Close
+          </button>
+        </div>
+
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_330px]">
+          <div className="grid gap-6">
+            <header className="flex items-center gap-4">
+              <span className="grid h-16 w-16 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]">
+                <CalendarCheck2 className="h-8 w-8" aria-hidden="true" />
+              </span>
+              <div>
+                <h1 className="text-[1.9rem] font-extrabold leading-tight text-[#080d2d] sm:text-[2.2rem]">Choose date & time</h1>
+                <p className="mt-1 text-sm font-medium text-[#52617d]">Select an available day and slot for your first session.</p>
+              </div>
+            </header>
+
+            <section className="grid gap-5 rounded-lg border border-[#dfe4ef] bg-white p-5 shadow-[0_10px_28px_rgba(51,65,85,0.05)] lg:grid-cols-[360px_1fr_280px] lg:items-center">
+              <div className="flex items-center gap-5">
+                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-[#f0edff] ring-8 ring-[#f7f5ff]">
+                  <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
+                  <span className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full bg-[#22c982] text-white ring-4 ring-white">
+                    <Check className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-extrabold text-[#101735]">{profile.name}</h2>
+                    <ShieldCheck className="h-5 w-5 text-[#6746e8]" aria-hidden="true" />
+                  </div>
+                  <p className="mt-1 text-sm font-medium text-[#435175]">{profile.role}</p>
+                  <p className="mt-3 flex items-center gap-2 text-sm font-semibold text-[#101735]">
+                    {profile.rating.toFixed(1)}
+                    <span className="inline-flex text-[#ffb020]">
+                      {Array.from({ length: 5 }, (_, index) => <Star key={index} className="h-4 w-4 fill-current" />)}
+                    </span>
+                    <span className="font-medium text-[#52617d]">({profile.reviews} reviews)</span>
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 border-[#e6eaf3] lg:border-l lg:px-7">
+                <div>
+                  <p className="text-xs font-extrabold text-[#52617d]">Specialties</p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {profile.specialties.slice(0, 3).map((specialty) => (
+                      <span key={specialty} className="rounded-md bg-[#f0edff] px-3 py-1 text-xs font-bold text-[#6746e8]">{compactSpecialtyLabel(specialty)}</span>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-[#52617d]">Languages</p>
+                  <p className="mt-2 text-sm font-medium text-[#435175]">{profile.languages.join(', ')}</p>
+                </div>
+              </div>
+
+              <div className="grid gap-5 border-[#e6eaf3] lg:border-l lg:pl-7">
+                <div>
+                  <p className="text-xs font-extrabold text-[#52617d]">Session Modes</p>
+                  <div className="mt-3 flex flex-wrap gap-4 text-xs font-semibold text-[#435175]">
+                    <span className="inline-flex items-center gap-1.5"><Video className="h-4 w-4" />Video</span>
+                    <span className="inline-flex items-center gap-1.5"><UserRound className="h-4 w-4" />In-Person</span>
+                    <span className="inline-flex items-center gap-1.5"><Phone className="h-4 w-4" />Phone</span>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-extrabold text-[#52617d]">Consultation Fee</p>
+                  <p className="mt-2 inline-flex items-center gap-1 text-base font-extrabold text-[#101735]">{profile.price}<span className="text-sm font-semibold text-[#52617d]">/ session</span><Info className="h-4 w-4 text-[#71809c]" /></p>
+                </div>
+              </div>
+            </section>
+
+            <section className="rounded-lg border border-[#dfe4ef] bg-white p-5 shadow-[0_10px_28px_rgba(51,65,85,0.05)]">
+              <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <h2 className="inline-flex items-center gap-3 text-lg font-extrabold text-[#101735]">
+                  <span className="grid h-6 w-6 place-items-center rounded-full border border-[#6746e8] text-sm text-[#6746e8]">1</span>
+                  Select a date
+                </h2>
+                <div className="flex items-center gap-4 text-sm font-semibold text-[#101735]">
+                  June 2026 <ChevronDown className="h-4 w-4" />
+                  <span className="inline-flex gap-2">
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-[#dfe4ef] text-[#647391]"><ChevronLeft className="h-4 w-4" /></button>
+                    <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-[#dfe4ef] text-[#647391]"><ChevronRight className="h-4 w-4" /></button>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex gap-4 overflow-x-auto pb-5">
+                {bookingDateOptions.map((date) => {
+                  const selected = date.key === selectedBookingDateKey;
+                  return (
+                    <button
+                      key={date.key}
+                      type="button"
+                      onClick={() => setSelectedBookingDateKey(date.key)}
+                      className={`grid h-[116px] min-w-[90px] place-items-center rounded-lg border px-4 py-3 text-center transition ${
+                        selected
+                          ? 'border-[#6746e8] bg-[linear-gradient(180deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_14px_28px_rgba(103,70,232,0.28)]'
+                          : 'border-[#e0e5ef] bg-white text-[#101735] hover:border-[#b9a8f6]'
+                      }`}
+                    >
+                      <span className={`text-xs font-semibold ${selected ? 'text-white/80' : 'text-[#8a94aa]'}`}>{date.eyebrow || date.weekday}</span>
+                      <span className={`text-sm font-bold ${date.eyebrow && !selected ? 'text-[#52617d]' : ''}`}>{date.eyebrow ? date.weekday : date.date}</span>
+                      <span className="text-2xl font-extrabold">{date.eyebrow ? date.date : null}</span>
+                      <span className={`text-xs font-semibold ${selected ? 'text-white/85' : 'text-[#52617d]'}`}>{date.month}</span>
+                      <span className={`mt-1 text-xs font-bold ${selected ? 'text-white' : 'text-[#6746e8]'}`}>{date.slots ? `${date.slots} slots` : '-'}</span>
+                    </button>
+                  );
+                })}
+                <button type="button" className="my-auto grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#deddf8] text-[#6746e8]"><ChevronRight className="h-4 w-4" /></button>
+              </div>
+
+              <div className="border-t border-[#edf0f6] pt-5">
+                <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                  <h2 className="inline-flex items-center gap-3 text-lg font-extrabold text-[#101735]">
+                    <span className="grid h-6 w-6 place-items-center rounded-full border border-[#6746e8] text-sm text-[#6746e8]">2</span>
+                    Select a time
+                  </h2>
+                  <p className="text-xs font-semibold text-[#52617d]">Times are shown in your local time (IST)</p>
+                </div>
+
+                <div className="grid gap-4">
+                  {bookingTimeGroups.map((group) => {
+                    const Icon = group.icon;
+                    return (
+                      <div key={group.label} className="grid gap-3 border-b border-[#edf0f6] pb-4 last:border-b-0 last:pb-0 sm:grid-cols-[120px_1fr] sm:items-center">
+                        <div className="flex items-center gap-3">
+                          <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f5f7fb] text-[#101735]"><Icon className="h-5 w-5" /></span>
+                          <span className="text-sm font-extrabold text-[#101735]">{group.label}</span>
+                        </div>
+                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                          {group.times.map((time) => {
+                            const timeIndex = bookingTimeGroups.flatMap((item) => item.times).indexOf(time);
+                            const selected = selectedBookingTimeLabel === time;
+                            return (
+                              <button
+                                key={time}
+                                type="button"
+                                onClick={() => {
+                                  const nextSlot = getSlotForTime(slotsForPractitioner, timeIndex);
+                                  setSelectedBookingTimeLabel(time);
+                                  onSelectSlot(nextSlot?.id ?? selectedSlotId);
+                                }}
+                                className={`relative h-10 rounded-lg border px-4 text-sm font-bold transition ${
+                                  selected
+                                    ? 'border-[#6746e8] bg-[linear-gradient(90deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_10px_22px_rgba(103,70,232,0.22)]'
+                                    : 'border-[#cdbff7] bg-white text-[#6746e8] hover:bg-[#f7f5ff]'
+                                }`}
+                              >
+                                {time}
+                                {selected ? <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-white text-[#6746e8]" /> : null}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </section>
+          </div>
+
+          <aside className="h-fit rounded-lg border border-[#dfe4ef] bg-white p-5 shadow-[0_10px_28px_rgba(51,65,85,0.05)] xl:sticky xl:top-6">
+            <h2 className="mb-5 inline-flex items-center gap-2 text-lg font-extrabold text-[#101735]">
+              <span className="grid h-7 w-7 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]"><IndianRupee className="h-4 w-4" /></span>
+              Booking summary
+            </h2>
+            <div className="overflow-hidden rounded-lg border border-[#e1e6ef]">
+              <div className="flex items-center gap-3 border-b border-[#e1e6ef] p-4">
+                <img src={profile.avatar} alt="" className="h-14 w-14 rounded-full object-cover" />
+                <div>
+                  <p className="inline-flex items-center gap-1.5 font-extrabold text-[#101735]">{profile.name}<ShieldCheck className="h-4 w-4 text-[#6746e8]" /></p>
+                  <p className="mt-0.5 text-sm font-medium text-[#52617d]">{profile.role}</p>
+                </div>
+              </div>
+              <div className="grid gap-4 p-4 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><CalendarDays className="h-4 w-4" />Date</span>
+                  <span className="font-bold text-[#101735]">{selectedDate.weekday}, {selectedDate.date} Jun 2026</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><Clock3 className="h-4 w-4" />Time</span>
+                  <span className="font-bold text-[#101735]">{selectedBookingTimeLabel}</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><CalendarCheck2 className="h-4 w-4" />Session Type</span>
+                  <span className="inline-flex items-center gap-1.5 font-bold text-[#101735]"><Video className="h-4 w-4" />Video Consultation</span>
+                </div>
+                <div className="flex items-center justify-between gap-4">
+                  <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><IndianRupee className="h-4 w-4" />Fee</span>
+                  <span className="font-bold text-[#101735]">{profile.price}</span>
+                </div>
+                <div className="flex items-center justify-between border-t border-[#e1e6ef] pt-4 text-base">
+                  <span className="font-extrabold text-[#101735]">Total</span>
+                  <span className="font-extrabold text-[#6746e8]">{profile.price}</span>
+                </div>
+              </div>
+            </div>
+            <div className="mt-4 flex items-start gap-3 rounded-lg border border-[#e4ddf8] bg-[#f7f4ff] p-4">
+              <ShieldCheck className="mt-0.5 h-6 w-6 shrink-0 text-[#6746e8]" />
+              <p className="text-sm font-medium leading-5 text-[#52617d]"><span className="font-extrabold text-[#6746e8]">Your session is secure and private.</span><br />You can reschedule later if needed.</p>
+            </div>
+            <button
+              type="button"
+              onClick={onPrimary}
+              disabled={primaryDisabled || !selectedSlotId || !totalTimeSlots}
+              className="mt-5 h-12 w-full rounded-lg bg-[linear-gradient(90deg,#7447f3_0%,#5f39df_100%)] text-sm font-extrabold text-white shadow-[0_14px_28px_rgba(103,70,232,0.26)] transition hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              {loading ? 'Reserving...' : primaryLabel}
+            </button>
+            <button type="button" onClick={onBack} className="mt-3 h-12 w-full rounded-lg border border-[#bdaef7] bg-white text-sm font-extrabold text-[#101735] transition hover:bg-[#f7f5ff]">
+              Back
+            </button>
+            <p className="mt-5 flex items-center justify-center gap-2 text-xs font-semibold text-[#9aa4b8]"><LockKeyhole className="h-4 w-4" />No payment needed to reserve</p>
+          </aside>
+        </div>
+      </div>
+    );
+  }
+
   if (state.step === 6) {
     const underReview = confirmation?.state === 'under_review';
 
@@ -736,6 +1321,45 @@ export default function ClientIntakeFlowPage() {
         </div>
       </div>
     );
+  }
+
+  if (state.step === 3 && isCombined && state.selectedPsychologistId) {
+    return renderDateTimeSelectionScreen({
+      practitioner: selectedPsychologist,
+      slotsForPractitioner: psychologistSlots,
+      selectedSlotId: state.selectedPsychologistSlotId,
+      onSelectSlot: (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: slotId } }),
+      onBack: () => dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistId: null, selectedPsychologistSlotId: null } }),
+      onPrimary: () => dispatch({ type: 'SET_STEP', payload: 4 }),
+      primaryLabel: 'Continue',
+      primaryDisabled: !state.selectedPsychologistSlotId,
+    });
+  }
+
+  if (state.step === 4 && isCombined && state.selectedTrainerId) {
+    return renderDateTimeSelectionScreen({
+      practitioner: selectedTrainer,
+      slotsForPractitioner: trainerSlots,
+      selectedSlotId: state.selectedTrainerSlotId,
+      onSelectSlot: (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: slotId } }),
+      onBack: () => dispatch({ type: 'SET_FIELD', payload: { selectedTrainerId: null, selectedTrainerSlotId: null } }),
+      onPrimary: () => dispatch({ type: 'SET_STEP', payload: 5 }),
+      primaryLabel: 'Review',
+      primaryDisabled: !state.selectedTrainerSlotId,
+    });
+  }
+
+  if (state.step === 3 && !isCombined && state.selectedPractitionerId) {
+    return renderDateTimeSelectionScreen({
+      practitioner: selectedPractitioner,
+      slotsForPractitioner: slots,
+      selectedSlotId: state.selectedSlotId,
+      onSelectSlot: (slotId) => dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: slotId } }),
+      onBack: () => dispatch({ type: 'SET_FIELD', payload: { selectedPractitionerId: null, selectedSlotId: null } }),
+      onPrimary: onReserveSingleSlot,
+      primaryLabel: 'Reserve Slot',
+      primaryDisabled: loading || !state.selectedSlotId || !state.selectedPractitionerId,
+    });
   }
 
   return (
@@ -897,25 +1521,25 @@ export default function ClientIntakeFlowPage() {
         ) : null}
 
         <Dialog open={pickerMode !== null} onOpenChange={(open) => setPickerMode(open ? pickerMode : null)}>
-          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-y-auto rounded-none border-0 bg-[#fbfaff] p-0 text-slate-950 sm:max-w-none">
-            <div className="relative min-h-dvh overflow-hidden px-4 py-6 sm:px-8 lg:px-12">
-              <div className="pointer-events-none absolute inset-x-0 top-0 h-40 bg-[radial-gradient(circle_at_65%_0%,rgba(124,58,237,0.16),transparent_38%),linear-gradient(180deg,rgba(238,234,255,0.72),rgba(255,255,255,0))]" />
-              <div className="pointer-events-none absolute right-0 top-12 h-28 w-1/2 rounded-bl-[100%] bg-white/60" />
+          <DialogContent className="left-0 top-0 h-dvh max-h-dvh w-screen max-w-none translate-x-0 translate-y-0 overflow-hidden rounded-none border-0 bg-[#fbfaff] p-0 text-slate-950 sm:max-w-none">
+            <div className="relative min-h-dvh overflow-hidden px-4 py-6 sm:px-8 lg:px-14">
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-44 bg-[linear-gradient(180deg,rgba(247,243,255,0.86),rgba(255,255,255,0.18)_76%,rgba(255,255,255,0))]" />
+              <div className="pointer-events-none absolute right-0 top-16 h-24 w-[45%] rounded-bl-[100%] bg-white/70" />
 
-              <div className="relative mx-auto max-w-[1780px]">
-                <DialogHeader className="mb-8 space-y-4 pr-16 text-left">
-                  <div className="flex items-center gap-3">
-                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-indigo-600 text-white shadow-md shadow-indigo-100">
-                      <Heart className="h-4 w-4" aria-hidden="true" />
+              <div className="relative mx-auto max-w-[1550px]">
+                <DialogHeader className="mb-7 space-y-4 pr-16 text-left">
+                  <div className="flex items-center gap-2.5">
+                    <span className="grid h-6 w-6 place-items-center rounded-md bg-[#6647f5] text-white shadow-sm shadow-indigo-100">
+                      <Heart className="h-3.5 w-3.5" aria-hidden="true" />
                     </span>
-                    <span className="text-xl font-extrabold tracking-tight text-slate-950">WellnessConnect</span>
+                    <span className="text-[1rem] font-extrabold tracking-tight text-slate-950">WellnessConnect</span>
                   </div>
                   <div>
-                    <DialogTitle className="text-4xl font-extrabold tracking-tight text-slate-950 sm:text-5xl">
-                      {pickerMode === 'trainer' ? 'Select fitness trainer' : pickerMode === 'psychologist' ? 'Select psychologist' : 'Select practitioner'}
+                    <DialogTitle className="text-[2.05rem] font-extrabold leading-tight tracking-normal text-[#080d2d] sm:text-[2.35rem]">
+                      Select practitioner
                     </DialogTitle>
-                    <DialogDescription className="mt-3 text-lg font-medium text-slate-600">
-                      {pickerMode === 'trainer' ? 'Choose a trainer for your fitness session.' : pickerMode === 'psychologist' ? 'Choose a psychologist from your recommended matches.' : 'Choose a practitioner from your recommended matches.'}
+                    <DialogDescription className="mt-2 text-[1rem] font-medium text-[#485a78]">
+                      Choose a practitioner from your recommended matches.
                     </DialogDescription>
                   </div>
                 </DialogHeader>
@@ -923,21 +1547,21 @@ export default function ClientIntakeFlowPage() {
                 <button
                   type="button"
                   onClick={() => setPickerMode(null)}
-                  className="absolute right-0 top-0 grid h-12 w-12 place-items-center rounded-full bg-white text-slate-950 shadow-sm transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100"
+                  className="absolute right-0 top-0 grid h-11 w-11 place-items-center rounded-full bg-white text-slate-950 shadow-sm transition hover:bg-indigo-50 focus:outline-none focus:ring-4 focus:ring-indigo-100"
                   aria-label="Close practitioner selector"
                 >
-                  <X className="h-6 w-6" aria-hidden="true" />
+                  <X className="h-5 w-5" aria-hidden="true" />
                 </button>
 
-                <div className="mb-6 flex flex-wrap items-center gap-3">
-                  <label className="relative min-w-72 flex-1 lg:max-w-[520px]">
+                <div className="mb-5 flex flex-wrap items-center gap-3">
+                  <label className="relative min-w-72 flex-1 lg:max-w-[420px]">
                     <span className="sr-only">Search practitioners</span>
-                    <Search className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-500" aria-hidden="true" />
+                    <Search className="pointer-events-none absolute left-4 top-1/2 h-[18px] w-[18px] -translate-y-1/2 text-slate-500" aria-hidden="true" />
                     <input
                       value={practitionerSearch}
                       onChange={(event) => setPractitionerSearch(event.target.value)}
                       placeholder="Search by name, specialty, or keyword"
-                      className="h-12 w-full rounded-xl border border-indigo-100 bg-white pl-12 pr-4 text-sm font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                      className="h-11 w-full rounded-lg border border-[#cfd6e8] bg-white pl-11 pr-4 text-[0.8rem] font-semibold text-slate-900 shadow-sm outline-none transition placeholder:text-slate-500 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
                     />
                   </label>
                   {renderFilterSelect('Specialty', specialtyFilter, setSpecialtyFilter, availableSpecialties)}
@@ -947,16 +1571,16 @@ export default function ClientIntakeFlowPage() {
                   <button
                     type="button"
                     onClick={clearPractitionerFilters}
-                    className="inline-flex h-12 items-center gap-2 rounded-xl px-3 text-sm font-bold text-indigo-700 transition hover:bg-indigo-50"
+                    className="inline-flex h-11 items-center gap-2 rounded-lg px-3 text-[0.82rem] font-bold text-[#5b39f6] transition hover:bg-indigo-50"
                   >
                     <RotateCcw className="h-4 w-4" aria-hidden="true" />
                     Clear filters
                   </button>
                 </div>
 
-                <div className="grid gap-8 xl:grid-cols-[1fr_310px]">
-                  <div className="grid gap-4">
-                    {filteredPickerPractitioners.length ? filteredPickerPractitioners.map(renderPractitionerPickerCard) : (
+                <div className="grid min-h-0 items-start gap-7 xl:grid-cols-[minmax(0,1fr)_260px]">
+                  <div className="grid max-h-[calc(100dvh-230px)] content-start gap-2.5 overflow-y-auto pr-1 pb-4">
+                    {filteredPickerPractitioners.length ? filteredPickerPractitioners.map(renderExpectedPractitionerPickerCard) : (
                       <div className="rounded-2xl border border-slate-200 bg-white px-6 py-10 text-center shadow-sm">
                         <p className="text-lg font-bold text-slate-950">No practitioners match these filters.</p>
                         <p className="mt-2 text-sm text-slate-600">Clear filters or try a broader search term.</p>
@@ -964,47 +1588,51 @@ export default function ClientIntakeFlowPage() {
                     )}
                   </div>
 
-                  <aside className="h-fit rounded-2xl border border-indigo-100 bg-white/80 p-6 shadow-sm backdrop-blur xl:sticky xl:top-6">
-                    <div className="grid justify-items-center border-b border-slate-100 pb-6 text-center">
-                      <div className="grid h-24 w-24 place-items-center rounded-3xl bg-indigo-50">
-                        <Sparkles className="h-12 w-12 text-indigo-600" aria-hidden="true" />
+                  <aside className="h-fit rounded-lg border border-[#e4ddf8] bg-white/76 p-5 shadow-[0_8px_26px_rgba(93,69,197,0.05)] backdrop-blur xl:sticky xl:top-6">
+                    <div className="grid justify-items-center border-b border-[#ececf4] pb-6 text-center">
+                      <div className="relative grid h-24 w-24 place-items-center">
+                        <span className="absolute h-16 w-9 rounded-[999px_999px_10px_10px] bg-[#b9a7ff]/70 blur-[0.2px]" />
+                        <span className="absolute h-16 w-9 rotate-[-42deg] rounded-[999px_999px_10px_10px] bg-[#d9ccff]/80" />
+                        <span className="absolute h-16 w-9 rotate-[42deg] rounded-[999px_999px_10px_10px] bg-[#a48bf5]/80" />
+                        <span className="absolute h-11 w-11 rounded-full bg-white/70" />
+                        <Heart className="relative h-7 w-7 fill-[#c9b8ff] text-[#7c61ee]" aria-hidden="true" />
                       </div>
                     </div>
                     <div className="mt-6">
-                      <h3 className="text-lg font-extrabold text-slate-950">Personalized recommendations</h3>
-                      <p className="mt-3 text-sm leading-6 text-slate-600">
+                      <h3 className="text-[1rem] font-extrabold leading-6 text-[#101735]">Personalized recommendations</h3>
+                      <p className="mt-3 text-[0.84rem] leading-6 text-[#435175]">
                         These recommendations are based on your intake responses, goals, and preferences.
                       </p>
                     </div>
-                    <div className="mt-8 grid gap-7">
-                      <div className="grid grid-cols-[48px_1fr] gap-4">
-                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><ShieldCheck className="h-6 w-6" aria-hidden="true" /></span>
+                    <div className="mt-8 grid gap-6">
+                      <div className="grid grid-cols-[44px_1fr] gap-4">
+                        <span className="grid h-11 w-11 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]"><ShieldCheck className="h-5 w-5" aria-hidden="true" /></span>
                         <div>
-                          <p className="font-bold text-slate-950">Verified professionals</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">All practitioners are background-checked and verified.</p>
+                          <p className="text-[0.82rem] font-extrabold text-[#101735]">Verified professionals</p>
+                          <p className="mt-1 text-[0.78rem] leading-5 text-[#435175]">All practitioners are background-checked and verified.</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-[48px_1fr] gap-4">
-                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><LockKeyhole className="h-6 w-6" aria-hidden="true" /></span>
+                      <div className="grid grid-cols-[44px_1fr] gap-4">
+                        <span className="grid h-11 w-11 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]"><LockKeyhole className="h-5 w-5" aria-hidden="true" /></span>
                         <div>
-                          <p className="font-bold text-slate-950">Your privacy matters</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">Your information is secure and confidential.</p>
+                          <p className="text-[0.82rem] font-extrabold text-[#101735]">Your privacy matters</p>
+                          <p className="mt-1 text-[0.78rem] leading-5 text-[#435175]">Your information is secure and confidential.</p>
                         </div>
                       </div>
-                      <div className="grid grid-cols-[48px_1fr] gap-4">
-                        <span className="grid h-12 w-12 place-items-center rounded-full bg-indigo-50 text-indigo-700"><UserCheck className="h-6 w-6" aria-hidden="true" /></span>
+                      <div className="grid grid-cols-[44px_1fr] gap-4">
+                        <span className="grid h-11 w-11 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]"><UserCheck className="h-5 w-5" aria-hidden="true" /></span>
                         <div>
-                          <p className="font-bold text-slate-950">You're in control</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-600">You can change your selection anytime.</p>
+                          <p className="text-[0.82rem] font-extrabold text-[#101735]">You're in control</p>
+                          <p className="mt-1 text-[0.78rem] leading-5 text-[#435175]">You can change your selection anytime.</p>
                         </div>
                       </div>
                     </div>
-                    <div className="mt-8 border-t border-slate-100 pt-6">
-                      <div className="grid grid-cols-[40px_1fr] gap-3">
-                        <span className="grid h-10 w-10 place-items-center rounded-full bg-indigo-50 text-indigo-700"><Headphones className="h-5 w-5" aria-hidden="true" /></span>
+                    <div className="mt-8 border-t border-[#ececf4] pt-6">
+                      <div className="grid grid-cols-[36px_1fr] gap-3">
+                        <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f0edff] text-[#6746e8]"><Headphones className="h-[18px] w-[18px]" aria-hidden="true" /></span>
                         <div>
-                          <p className="font-bold text-slate-950">Need help choosing?</p>
-                          <button type="button" className="mt-1 text-sm font-bold text-indigo-700">Chat with our care team</button>
+                          <p className="text-[0.78rem] font-extrabold text-[#101735]">Need help choosing?</p>
+                          <button type="button" className="mt-1 text-[0.78rem] font-bold text-[#5b39f6]">Chat with our care team</button>
                         </div>
                       </div>
                     </div>

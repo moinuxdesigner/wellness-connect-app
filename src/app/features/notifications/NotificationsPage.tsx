@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import {
+  AlertTriangle,
   ArrowRight,
   ArrowUpDown,
   Bell,
@@ -8,7 +9,9 @@ import {
   CheckCheck,
   ChevronRight,
   Clock3,
+  ClipboardCheck,
   FileText,
+  Filter,
   Headphones,
   Mail,
   MessageCircle,
@@ -16,8 +19,11 @@ import {
   MoreVertical,
   Search,
   Settings,
+  Shield,
   Sparkles,
   UserCircle2,
+  Users,
+  X,
 } from 'lucide-react';
 import { useNavigate } from 'react-router';
 import type { Role } from '../../types';
@@ -36,11 +42,16 @@ import {
   type AdminNotificationViewModel,
 } from './adminNotificationPresentation';
 import {
+  getCounsellorNotifications,
   getNotifications,
   markAllNotificationsRead,
   notificationCategoryLabel,
   updateNotification,
   type AppNotification,
+  type CounsellorNotificationCategory,
+  type CounsellorNotificationItem,
+  type CounsellorNotificationsResponse,
+  type CounsellorNotificationPriority,
 } from './notificationsApi';
 import {
   DropdownMenu,
@@ -294,6 +305,362 @@ function buildClientNotificationViewModel(notification: AppNotification): Client
     timeLabel: date.timeLabel,
     ...visual,
   };
+}
+
+type CounsellorNotificationFilter = 'all' | CounsellorNotificationCategory;
+
+const counsellorFilterTabs: Array<{ key: CounsellorNotificationFilter; label: string }> = [
+  { key: 'all', label: 'All' },
+  { key: 'sessions', label: 'Sessions' },
+  { key: 'clients', label: 'Clients' },
+  { key: 'cbt_care', label: 'CBT Care' },
+  { key: 'urgent', label: 'Urgent' },
+  { key: 'system', label: 'System' },
+];
+
+function CounsellorNoticeSnackbar({ notice, onClose }: { notice: NoticeState; onClose: () => void }) {
+  useEffect(() => {
+    if (!notice) return undefined;
+    const timer = window.setTimeout(onClose, 4000);
+    return () => window.clearTimeout(timer);
+  }, [notice, onClose]);
+
+  if (!notice) return null;
+
+  const success = notice.tone === 'success';
+
+  return (
+    <div className="fixed right-5 top-5 z-[80] w-[min(calc(100vw-2rem),420px)]">
+      <div
+        role={success ? 'status' : 'alert'}
+        className={`flex items-start gap-3 rounded-2xl border bg-white px-4 py-3 text-sm shadow-2xl shadow-slate-900/10 ${
+          success ? 'border-emerald-200 text-emerald-800' : 'border-rose-200 text-rose-800'
+        }`}
+      >
+        <span className={`mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full ${success ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+          {success ? <CheckCheck size={18} /> : <AlertTriangle size={18} />}
+        </span>
+        <p className="min-w-0 flex-1 py-1 font-semibold leading-5">{notice.text}</p>
+        <button type="button" aria-label="Close notification" onClick={onClose} className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+          <X size={16} />
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function CounsellorNotificationsActionCenter({
+  data,
+  loading,
+  notice,
+  filter,
+  search,
+  markAllPending,
+  onFilterChange,
+  onSearchChange,
+  onMarkAllRead,
+  onToggleRead,
+  onOpenAction,
+  onCloseNotice,
+}: {
+  data: CounsellorNotificationsResponse | null;
+  loading: boolean;
+  notice: NoticeState;
+  filter: CounsellorNotificationFilter;
+  search: string;
+  markAllPending: boolean;
+  onFilterChange: (filter: CounsellorNotificationFilter) => void;
+  onSearchChange: (value: string) => void;
+  onMarkAllRead: () => Promise<void>;
+  onToggleRead: (item: CounsellorNotificationItem) => Promise<void>;
+  onOpenAction: (path: string) => void;
+  onCloseNotice: () => void;
+}) {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const items = data?.items ?? [];
+  const unreadNotificationRows = items.filter((item) => item.notificationId && !item.read).length;
+  const filteredItems = useMemo(() => items.filter((item) => {
+    if (filter !== 'all' && item.category !== filter) return false;
+    if (search.trim()) {
+      const text = `${item.title} ${item.message} ${item.clientName ?? ''} ${item.category} ${item.priority}`.toLowerCase();
+      if (!text.includes(search.trim().toLowerCase())) return false;
+    }
+    return true;
+  }), [filter, items, search]);
+
+  const tabCounts = counsellorFilterTabs.reduce<Record<string, number>>((counts, tab) => {
+    counts[tab.key] = tab.key === 'all' ? items.length : items.filter((item) => item.category === tab.key).length;
+    return counts;
+  }, {});
+
+  const summary = data?.summary ?? {
+    unread: 0,
+    clientActivity: 0,
+    todaysReminders: 0,
+    urgentAlerts: 0,
+  };
+
+  return (
+    <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-6">
+      <CounsellorNoticeSnackbar notice={notice} onClose={onCloseNotice} />
+
+      <header className="flex flex-col gap-4 rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-5 lg:flex-row lg:items-center lg:justify-between">
+        <div>
+          <p className="text-xs font-semibold uppercase tracking-widest text-violet-700">Counsellor Action Center</p>
+          <h1 className="mt-2 text-3xl font-semibold leading-tight text-slate-950">Notifications</h1>
+          <p className="mt-1 text-sm text-slate-600">Prioritized clinical alerts, session actions, client activity, and CBT care updates.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => void onMarkAllRead()}
+            disabled={markAllPending || unreadNotificationRows === 0}
+            className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-violet-600 px-4 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-55"
+          >
+            <CheckCheck size={17} />
+            {markAllPending ? 'Updating...' : 'Mark All Read'}
+          </button>
+          <button type="button" onClick={() => setSettingsOpen(true)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <Settings size={17} />
+            Notification Settings
+          </button>
+          <button type="button" onClick={() => setFiltersOpen((open) => !open)} className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+            <Filter size={17} />
+            Filter
+          </button>
+        </div>
+      </header>
+
+      <section className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <CounsellorSummaryCard icon={<Mail size={18} />} label="Unread" value={summary.unread} tone="violet" />
+        <CounsellorSummaryCard icon={<Users size={18} />} label="Client Activity" value={summary.clientActivity} tone="blue" />
+        <CounsellorSummaryCard icon={<Calendar size={18} />} label="Today's Reminders" value={summary.todaysReminders} tone="amber" />
+        <CounsellorSummaryCard icon={<Shield size={18} />} label="Urgent Alerts" value={summary.urgentAlerts} tone="rose" />
+      </section>
+
+      <section className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+        <div className="flex flex-wrap gap-2">
+          {counsellorFilterTabs.map((tab) => (
+            <button
+              key={tab.key}
+              type="button"
+              onClick={() => onFilterChange(tab.key)}
+              className={`inline-flex min-h-10 items-center gap-2 rounded-full px-4 text-sm font-semibold transition ${
+                filter === tab.key ? 'bg-violet-600 text-white' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+              }`}
+            >
+              {tab.label}
+              <span className={`rounded-full px-2 py-0.5 text-xs ${filter === tab.key ? 'bg-white/20 text-white' : 'bg-white text-slate-500'}`}>{tabCounts[tab.key] ?? 0}</span>
+            </button>
+          ))}
+        </div>
+
+        {filtersOpen ? (
+          <label className="mt-3 flex min-h-11 items-center gap-3 rounded-lg border border-slate-200 bg-slate-50 px-4 focus-within:border-violet-300 focus-within:ring-4 focus-within:ring-violet-100">
+            <Search size={17} className="text-slate-400" />
+            <input
+              value={search}
+              onChange={(event) => onSearchChange(event.target.value)}
+              placeholder="Search by client, priority, category, or message"
+              className="min-w-0 flex-1 bg-transparent text-sm font-medium text-slate-700 outline-none placeholder:text-slate-400"
+            />
+          </label>
+        ) : null}
+      </section>
+
+      {loading && !data ? (
+        <div className="space-y-3">
+          {Array.from({ length: 5 }).map((_, index) => (
+            <div key={index} className="h-28 animate-pulse rounded-2xl border border-slate-200 bg-white" />
+          ))}
+        </div>
+      ) : null}
+
+      {!loading && !filteredItems.length ? (
+        <section className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center">
+          <Bell size={28} className="mx-auto text-slate-400" />
+          <h2 className="mt-4 text-lg font-semibold text-slate-950">No action items found</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-500">{items.length ? 'Try another category or clear the search filter.' : 'Your counsellor action center is clear right now.'}</p>
+        </section>
+      ) : null}
+
+      {!loading && filteredItems.length ? (
+        <section className="space-y-3">
+          {filteredItems.map((item) => (
+            <CounsellorNotificationCard
+              key={item.id}
+              item={item}
+              onToggleRead={onToggleRead}
+              onOpenAction={onOpenAction}
+            />
+          ))}
+        </section>
+      ) : null}
+
+      <CounsellorNotificationSettingsDrawer open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+    </div>
+  );
+}
+
+function CounsellorSummaryCard({ icon, label, value, tone }: { icon: ReactNode; label: string; value: number; tone: 'violet' | 'blue' | 'amber' | 'rose' }) {
+  const styles = {
+    violet: 'bg-violet-50 text-violet-700',
+    blue: 'bg-blue-50 text-blue-700',
+    amber: 'bg-amber-50 text-amber-700',
+    rose: 'bg-rose-50 text-rose-700',
+  } as const;
+
+  return (
+    <article className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <span className={`inline-flex size-10 items-center justify-center rounded-xl ${styles[tone]}`}>{icon}</span>
+      <p className="mt-4 text-3xl font-semibold leading-none text-slate-950">{value}</p>
+      <p className="mt-1 text-sm font-semibold text-slate-500">{label}</p>
+    </article>
+  );
+}
+
+function CounsellorNotificationCard({ item, onToggleRead, onOpenAction }: { item: CounsellorNotificationItem; onToggleRead: (item: CounsellorNotificationItem) => Promise<void>; onOpenAction: (path: string) => void }) {
+  const visual = counsellorNotificationVisual(item.category, item.priority);
+  const Icon = visual.Icon;
+
+  return (
+    <article className={`rounded-2xl border bg-white p-4 shadow-sm ${item.read ? 'border-slate-200' : visual.borderClass}`}>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
+        <div className="flex min-w-0 gap-4">
+          <span className={`mt-1 inline-flex size-11 shrink-0 items-center justify-center rounded-xl ${visual.iconClass}`}>
+            <Icon size={21} />
+          </span>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              {!item.read ? <span className="size-2 rounded-full bg-violet-600" /> : null}
+              <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${visual.priorityClass}`}>{labelFromNotificationValue(item.priority)}</span>
+              <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold text-slate-600">{labelFromNotificationValue(item.category)}</span>
+              <span className="text-xs font-semibold text-slate-400">{formatCounsellorRelativeTime(item.createdAt)}</span>
+            </div>
+            <h2 className="mt-2 text-base font-semibold text-slate-950">{item.title}</h2>
+            {item.clientName ? <p className="mt-1 text-sm font-semibold text-slate-700">{item.clientName}</p> : null}
+            <p className="mt-1 text-sm leading-6 text-slate-600">{item.message}</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap gap-2 lg:justify-end">
+          {item.actionRoute ? (
+            <button type="button" onClick={() => onOpenAction(item.actionRoute as string)} className={`inline-flex min-h-10 items-center justify-center rounded-lg px-4 text-sm font-semibold text-white ${visual.buttonClass}`}>
+              {item.actionLabel}
+            </button>
+          ) : null}
+          {item.notificationId ? (
+            <button type="button" onClick={() => void onToggleRead(item)} className="inline-flex min-h-10 items-center justify-center rounded-lg border border-slate-200 bg-white px-4 text-sm font-semibold text-slate-700 hover:bg-slate-50">
+              {item.read ? 'Mark Unread' : 'Mark Read'}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function CounsellorNotificationSettingsDrawer({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [settings, setSettings] = useState({
+    clinical: true,
+    sessions: true,
+    cbt: true,
+    clients: true,
+    system: false,
+  });
+
+  if (!open) return null;
+
+  const rows = [
+    { key: 'clinical', label: 'Clinical alerts' },
+    { key: 'sessions', label: 'Session reminders' },
+    { key: 'cbt', label: 'CBT care' },
+    { key: 'clients', label: 'Client activity' },
+    { key: 'system', label: 'System updates' },
+  ] as const;
+
+  return (
+    <div className="fixed inset-0 z-[70] bg-slate-950/30 backdrop-blur-sm">
+      <aside className="ml-auto flex h-full w-[min(100vw,420px)] flex-col bg-white shadow-2xl">
+        <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-5">
+          <div>
+            <h2 className="text-lg font-semibold text-slate-950">Notification Settings</h2>
+            <p className="mt-1 text-sm text-slate-500">Local preference preview for this workspace.</p>
+          </div>
+          <button type="button" aria-label="Close notification settings" onClick={onClose} className="inline-flex size-9 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900">
+            <X size={18} />
+          </button>
+        </div>
+        <div className="space-y-3 p-5">
+          {rows.map((row) => (
+            <label key={row.key} className="flex min-h-14 items-center justify-between gap-4 rounded-xl border border-slate-200 px-4">
+              <span className="text-sm font-semibold text-slate-700">{row.label}</span>
+              <input
+                type="checkbox"
+                checked={settings[row.key]}
+                onChange={(event) => setSettings((current) => ({ ...current, [row.key]: event.target.checked }))}
+                className="h-5 w-5 accent-violet-600"
+              />
+            </label>
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+function counsellorNotificationVisual(category: CounsellorNotificationCategory, priority: CounsellorNotificationPriority) {
+  const priorityStyles = {
+    critical: {
+      priorityClass: 'bg-rose-100 text-rose-700',
+      borderClass: 'border-rose-300 ring-1 ring-rose-100',
+      buttonClass: 'bg-rose-600 hover:bg-rose-700',
+    },
+    high: {
+      priorityClass: 'bg-orange-100 text-orange-700',
+      borderClass: 'border-orange-300 ring-1 ring-orange-100',
+      buttonClass: 'bg-orange-600 hover:bg-orange-700',
+    },
+    medium: {
+      priorityClass: 'bg-blue-100 text-blue-700',
+      borderClass: 'border-blue-200',
+      buttonClass: 'bg-violet-600 hover:bg-violet-700',
+    },
+    low: {
+      priorityClass: 'bg-slate-100 text-slate-600',
+      borderClass: 'border-slate-200',
+      buttonClass: 'bg-slate-700 hover:bg-slate-800',
+    },
+  } as const;
+
+  const categoryStyles = {
+    urgent: { Icon: AlertTriangle, iconClass: 'bg-rose-50 text-rose-600' },
+    sessions: { Icon: Calendar, iconClass: 'bg-orange-50 text-orange-600' },
+    clients: { Icon: Users, iconClass: 'bg-blue-50 text-blue-600' },
+    cbt_care: { Icon: ClipboardCheck, iconClass: 'bg-emerald-50 text-emerald-600' },
+    system: { Icon: Bell, iconClass: 'bg-slate-100 text-slate-600' },
+  } as const;
+
+  return { ...categoryStyles[category], ...priorityStyles[priority] };
+}
+
+function formatCounsellorRelativeTime(value: string | null) {
+  if (!value) return 'Time unavailable';
+  const date = new Date(value);
+  const diffMs = Date.now() - date.getTime();
+  const absMinutes = Math.abs(Math.round(diffMs / 60000));
+  if (absMinutes < 1) return 'Now';
+  if (diffMs < 0) {
+    if (absMinutes < 60) return `In ${absMinutes} min`;
+    return `In ${Math.round(absMinutes / 60)} hr`;
+  }
+  if (absMinutes < 60) return `${absMinutes} min ago`;
+  if (absMinutes < 1440) return `${Math.round(absMinutes / 60)} hr ago`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+function labelFromNotificationValue(value: string) {
+  return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 function StandardNotificationsPage({
@@ -999,11 +1366,14 @@ function AdminNotificationsPage({
 export default function NotificationsPage({ role }: { role: Role }) {
   const navigate = useNavigate();
   const [data, setData] = useState<NotificationData | null>(null);
+  const [counsellorData, setCounsellorData] = useState<CounsellorNotificationsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [notice, setNotice] = useState<NoticeState>(null);
   const [standardFilter, setStandardFilter] = useState<StandardFilterKey | ClientNotificationCategory>('all');
   const [standardSort, setStandardSort] = useState<ClientNotificationSort>('newest');
   const [standardSearch, setStandardSearch] = useState('');
+  const [counsellorFilter, setCounsellorFilter] = useState<CounsellorNotificationFilter>('all');
+  const [counsellorSearch, setCounsellorSearch] = useState('');
   const [adminFilter, setAdminFilter] = useState<AdminNotificationFilter>('all');
   const [adminSort, setAdminSort] = useState<AdminNotificationSort>('newest');
   const [adminSearch, setAdminSearch] = useState('');
@@ -1013,7 +1383,11 @@ export default function NotificationsPage({ role }: { role: Role }) {
   async function refresh() {
     setLoading(true);
     try {
-      setData(await getNotifications());
+      if (role === 'counsellor') {
+        setCounsellorData(await getCounsellorNotifications());
+      } else {
+        setData(await getNotifications());
+      }
       setNotice(null);
     } catch (error) {
       setNotice({
@@ -1027,7 +1401,7 @@ export default function NotificationsPage({ role }: { role: Role }) {
 
   useEffect(() => {
     void refresh();
-  }, []);
+  }, [role]);
 
   async function handleToggleRead(notification: AppNotification) {
     setActingNotificationId(notification.id);
@@ -1067,6 +1441,27 @@ export default function NotificationsPage({ role }: { role: Role }) {
     }
   }
 
+  async function handleCounsellorToggleRead(item: CounsellorNotificationItem) {
+    if (!item.notificationId) return;
+
+    setActingNotificationId(item.notificationId);
+    try {
+      await updateNotification(item.notificationId, !item.read);
+      await refresh();
+      setNotice({
+        tone: 'success',
+        text: item.read ? 'Notification marked as unread.' : 'Notification marked as read.',
+      });
+    } catch (error) {
+      setNotice({
+        tone: 'error',
+        text: error instanceof Error ? error.message : 'Unable to update notification.',
+      });
+    } finally {
+      setActingNotificationId(null);
+    }
+  }
+
   async function handleCopySummary(item: AdminNotificationViewModel) {
     const summary = `${item.title}: ${item.message} (${item.entityName} | ${item.timeLabel} ${item.dateLabel})`;
     if (!navigator.clipboard?.writeText) {
@@ -1093,6 +1488,25 @@ export default function NotificationsPage({ role }: { role: Role }) {
 
   function handleOpenRelatedPage(path: string) {
     navigate(path);
+  }
+
+  if (role === 'counsellor') {
+    return (
+      <CounsellorNotificationsActionCenter
+        data={counsellorData}
+        loading={loading}
+        notice={notice}
+        filter={counsellorFilter}
+        search={counsellorSearch}
+        markAllPending={markAllPending}
+        onFilterChange={setCounsellorFilter}
+        onSearchChange={setCounsellorSearch}
+        onMarkAllRead={handleMarkAllRead}
+        onToggleRead={handleCounsellorToggleRead}
+        onOpenAction={handleOpenRelatedPage}
+        onCloseNotice={() => setNotice(null)}
+      />
+    );
   }
 
   if (role !== 'admin') {

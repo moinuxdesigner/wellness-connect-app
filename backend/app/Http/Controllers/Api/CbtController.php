@@ -87,6 +87,49 @@ class CbtController extends Controller
         return response()->json(['templates' => $templates]);
     }
 
+    public function dashboard(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->role === 'counsellor', 403);
+
+        $practitioner = Practitioner::query()
+            ->where('user_id', $request->user()->id)
+            ->where('practitioner_type', 'counsellor')
+            ->first();
+
+        if (!$practitioner) {
+            return response()->json([
+                'stats' => [
+                    'activePlans' => 0,
+                    'completionRate' => 0,
+                    'pendingReviews' => 0,
+                ],
+                'plans' => [],
+            ]);
+        }
+
+        $plans = CbtCarePlan::query()
+            ->with(['client', 'exercises.instances.response.review'])
+            ->where('primary_practitioner_id', $practitioner->id)
+            ->latest()
+            ->get();
+
+        $instances = $plans->flatMap(fn (CbtCarePlan $plan) => $plan->exercises->flatMap(fn (CbtPlanExercise $exercise) => $exercise->instances));
+        $responses = $instances->pluck('response')->filter();
+        $totalInstances = $instances->count();
+        $completedInstances = $instances->whereIn('status', ['completed', 'reviewed'])->count();
+
+        return response()->json([
+            'stats' => [
+                'activePlans' => $plans->where('status', 'active')->count(),
+                'completionRate' => $totalInstances > 0 ? round(($completedInstances / $totalInstances) * 100, 2) : 0,
+                'pendingReviews' => $responses->filter(fn (CbtExerciseResponse $response) => !$response->review)->count(),
+            ],
+            'plans' => $plans
+                ->map(fn (CbtCarePlan $plan) => $this->dashboardPlanPayload($plan))
+                ->values(),
+        ]);
+    }
+
     public function storeTemplate(Request $request): JsonResponse
     {
         $validated = $this->validateTemplate($request);
@@ -581,6 +624,27 @@ class CbtController extends Controller
             'templateSchema' => $template->template_schema_json,
             'scoringSchema' => $template->scoring_schema_json,
             'isActive' => $template->is_active,
+        ];
+    }
+
+    private function dashboardPlanPayload(CbtCarePlan $plan): array
+    {
+        $instances = $plan->exercises->flatMap(fn (CbtPlanExercise $exercise) => $exercise->instances);
+        $responses = $instances->pluck('response')->filter();
+        $totalInstances = $instances->count();
+        $completedInstances = $instances->whereIn('status', ['completed', 'reviewed'])->count();
+
+        return [
+            'id' => $plan->id,
+            'clientId' => $plan->client_id,
+            'clientName' => $plan->client?->name,
+            'title' => $plan->title,
+            'status' => $plan->status,
+            'riskLevel' => $plan->risk_level,
+            'completionRate' => $totalInstances > 0 ? round(($completedInstances / $totalInstances) * 100, 2) : 0,
+            'pendingReviews' => $responses->filter(fn (CbtExerciseResponse $response) => !$response->review)->count(),
+            'exerciseCount' => $plan->exercises->count(),
+            'updatedAt' => optional($plan->updated_at)->toIso8601String(),
         ];
     }
 
