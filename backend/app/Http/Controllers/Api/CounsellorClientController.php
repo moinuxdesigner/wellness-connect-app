@@ -47,6 +47,7 @@ class CounsellorClientController extends Controller
                 $appointments = $client->clientAppointments;
                 $lastSession = $appointments
                     ->whereIn('status', ['completed', 'scheduled', 'rescheduled'])
+                    ->where('starts_at', '<=', now())
                     ->sortByDesc('starts_at')
                     ->first();
                 $nextSession = $appointments
@@ -71,9 +72,11 @@ class CounsellorClientController extends Controller
                     'name' => $client->name,
                     'email' => $client->email,
                     'phone' => $client->phone,
+                    'profilePhotoUrl' => $client->clientProfile?->profile_photo_url,
                     'primaryGoal' => $client->clientProfile?->primary_goal ?? $client->wellness_goal,
-                    'lastSession' => $lastSession?->starts_at?->toDateString(),
+                    'lastSession' => $lastSession?->starts_at?->toIso8601String(),
                     'nextSession' => $nextSession?->starts_at?->toIso8601String(),
+                    'intakeStatus' => $latestIntake?->status,
                     'risk' => $risk,
                     'nextAction' => $this->nextAction($risk, $nextSession !== null, $latestIntake?->status),
                 ];

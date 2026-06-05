@@ -41,7 +41,7 @@ export default function AuthActionLoader({ action }: AuthActionLoaderProps) {
     >
 
       {/* Logo at top left */}
-      <div className="relative z-10 px-6 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pt-8 xl:px-16">
+      <div className="absolute left-0 top-0 z-10 px-6 pt-6 sm:px-8 sm:pt-7 lg:px-12 lg:pt-8 xl:px-16">
         <img 
           src={logoImage} 
           alt="Wellness Connect Logo" 
@@ -50,7 +50,7 @@ export default function AuthActionLoader({ action }: AuthActionLoaderProps) {
       </div>
 
       {/* Loading Card */}
-      <div className="relative z-20 flex min-h-[calc(100vh-24px)] w-full items-center justify-center px-6 sm:px-4 lg:px-0">
+      <div className="relative z-20 flex min-h-screen w-full items-center justify-center px-6 py-20 sm:px-4 lg:px-0">
         <div className="w-full max-w-md rounded-3xl border border-slate-100 bg-white px-8 py-12 text-center shadow-[0_20px_60px_rgba(118,94,210,0.10)] sm:px-10 sm:py-14">
           {/* Lock Animation */}
           <div className="mb-8 flex justify-center">

@@ -137,9 +137,11 @@ export interface CounsellorClientItem {
   name: string;
   email?: string | null;
   phone?: string | null;
+  profilePhotoUrl?: string | null;
   primaryGoal?: string | null;
   lastSession?: string | null;
   nextSession?: string | null;
+  intakeStatus?: string | null;
   risk: 'normal' | 'watch' | 'high' | string;
   nextAction: string;
 }
