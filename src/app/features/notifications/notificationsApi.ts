@@ -3,6 +3,7 @@ import { getRoleHomePath } from '../auth/roleRedirects';
 import type { Role } from '../../types';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
+export const NOTIFICATION_UNREAD_COUNT_CHANGED = 'wc:notification-unread-count-changed';
 
 export type AppNotification = {
   id: number;
@@ -134,4 +135,9 @@ export async function updateNotification(id: number, read: boolean) {
     headers: headers(true),
     body: JSON.stringify({ read }),
   })).notification;
+}
+
+export function notifyUnreadCountChanged() {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new Event(NOTIFICATION_UNREAD_COUNT_CHANGED));
 }

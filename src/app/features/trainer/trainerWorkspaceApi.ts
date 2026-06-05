@@ -3,13 +3,14 @@ import type { AppNotification } from '../notifications/notificationsApi';
 
 const API_BASE = import.meta.env.VITE_API_URL ?? '/api/v1';
 
-export type TrainerClient = { id: number; name: string; email: string; eligibleForPlan: boolean };
+export type TrainerClient = { id: number; name: string; email: string; eligibleForPlan: boolean; avatarUrl?: string | null; avatar_url?: string | null };
 export type TrainerActivity = { id: number; title: string; activityType: string; scheduledFor: string; status: 'scheduled' | 'completed' | 'missed' | 'modified' | 'cancelled'; notes?: string | null };
 export type TrainerPlan = {
   id: number;
   clientUserId: number;
   clientName: string;
   clientEmail: string;
+  clientAvatarUrl?: string | null;
   goalTitle: string;
   goalDescription?: string | null;
   startsOn: string;
@@ -24,6 +25,7 @@ export type TrainerCheckIn = {
   planId: number;
   planTitle: string;
   clientName: string;
+  clientAvatarUrl?: string | null;
   checkedInOn: string;
   weightKg: number | null;
   goalProgressPercent: number;
@@ -38,6 +40,7 @@ export type TrainerScheduleItem = {
   type: 'session' | 'call' | 'follow_up';
   title: string;
   clientName?: string | null;
+  clientAvatarUrl?: string | null;
   startsAt: string;
   endsAt: string;
   status: string;
@@ -51,6 +54,7 @@ export type TrainerAlert = {
   status: 'open' | 'acknowledged' | 'scheduled_follow_up' | 'escalated' | 'resolved';
   summary: string;
   clientName?: string | null;
+  clientAvatarUrl?: string | null;
   dueAt?: string | null;
 };
 export type TrainerNotification = AppNotification;
@@ -62,6 +66,8 @@ export type ProgressReviewClient = {
   status: string;
   age: number | null;
   gender: string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
 };
 export type ProgressOverview = {
   overallProgressPercent: number;
@@ -104,7 +110,7 @@ export type ProgressThreadMessage = {
   id: number;
   body: string;
   createdAt: string;
-  sender: { id: number; name: string; role: string };
+  sender: { id: number; name: string; role: string; avatarUrl?: string | null; avatar_url?: string | null };
   attachment: MessageAttachment | null;
 };
 export type TrainerNextAction = {

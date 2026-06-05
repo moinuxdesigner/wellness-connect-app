@@ -43,7 +43,7 @@ import {
 } from '../../../components/ui/drawer';
 import type { BodyMetricTrend, MessageThreadItem, ProgressKpi, RecommendationCard } from '../mockProgressReviewData';
 import type { ProgressReviewWorkspaceData } from '../useProgressReviewData';
-import { avatarForName } from '../mockTrainerDashboardData';
+import { UserAvatar } from '../../../components/UserAvatar';
 
 function Card({ children, className = '' }: { children: ReactNode; className?: string }) {
   return <section className={`rounded-[28px] border border-slate-200/80 bg-white shadow-[0_2px_14px_rgba(30,41,59,0.045)] ${className}`}>{children}</section>;
@@ -138,7 +138,7 @@ function ProgressTrendSection({ payload }: { payload: ProgressReviewWorkspaceDat
 function MessageThreadHeader({ payload }: { payload: ProgressReviewWorkspaceData }) {
   return (
     <div className="flex items-start gap-3">
-      <img src={avatarForName(payload.client.name)} alt="" className="h-14 w-14 rounded-full object-cover" />
+      <UserAvatar user={payload.client} size="lg" className="h-14 w-14" decorative />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <h3 className="text-xl font-semibold text-[#111941]">{payload.client.name}</h3>
@@ -178,7 +178,7 @@ function MessageThreadBody({
           const isClient = message.senderRole === 'client';
           return (
             <div key={message.id} className={`flex gap-3 ${isClient ? 'justify-end' : 'justify-start'}`}>
-              {!isClient ? <img src={payload.trainer.avatarUrl} alt="" className="mt-6 h-11 w-11 rounded-full object-cover" /> : null}
+              {!isClient ? <UserAvatar user={payload.trainer} src={payload.trainer.avatarUrl} size="lg" className="mt-6 h-11 w-11" decorative /> : null}
               <div className={`max-w-[88%] sm:max-w-[78%] ${isClient ? 'items-end' : 'items-start'} flex flex-col`}>
                 <p className="mb-2 text-sm font-medium text-slate-500">
                   {message.senderName}
@@ -203,7 +203,7 @@ function MessageThreadBody({
                   ) : null}
                 </div>
               </div>
-              {isClient ? <img src={avatarForName(payload.client.name)} alt="" className="mt-6 h-11 w-11 rounded-full object-cover" /> : null}
+              {isClient ? <UserAvatar user={payload.client} size="lg" className="mt-6 h-11 w-11" decorative /> : null}
             </div>
           );
         })}

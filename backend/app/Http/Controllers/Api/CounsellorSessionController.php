@@ -320,7 +320,7 @@ class CounsellorSessionController extends Controller
             'phone' => $client->phone,
             'age' => $profile?->dob ? $profile->dob->age : null,
             'gender' => $profile?->gender,
-            'occupation' => $this->answerText($answers, ['occupation', 'work_status']) ?? 'Not recorded',
+            'occupation' => $profile?->occupation ?: $this->answerText($answers, ['occupation', 'work_status']),
             'riskFlags' => CbtRiskEvent::query()
                 ->where('client_id', $client->id)
                 ->whereIn('status', ['open', 'acknowledged'])

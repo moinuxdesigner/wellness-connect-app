@@ -6,6 +6,7 @@ import { logoutRequest } from '../auth/apiAuth';
 import AuthActionLoader from '../auth/AuthActionLoader';
 import { fetchTrainerAccessState, getCachedTrainerAccessState, type TrainerAccessState } from './trainerAccess';
 import type { TrainerApplicationRecord, UploadValue } from './trainerOnboarding';
+import { UserAvatar } from '../../components/UserAvatar';
 
 export default function TrainerProtectedRoute() {
   const auth = getAuthState();
@@ -126,13 +127,7 @@ function TrainerStatusPage({ status, remarks, application }: { status: 'pending_
         {status === 'pending_review' && application ? (
           <div className="mx-auto flex w-fit flex-col items-center">
             <div className="relative">
-              <div className="flex h-32 w-32 items-center justify-center overflow-hidden rounded-full border-2 border-indigo-200 bg-white text-3xl font-semibold text-indigo-700 shadow-[0_18px_40px_rgba(99,102,241,0.14)]">
-                {profilePhotoUrl ? (
-                  <img src={profilePhotoUrl} alt={`${profileName} avatar`} className="h-full w-full object-cover" />
-                ) : (
-                  displayInitials(profileName)
-                )}
-              </div>
+              <UserAvatar user={{ name: profileName }} src={profilePhotoUrl} size="xl" className="h-32 w-32 border-2 border-indigo-200 bg-white text-3xl shadow-[0_18px_40px_rgba(99,102,241,0.14)]" />
               <div className="absolute -bottom-1 right-1 flex h-12 w-12 items-center justify-center rounded-full border border-indigo-200 bg-white text-indigo-600 shadow-sm">
                 <Clock3 size={20} />
               </div>
@@ -213,15 +208,6 @@ function TrainerLogoutButton() {
 function displayDate(value: string) {
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
-}
-
-function displayInitials(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'TP';
-  return parts
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('');
 }
 
 function MediaPreviewSection({
@@ -360,13 +346,7 @@ function SubmittedTrainerProfile({ application }: { application: TrainerApplicat
         <header className="mt-8 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
           <div className="flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
             <div className="flex items-center gap-4">
-              <div className="flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-indigo-50 text-2xl font-semibold text-indigo-700 shadow-sm">
-                {profilePhotoUrl ? (
-                  <img src={profilePhotoUrl} alt={`${profileName} avatar`} className="h-full w-full object-cover" />
-                ) : (
-                  displayInitials(profileName)
-                )}
-              </div>
+              <UserAvatar user={{ name: profileName }} src={profilePhotoUrl} size="xl" className="h-24 w-24 shrink-0 border border-slate-200 text-2xl shadow-sm" />
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-indigo-600">Submitted profile</p>
                 <h1 className="mt-3 text-3xl font-semibold text-slate-950">{profileName}</h1>

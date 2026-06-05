@@ -120,7 +120,7 @@ class AdminController extends Controller
         $this->authorizeAdmin($request);
 
         $users = User::query()
-            ->select('id', 'name', 'email', 'phone', 'role', 'status', 'created_at')
+            ->select('id', 'name', 'email', 'phone', 'role', 'status', 'avatar_url', 'created_at')
             ->selectSub(
                 DB::table('personal_access_tokens')
                     ->selectRaw('MAX(last_used_at)')
@@ -135,6 +135,8 @@ class AdminController extends Controller
                 'name' => (string) $user->name,
                 'email' => (string) $user->email,
                 'phone' => $user->phone ? (string) $user->phone : null,
+                'avatarUrl' => $user->avatar_url ? (string) $user->avatar_url : null,
+                'avatar_url' => $user->avatar_url ? (string) $user->avatar_url : null,
                 'role' => (string) $user->role,
                 'status' => (string) ($user->status ?? 'active'),
                 'joinedAt' => optional($user->created_at)->format('Y-m-d') ?? '',
@@ -230,7 +232,7 @@ class AdminController extends Controller
         $this->authorizeAdmin($request);
 
         $audits = RoleChangeAudit::query()
-            ->with(['actor:id,name,email', 'target:id,name,email'])
+            ->with(['actor:id,name,email,avatar_url', 'target:id,name,email,avatar_url'])
             ->latest()
             ->limit(50)
             ->get()
@@ -293,7 +295,7 @@ class AdminController extends Controller
             ]);
         });
 
-        $audit->load(['actor:id,name,email', 'target:id,name,email']);
+        $audit->load(['actor:id,name,email,avatar_url', 'target:id,name,email,avatar_url']);
         $updatedUser = User::query()->findOrFail($user->id);
 
         $this->activityLogs->record('rbac', 'role_changed', sprintf('%s changed %s from %s to %s.', $request->user()->name, $updatedUser->name, $audit->previous_role, $audit->new_role), [
@@ -315,6 +317,8 @@ class AdminController extends Controller
                 'id' => (string) $updatedUser->id,
                 'name' => (string) $updatedUser->name,
                 'email' => (string) $updatedUser->email,
+                'avatarUrl' => $updatedUser->avatar_url ? (string) $updatedUser->avatar_url : null,
+                'avatar_url' => $updatedUser->avatar_url ? (string) $updatedUser->avatar_url : null,
                 'role' => (string) $updatedUser->role,
                 'status' => (string) $updatedUser->status,
                 'joinedAt' => optional($updatedUser->created_at)->format('Y-m-d') ?? '',
@@ -476,9 +480,11 @@ class AdminController extends Controller
             'id' => (string) $audit->id,
             'actorName' => (string) optional($audit->actor)->name,
             'actorEmail' => (string) optional($audit->actor)->email,
+            'actorAvatarUrl' => optional($audit->actor)->avatar_url,
             'targetUserId' => (string) $audit->target_user_id,
             'targetName' => (string) optional($audit->target)->name,
             'targetEmail' => (string) optional($audit->target)->email,
+            'targetAvatarUrl' => optional($audit->target)->avatar_url,
             'previousRole' => (string) $audit->previous_role,
             'newRole' => (string) $audit->new_role,
             'reason' => (string) $audit->reason,

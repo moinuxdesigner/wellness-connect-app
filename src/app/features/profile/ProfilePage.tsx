@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router';
-import { ShieldCheck, UserCircle2 } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import type { Role } from '../../types';
-import { changePasswordRequest, getAccountProfileRequest, updateAccountProfileRequest, type AccountProfileRoleDetails } from '../auth/apiAuth';
+import { changePasswordRequest, getAccountProfileRequest, updateAccountAvatarRequest, updateAccountProfileRequest, type AccountProfileRoleDetails } from '../auth/apiAuth';
 import { getAuthState, type AuthUser } from '../auth/auth';
+import { ProfileAvatarUploader } from '../../components/ProfileAvatarUploader';
 
 const goals = [
   { value: 'fitness', label: 'Fitness' },
@@ -22,12 +23,6 @@ const roleDescriptions: Record<Role, string> = {
   legal: 'Manage your legal console account details and security settings.',
   content: 'Manage your content workspace account details and security settings.',
 };
-
-function displayInitials(value: string) {
-  const parts = value.trim().split(/\s+/).filter(Boolean);
-  if (!parts.length) return 'WC';
-  return parts.slice(0, 2).map((part) => part[0]?.toUpperCase() ?? '').join('');
-}
 
 function displayDate(value?: string | null) {
   if (!value) return 'Not available';
@@ -90,22 +85,21 @@ export default function ProfilePage({ role }: { role: Role }) {
   const pageUser = user ?? authUser;
   const roleLabel = roleDetails?.roleLabel ?? 'Account';
   const workspaceTitle = roleDetails?.workspaceTitle ?? 'Workspace';
+  const avatarSrc = pageUser?.avatarUrl ?? trainerDetails?.profilePhotoUrl;
+
+  async function handleAvatarUpload(file: Blob) {
+    const data = await updateAccountAvatarRequest(file);
+    setUser(data.user);
+    setRoleDetails(data.roleDetails);
+    setNotice(data.message);
+  }
 
   return (
     <div className="space-y-6">
       <header className="flex flex-col gap-4 rounded-3xl border border-slate-200 bg-white p-6 shadow-sm md:flex-row md:items-center md:justify-between">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <div className="flex h-20 w-20 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-indigo-50 text-2xl font-semibold text-indigo-700">
-              {trainerDetails?.profilePhotoUrl ? (
-                <img src={trainerDetails.profilePhotoUrl} alt={`${pageUser?.name ?? 'User'} avatar`} className="h-full w-full object-cover" />
-              ) : (
-                displayInitials(pageUser?.name ?? '')
-              )}
-            </div>
-            <div className="absolute -bottom-1 -right-1 flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-indigo-600 shadow-sm">
-              <UserCircle2 size={16} />
-            </div>
+            <ProfileAvatarUploader user={pageUser} src={avatarSrc} onUpload={handleAvatarUpload} disabled={loading} />
           </div>
           <div>
             <p className="text-xs font-semibold uppercase tracking-[0.28em] text-indigo-600">{workspaceTitle}</p>

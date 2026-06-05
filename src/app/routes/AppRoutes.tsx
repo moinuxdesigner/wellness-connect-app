@@ -80,7 +80,23 @@ const TrainerMessagesLandingPage = lazy(() => import('../features/trainer/Traine
 const TrainerMessagesPage = lazy(() => import('../features/trainer/TrainerMessagesPage'));
 
 function TrainerPageLoader({ children }: { children: ReactNode }) {
-  return <Suspense fallback={<div className="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">Loading trainer workspace...</div>}>{children}</Suspense>;
+  return <Suspense fallback={<TrainerRouteSkeleton />}>{children}</Suspense>;
+}
+
+function TrainerRouteSkeleton() {
+  return (
+    <div className="space-y-4" aria-label="Loading trainer workspace" aria-busy="true">
+      <div className="grid gap-4 lg:grid-cols-4">
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="h-[122px] animate-pulse rounded-2xl bg-slate-100" />
+        ))}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1.62fr)_minmax(380px,1fr)]">
+        <div className="h-[420px] animate-pulse rounded-2xl bg-slate-100" />
+        <div className="h-[420px] animate-pulse rounded-2xl bg-slate-100" />
+      </div>
+    </div>
+  );
 }
 
 export default function AppRoutes() {

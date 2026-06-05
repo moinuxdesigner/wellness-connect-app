@@ -33,7 +33,7 @@ class ActivityLogService
         if (is_string($sourceKey) && $sourceKey !== '') {
             $existing = ActivityEvent::query()->where('source_key', $sourceKey)->first();
             if ($existing) {
-                return $existing->loadMissing(['actor:id,name,email,role', 'target:id,name,email,role']);
+                return $existing->loadMissing(['actor:id,name,email,role,avatar_url', 'target:id,name,email,role,avatar_url']);
             }
         }
 
@@ -69,7 +69,7 @@ class ActivityLogService
             $event->audiences()->createMany($audienceRows);
         }
 
-        return $event->loadMissing(['actor:id,name,email,role', 'target:id,name,email,role']);
+        return $event->loadMissing(['actor:id,name,email,role,avatar_url', 'target:id,name,email,role,avatar_url']);
     }
 
     public function feed(User $user, array $filters = []): array
@@ -90,7 +90,7 @@ class ActivityLogService
         $total = (clone $query)->count();
 
         $entries = $query
-            ->with(['actor:id,name,email,role', 'target:id,name,email,role'])
+            ->with(['actor:id,name,email,role,avatar_url', 'target:id,name,email,role,avatar_url'])
             ->orderByDesc('occurred_at')
             ->orderByDesc('id')
             ->forPage($page, $pageSize)
@@ -157,6 +157,8 @@ class ActivityLogService
                 'name' => $event->actor->name,
                 'email' => $event->actor->email,
                 'role' => $event->actor->role,
+                'avatarUrl' => $event->actor->avatar_url,
+                'avatar_url' => $event->actor->avatar_url,
             ] : ($event->actor_role ? [
                 'id' => null,
                 'name' => ucfirst((string) $event->actor_role),
@@ -173,6 +175,8 @@ class ActivityLogService
                 'name' => $event->target->name,
                 'email' => $event->target->email,
                 'role' => $event->target->role,
+                'avatarUrl' => $event->target->avatar_url,
+                'avatar_url' => $event->target->avatar_url,
             ] : ($event->target_role ? [
                 'id' => null,
                 'name' => ucfirst((string) $event->target_role),
@@ -272,7 +276,7 @@ class ActivityLogService
 
         $actors = User::query()
             ->whereIn('id', $actorIds)
-            ->get(['id', 'name', 'role'])
+            ->get(['id', 'name', 'role', 'avatar_url'])
             ->keyBy('id');
 
         return collect($actorIds)
@@ -286,6 +290,8 @@ class ActivityLogService
                     'id' => $actor->id,
                     'name' => $actor->name,
                     'role' => $actor->role,
+                    'avatarUrl' => $actor->avatar_url,
+                    'avatar_url' => $actor->avatar_url,
                 ];
             })
             ->filter()

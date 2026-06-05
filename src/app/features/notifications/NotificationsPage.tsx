@@ -45,6 +45,7 @@ import {
   getCounsellorNotifications,
   getNotifications,
   markAllNotificationsRead,
+  notifyUnreadCountChanged,
   notificationCategoryLabel,
   updateNotification,
   type AppNotification,
@@ -1408,6 +1409,7 @@ export default function NotificationsPage({ role }: { role: Role }) {
     try {
       await updateNotification(notification.id, !notification.read);
       await refresh();
+      notifyUnreadCountChanged();
       setNotice({
         tone: 'success',
         text: notification.read ? 'Notification marked as unread.' : 'Notification marked as read.',
@@ -1427,6 +1429,7 @@ export default function NotificationsPage({ role }: { role: Role }) {
     try {
       const result = await markAllNotificationsRead();
       await refresh();
+      notifyUnreadCountChanged();
       setNotice({
         tone: 'success',
         text: result.message,
@@ -1448,6 +1451,7 @@ export default function NotificationsPage({ role }: { role: Role }) {
     try {
       await updateNotification(item.notificationId, !item.read);
       await refresh();
+      notifyUnreadCountChanged();
       setNotice({
         tone: 'success',
         text: item.read ? 'Notification marked as unread.' : 'Notification marked as read.',

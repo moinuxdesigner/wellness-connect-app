@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 import { getActivityLogs, type ActivityLogFilters } from '../shared/services/activityApi';
 import type { ActivityLogActorOption, ActivityLogEntry, ActivityLogPagination, ActivityLogSummary, Role } from '../../types';
-import { Avatar, AvatarFallback, AvatarImage } from '../../components/ui/avatar';
+import { UserAvatar } from '../../components/UserAvatar';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -29,7 +29,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../../components/ui/dropdown-menu';
-import { avatarForName } from '../trainer/mockTrainerDashboardData';
 import { buildActivityPresentation, type ActivityPresentation, type ActivitySeverity } from './activityPresentation';
 
 const roleOptions: Role[] = ['admin', 'client', 'counsellor', 'trainer', 'coach', 'helpdesk', 'finance', 'legal', 'content'];
@@ -80,15 +79,6 @@ function titleCase(value: string) {
   return value
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (letter) => letter.toUpperCase());
-}
-
-function initialsForName(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'WC';
 }
 
 function formatDateLabel(value: string | null) {
@@ -248,10 +238,7 @@ function buildPresentedEntries(entries: ActivityLogEntry[]) {
 function PersonPill({ name, subtitle }: { name: string; subtitle: string }) {
   return (
     <div className="flex min-w-0 items-center gap-3">
-      <Avatar className="h-9 w-9 border border-white shadow-sm">
-        <AvatarImage src={encodeURI(avatarForName(name))} alt={name} className="object-cover" />
-        <AvatarFallback className="bg-violet-100 text-xs font-semibold text-violet-700">{initialsForName(name)}</AvatarFallback>
-      </Avatar>
+      <UserAvatar user={{ name }} size="sm" className="h-9 w-9 border border-white shadow-sm" />
       <div className="min-w-0">
         <p className="truncate text-sm font-semibold text-slate-900">{name}</p>
         <p className="truncate text-xs text-slate-500">{subtitle}</p>

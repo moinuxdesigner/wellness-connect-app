@@ -16,6 +16,14 @@ export interface NavItem {
   permission?: string;
 }
 
+export function shouldUseExactNavMatch(item: NavItem) {
+  if (typeof item.end === 'boolean') {
+    return item.end;
+  }
+
+  return item.to.split('?')[0].split('#')[0].split('/').filter(Boolean).length === 1;
+}
+
 export default function Sidebar({
   items,
   collapsed,
@@ -141,7 +149,7 @@ function SidebarContent({
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              end={shouldUseExactNavMatch(item)}
               title={collapsed ? item.label : undefined}
               onClick={onMobileClose}
               className={({ isActive }) =>

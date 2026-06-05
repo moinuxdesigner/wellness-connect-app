@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { ArrowLeft, CalendarDays, CircleAlert, Clock3, MapPin } from 'lucide-react';
 import { Link, useParams } from 'react-router';
-import { avatarForName } from './mockTrainerDashboardData';
+import { UserAvatar } from '../../components/UserAvatar';
 import { buildAlertDisplay, buildScheduleRowDisplay } from './trainerDashboardViewModel';
 import { getTrainerDashboard, type TrainerAlert, type TrainerScheduleItem } from './trainerWorkspaceApi';
 
@@ -69,7 +69,7 @@ function ScheduleDetail({ item }: { item: TrainerScheduleItem }) {
       <div className="bg-gradient-to-br from-indigo-50 to-white px-6 py-7">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-indigo-600">Schedule Details</p>
         <div className="mt-5 flex items-center gap-4">
-          <img src={display.avatarUrl} alt="" className="h-16 w-16 rounded-full object-cover" />
+          <UserAvatar user={{ name: display.clientName }} src={display.avatarUrl} size="xl" className="h-16 w-16" decorative />
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold text-[#101842]">{display.clientName}</h1>
             <p className="mt-1 text-sm text-slate-600">{display.sessionType}</p>
@@ -93,7 +93,7 @@ function AlertDetail({ alert }: { alert: TrainerAlert }) {
       <div className="bg-gradient-to-br from-orange-50 to-rose-50/50 px-6 py-7">
         <p className="text-xs font-semibold uppercase tracking-[0.22em] text-orange-600">Client Alert</p>
         <div className="mt-5 flex items-center gap-4">
-          <img src={avatarForName(display.clientName)} alt="" className="h-16 w-16 rounded-full object-cover" />
+          <UserAvatar user={{ name: display.clientName }} size="xl" className="h-16 w-16" decorative />
           <div className="min-w-0">
             <h1 className="truncate text-2xl font-semibold text-[#101842]">{display.clientName}</h1>
             <p className="mt-1 text-sm font-medium text-orange-600">{display.label}</p>

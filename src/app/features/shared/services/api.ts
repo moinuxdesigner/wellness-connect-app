@@ -14,6 +14,8 @@ export interface ClientAppointment {
       id: number;
       name: string;
       email?: string;
+      avatarUrl?: string | null;
+      avatar_url?: string | null;
     } | null;
   } | null;
   intake_flow_id?: number | null;
@@ -113,8 +115,13 @@ export interface AccountProfileRoleDetails {
   workspaceTitle: string;
   client?: {
     primaryGoal?: 'fitness' | 'mental_health' | 'both' | null;
+    dob?: string | null;
+    age?: number | null;
+    gender?: string | null;
+    occupation?: string | null;
     timezone?: string | null;
     preferredLanguage?: string | null;
+    profilePhotoUrl?: string | null;
   };
   trainer?: {
     applicationStatus?: string | null;
@@ -137,6 +144,8 @@ export interface CounsellorClientItem {
   name: string;
   email?: string | null;
   phone?: string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
   profilePhotoUrl?: string | null;
   primaryGoal?: string | null;
   lastSession?: string | null;
@@ -259,11 +268,23 @@ function getToken() {
   return token;
 }
 
-function mergeUserProfile(user: AuthUser, profile?: { primary_goal?: AuthUser['primary_goal'] | null } | null): AuthUser {
+type ClientProfileApiShape = {
+  primary_goal?: AuthUser['primary_goal'] | null;
+  dob?: string | null;
+  age?: number | null;
+  gender?: string | null;
+  occupation?: string | null;
+};
+
+function mergeUserProfile(user: AuthUser, profile?: ClientProfileApiShape | null): AuthUser {
   return {
     ...user,
     primary_goal: profile?.primary_goal ?? user.primary_goal ?? null,
     wellness_goal: profile?.primary_goal ?? user.wellness_goal ?? null,
+    dob: profile?.dob ?? user.dob ?? null,
+    age: profile?.age ?? user.age ?? null,
+    gender: profile?.gender ?? user.gender ?? null,
+    occupation: profile?.occupation ?? user.occupation ?? null,
   };
 }
 
@@ -274,6 +295,10 @@ function mergeAccountProfileUser(user: AuthUser, roleDetails?: AccountProfileRol
     ...user,
     primary_goal: primaryGoal,
     wellness_goal: primaryGoal,
+    dob: roleDetails?.client?.dob ?? user.dob ?? null,
+    age: roleDetails?.client?.age ?? user.age ?? null,
+    gender: roleDetails?.client?.gender ?? user.gender ?? null,
+    occupation: roleDetails?.client?.occupation ?? user.occupation ?? null,
   };
 }
 
@@ -427,7 +452,7 @@ export async function logoutRequest() {
   clearAuthState();
 }
 
-export async function updateProfileRequest(payload: { name: string; phone?: string; primary_goal?: 'fitness' | 'mental_health' | 'both'; timezone?: string; preferred_language?: string; consent_to_terms: boolean }) {
+export async function updateProfileRequest(payload: { name: string; phone?: string; primary_goal?: 'fitness' | 'mental_health' | 'both'; dob?: string | null; gender?: string | null; occupation?: string | null; timezone?: string; preferred_language?: string; consent_to_terms: boolean }) {
   const token = getToken();
   const response = await fetch(`${API_BASE}/client/profile`, {
     method: 'PUT',
@@ -460,6 +485,9 @@ export async function updateAccountProfileRequest(payload: {
   phone?: string;
   consent_to_terms: boolean;
   primary_goal?: 'fitness' | 'mental_health' | 'both';
+  dob?: string | null;
+  gender?: string | null;
+  occupation?: string | null;
   timezone?: string;
   preferred_language?: string;
 }) {
@@ -475,6 +503,29 @@ export async function updateAccountProfileRequest(payload: {
   setAuthState(token, mergedUser);
   return {
     message: String(data?.message ?? 'Profile updated.'),
+    user: mergedUser,
+    roleDetails: (data.roleDetails ?? {}) as AccountProfileRoleDetails,
+  } satisfies AccountProfileResponse & { message: string };
+}
+
+export async function updateAccountAvatarRequest(file: Blob | File) {
+  const token = getToken();
+  const formData = new FormData();
+  formData.append('avatar', file, file instanceof File ? file.name : 'profile-avatar.jpg');
+
+  const response = await fetch(`${API_BASE}/account/profile/avatar`, {
+    method: 'POST',
+    headers: authHeaders(token),
+    body: formData,
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Profile photo update failed'));
+
+  const mergedUser = mergeAccountProfileUser(data.user as AuthUser, data.roleDetails as AccountProfileRoleDetails | undefined);
+  setAuthState(token, mergedUser);
+
+  return {
+    message: String(data?.message ?? 'Profile photo updated.'),
     user: mergedUser,
     roleDetails: (data.roleDetails ?? {}) as AccountProfileRoleDetails,
   } satisfies AccountProfileResponse & { message: string };

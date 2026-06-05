@@ -48,6 +48,7 @@ import {
 import { DSButton, DSCard, DSSecondaryButton } from '../../../../design/components/primitives';
 import { MobileSectionTitle } from '../../../../design/patterns/intake';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '../../../components/ui/dialog';
+import { UserAvatar } from '../../../components/UserAvatar';
 import { getClientMemberships, type ClientMembership } from '../../shared/services/membershipApi';
 
 type ServiceType = 'psychology' | 'training' | 'combined' | 'package';
@@ -906,9 +907,7 @@ export default function ClientIntakeFlowPage() {
         ) : null}
 
         <div className="grid min-w-0 gap-4 sm:grid-cols-[116px_1fr] sm:items-center">
-          <div className="grid h-[116px] w-[116px] place-items-center overflow-hidden rounded-full bg-indigo-50 shadow-inner ring-1 ring-indigo-50">
-            <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
-          </div>
+          <UserAvatar user={{ name: profile.name }} src={profile.avatar} size="xl" className="h-[116px] w-[116px] shadow-inner ring-1 ring-indigo-50" decorative />
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2 leading-tight">
               <h3 className="text-[1.18rem] font-extrabold text-[#101735]">{profile.name}</h3>
@@ -1090,8 +1089,8 @@ export default function ClientIntakeFlowPage() {
 
             <section className="grid gap-5 rounded-lg border border-[#dfe4ef] bg-white p-5 shadow-[0_10px_28px_rgba(51,65,85,0.05)] lg:grid-cols-[360px_1fr_280px] lg:items-center">
               <div className="flex items-center gap-5">
-                <div className="relative h-28 w-28 overflow-hidden rounded-full bg-[#f0edff] ring-8 ring-[#f7f5ff]">
-                  <img src={profile.avatar} alt="" className="h-full w-full object-cover" />
+                <div className="relative h-28 w-28 rounded-full bg-[#f0edff] ring-8 ring-[#f7f5ff]">
+                  <UserAvatar user={{ name: profile.name }} src={profile.avatar} size="xl" className="h-full w-full" decorative />
                   <span className="absolute bottom-0 right-0 grid h-8 w-8 place-items-center rounded-full bg-[#22c982] text-white ring-4 ring-white">
                     <Check className="h-4 w-4" aria-hidden="true" />
                   </span>
@@ -1241,7 +1240,7 @@ export default function ClientIntakeFlowPage() {
             </h2>
             <div className="overflow-hidden rounded-lg border border-[#e1e6ef]">
               <div className="flex items-center gap-3 border-b border-[#e1e6ef] p-4">
-                <img src={profile.avatar} alt="" className="h-14 w-14 rounded-full object-cover" />
+                <UserAvatar user={{ name: profile.name }} src={profile.avatar} size="lg" className="h-14 w-14" decorative />
                 <div>
                   <p className="inline-flex items-center gap-1.5 font-extrabold text-[#101735]">{profile.name}<ShieldCheck className="h-4 w-4 text-[#6746e8]" /></p>
                   <p className="mt-0.5 text-sm font-medium text-[#52617d]">{profile.role}</p>

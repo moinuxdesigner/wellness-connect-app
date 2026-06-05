@@ -165,62 +165,126 @@ export default function ClientDashboardPage() {
         </div>
       ) : null}
 
+      {loading ? (
+        <ClientDashboardSkeleton />
+      ) : (
+        <>
+          <section className="grid gap-4 lg:hidden">
+            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+            <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
+            <DailyCheckInCard />
+            <QuickActionsCard onNavigate={navigate} />
+          </section>
+
+          <section className="hidden gap-4 sm:grid-cols-2 xl:grid-cols-4 lg:grid">
+            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+            <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
+            <MetricCard icon={activeProgramIcon} tone={activeProgramTone} label="Active Program" value={activeProgram?.title ?? 'Not assigned'} />
+            <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value={membershipStatus?.label ?? 'Inactive'} valueClassName={membershipValueClass} />
+          </section>
+
+          <section className="hidden gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(420px,0.98fr)] lg:grid">
+            <div className="space-y-5">
+              <Card>
+                <div className="flex items-start justify-between gap-4">
+                  <SectionTitle icon={CalendarDays} title="Schedule Summary" subtitle="Your schedule for today" />
+                  <button
+                    type="button"
+                    onClick={() => navigate('/client/appointments')}
+                    className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-violet-600 transition hover:text-violet-700"
+                  >
+                    View Calendar
+                    <ArrowRight size={16} />
+                  </button>
+                </div>
+
+                <div className="mt-4 overflow-hidden rounded-lg border border-slate-200/80 bg-white">
+                  {scheduleItems.length ? scheduleItems.map((item, index) => (
+                    <ScheduleRow key={item.id} item={item} isLast={index === scheduleItems.length - 1} />
+                  )) : <EmptyState message="No appointments scheduled for today." />}
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => navigate('/client/appointments')}
+                  className="mx-auto mt-4 flex items-center gap-2 text-sm font-semibold text-violet-600 transition hover:text-violet-700"
+                >
+                  See Full Schedule
+                  <ArrowRight size={16} />
+                </button>
+              </Card>
+
+              <RecentActivityCard activities={recentActivity} loading={loading} />
+            </div>
+
+            <div className="space-y-5">
+              <DailyCheckInCard />
+              <QuickActionsCard onNavigate={navigate} />
+              <ProgressSnapshotCard onNavigate={navigate} progress={progress} loading={loading} />
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function ClientDashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-label="Loading client dashboard" aria-busy="true">
       <section className="grid gap-4 lg:hidden">
-        <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={loading ? 'Loading...' : nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
-        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={loading ? 'Loading...' : String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
-        <DailyCheckInCard />
-        <QuickActionsCard onNavigate={navigate} />
+        {Array.from({ length: 2 }).map((_, index) => (
+          <div key={index} className="flex min-h-[112px] items-center gap-4 rounded-[14px] border border-slate-200 bg-white p-4 shadow-[0_14px_42px_-34px_rgba(15,23,42,0.34)]">
+            <SkeletonBlock className="h-14 w-14 rounded-[18px]" />
+            <div className="min-w-0 flex-1">
+              <SkeletonBlock className="h-4 w-28" />
+              <SkeletonBlock className="mt-3 h-6 w-40 max-w-full" />
+            </div>
+          </div>
+        ))}
+        <SkeletonCard className="h-[178px]" />
+        <SkeletonCard className="h-[180px]" />
       </section>
 
       <section className="hidden gap-4 sm:grid-cols-2 xl:grid-cols-4 lg:grid">
-        <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={loading ? 'Loading...' : nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
-        <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={loading ? 'Loading...' : String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
-        <MetricCard icon={activeProgramIcon} tone={activeProgramTone} label="Active Program" value={loading ? 'Loading...' : activeProgram?.title ?? 'Not assigned'} />
-        <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value={loading ? 'Loading...' : membershipStatus?.label ?? 'Inactive'} valueClassName={membershipValueClass} />
+        {Array.from({ length: 4 }).map((_, index) => (
+          <div key={index} className="flex min-h-[112px] items-center gap-4 rounded-[14px] border border-slate-200 bg-white p-4 shadow-[0_14px_42px_-34px_rgba(15,23,42,0.34)]">
+            <SkeletonBlock className="h-14 w-14 rounded-[18px]" />
+            <div className="min-w-0 flex-1">
+              <SkeletonBlock className="h-4 w-28" />
+              <SkeletonBlock className="mt-3 h-6 w-36 max-w-full" />
+            </div>
+          </div>
+        ))}
       </section>
 
       <section className="hidden gap-5 xl:grid-cols-[minmax(0,1.02fr)_minmax(420px,0.98fr)] lg:grid">
         <div className="space-y-5">
-          <Card>
-            <div className="flex items-start justify-between gap-4">
-              <SectionTitle icon={CalendarDays} title="Schedule Summary" subtitle="Your schedule for today" />
-              <button
-                type="button"
-                onClick={() => navigate('/client/appointments')}
-                className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-violet-600 transition hover:text-violet-700"
-              >
-                View Calendar
-                <ArrowRight size={16} />
-              </button>
-            </div>
-
-            <div className="mt-4 overflow-hidden rounded-lg border border-slate-200/80 bg-white">
-              {scheduleItems.length ? scheduleItems.map((item, index) => (
-                <ScheduleRow key={item.id} item={item} isLast={index === scheduleItems.length - 1} />
-              )) : <EmptyState message={loading ? 'Loading today schedule...' : 'No appointments scheduled for today.'} />}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => navigate('/client/appointments')}
-              className="mx-auto mt-4 flex items-center gap-2 text-sm font-semibold text-violet-600 transition hover:text-violet-700"
-            >
-              See Full Schedule
-              <ArrowRight size={16} />
-            </button>
-          </Card>
-
-          <RecentActivityCard activities={recentActivity} loading={loading} />
+          <SkeletonCard className="h-[338px]" />
+          <SkeletonCard className="h-[262px]" />
         </div>
-
         <div className="space-y-5">
-          <DailyCheckInCard />
-          <QuickActionsCard onNavigate={navigate} />
-          <ProgressSnapshotCard onNavigate={navigate} progress={progress} loading={loading} />
+          <SkeletonCard className="h-[178px]" />
+          <SkeletonCard className="h-[178px]" />
+          <SkeletonCard className="h-[198px]" />
         </div>
       </section>
     </div>
   );
+}
+
+function SkeletonCard({ className = '' }: { className?: string }) {
+  return (
+    <div className={`rounded-[14px] border border-slate-200 bg-white p-5 shadow-[0_14px_42px_-34px_rgba(15,23,42,0.34)] ${className}`}>
+      <SkeletonBlock className="h-5 w-44" />
+      <SkeletonBlock className="mt-4 h-4 w-2/3" />
+      <SkeletonBlock className="mt-3 h-4 w-1/2" />
+    </div>
+  );
+}
+
+function SkeletonBlock({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-slate-100 ${className}`} />;
 }
 
 function Card({ children, className = '' }: { children: React.ReactNode; className?: string }) {

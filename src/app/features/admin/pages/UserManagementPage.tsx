@@ -30,8 +30,7 @@ import {
   type AdminUserDeletionBlocker,
 } from '../../shared/services/adminApi';
 import { ToneBadge } from '../../shared/components/Ui';
-import { avatarForName } from '../../trainer/mockTrainerDashboardData';
-import { Avatar, AvatarFallback, AvatarImage } from '../../../components/ui/avatar';
+import { UserAvatar } from '../../../components/UserAvatar';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -95,15 +94,6 @@ const roleColors: Record<string, string> = {
   legal: '#64748b',
   content: '#14b8a6',
 };
-
-function initialsForName(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'WC';
-}
 
 function titleCase(value: string) {
   return value
@@ -764,12 +754,7 @@ export default function RefinedUserManagementPage() {
                             <tr key={user.id} className="border-b border-slate-100 align-top last:border-b-0">
                               <td className="px-2 py-4">
                                 <div className="flex min-w-0 items-center gap-3">
-                                  <Avatar className="h-11 w-11 border border-white shadow-sm">
-                                    <AvatarImage src={encodeURI(avatarForName(user.name))} alt={user.name} className="object-cover" />
-                                    <AvatarFallback className="bg-violet-100 text-xs font-semibold text-violet-700">
-                                      {initialsForName(user.name)}
-                                    </AvatarFallback>
-                                  </Avatar>
+                                  <UserAvatar user={user} size="lg" className="h-11 w-11 border border-white shadow-sm" />
                                   <div className="min-w-0">
                                     <p className="truncate text-sm font-semibold text-slate-950">{user.name}</p>
                                     <p className="truncate text-xs text-slate-500">{roleLabel(user.role)}</p>
@@ -849,12 +834,7 @@ export default function RefinedUserManagementPage() {
                         <article key={user.id} className="rounded-[26px] border border-slate-200 bg-white p-5 shadow-sm">
                           <div className="flex items-start justify-between gap-3">
                             <div className="flex min-w-0 items-center gap-3">
-                              <Avatar className="h-12 w-12 border border-white shadow-sm">
-                                <AvatarImage src={encodeURI(avatarForName(user.name))} alt={user.name} className="object-cover" />
-                                <AvatarFallback className="bg-violet-100 text-xs font-semibold text-violet-700">
-                                  {initialsForName(user.name)}
-                                </AvatarFallback>
-                              </Avatar>
+                              <UserAvatar user={user} size="lg" className="border border-white shadow-sm" />
                               <div className="min-w-0">
                                 <p className="truncate text-base font-semibold text-slate-950">{user.name}</p>
                                 <p className="truncate text-sm text-slate-500">{user.email}</p>
@@ -979,12 +959,7 @@ export default function RefinedUserManagementPage() {
               {recentPendingUsers.length ? recentPendingUsers.map((user) => (
                 <article key={user.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-3">
                   <div className="flex min-w-0 items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarImage src={encodeURI(avatarForName(user.name))} alt={user.name} className="object-cover" />
-                      <AvatarFallback className="bg-violet-100 text-xs font-semibold text-violet-700">
-                        {initialsForName(user.name)}
-                      </AvatarFallback>
-                    </Avatar>
+                    <UserAvatar user={user} size="md" />
                     <div className="min-w-0">
                       <p className="truncate text-sm font-semibold text-slate-950">{user.name}</p>
                       <p className="truncate text-xs text-slate-500">{user.email}</p>

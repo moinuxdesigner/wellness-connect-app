@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router';
 import { Menu } from 'lucide-react';
-import type { NavItem } from '../layout/Sidebar';
+import { shouldUseExactNavMatch, type NavItem } from '../layout/Sidebar';
 
 export interface BottomNavProps {
   items: NavItem[];
@@ -22,7 +22,7 @@ export const BottomNav = ({ items, onOpenMenu }: BottomNavProps) => {
             <NavLink
               key={item.to}
               to={item.to}
-              end={item.end}
+              end={shouldUseExactNavMatch(item)}
               className={({ isActive }) =>
                 `flex h-[58px] min-w-0 flex-1 flex-col items-center justify-center gap-1 rounded-[12px] px-1 text-[13px] font-medium ${
                   isActive ? 'bg-violet-50 text-violet-700 dark:bg-violet-500/15 dark:text-violet-200' : 'text-slate-500 hover:bg-slate-50 hover:text-slate-800 dark:text-slate-400 dark:hover:bg-slate-800 dark:hover:text-slate-100'

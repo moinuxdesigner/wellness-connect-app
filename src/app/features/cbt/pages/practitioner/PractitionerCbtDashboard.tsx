@@ -43,44 +43,89 @@ export default function PractitionerCbtDashboard() {
         <p className="mt-2 max-w-2xl text-sm text-slate-600">Create care plans, assign structured CBT exercises, review client submissions, and monitor progress.</p>
       </section>
 
+      {loading ? (
+        <PractitionerCbtDashboardSkeleton />
+      ) : (
+        <>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Stat icon={<Users size={17} />} label="Active plans" value={stats?.activePlans ?? 0} />
+            <Stat icon={<ClipboardList size={17} />} label="Completion" value={`${Math.round(stats?.completionRate ?? 0)}%`} />
+            <Stat icon={<AlertTriangle size={17} />} label="Pending reviews" value={stats?.pendingReviews ?? 0} />
+          </div>
+
+          {error ? (
+            <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+              {error}
+            </div>
+          ) : null}
+
+          <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+            <h2 className="text-base font-semibold text-slate-900">Client CBT overview</h2>
+            <div className="mt-4 space-y-3">
+              {!plans.length && !error ? (
+                <p className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">
+                  No CBT care plans found for this counsellor yet.
+                </p>
+              ) : null}
+              {plans.map((plan) => (
+                <article key={plan.id} className="rounded-xl border border-slate-200 px-4 py-3">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <h3 className="text-base font-semibold text-slate-900">{plan.clientName ?? 'Client'}</h3>
+                        <Badge tone={plan.status === 'active' ? 'success' : 'neutral'}>{labelFromValue(plan.status)}</Badge>
+                        <Badge tone={riskTone(plan.riskLevel)}>{labelFromValue(plan.riskLevel)} risk</Badge>
+                      </div>
+                      <p className="mt-1 text-sm text-slate-500">{plan.title}</p>
+                      <p className="mt-2 text-xs text-slate-500">
+                        {Math.round(plan.completionRate)}% complete - {plan.pendingReviews} pending reviews - {plan.exerciseCount} exercises
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <Link to={`/counsellor/cbt/clients/${plan.clientId}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open client</Link>
+                      <Link to={`/counsellor/cbt/plans/${plan.id}`} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700">Manage plan</Link>
+                    </div>
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PractitionerCbtDashboardSkeleton() {
+  return (
+    <div className="space-y-5" aria-label="Loading CBT dashboard" aria-busy="true">
       <div className="grid gap-4 md:grid-cols-3">
-        <Stat icon={<Users size={17} />} label="Active plans" value={loading ? '...' : stats?.activePlans ?? 0} />
-        <Stat icon={<ClipboardList size={17} />} label="Completion" value={loading ? '...' : `${Math.round(stats?.completionRate ?? 0)}%`} />
-        <Stat icon={<AlertTriangle size={17} />} label="Pending reviews" value={loading ? '...' : stats?.pendingReviews ?? 0} />
+        {Array.from({ length: 3 }).map((_, index) => (
+          <div key={index} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+            <SkeletonBlock className="h-4 w-28" />
+            <SkeletonBlock className="mt-3 h-8 w-16" />
+          </div>
+        ))}
       </div>
 
-      {error ? (
-        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
-
       <section className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
-        <h2 className="text-base font-semibold text-slate-900">Client CBT overview</h2>
+        <SkeletonBlock className="h-5 w-40" />
         <div className="mt-4 space-y-3">
-          {loading ? <p className="text-sm text-slate-500">Loading CBT plans...</p> : null}
-          {!loading && !plans.length && !error ? (
-            <p className="rounded-xl border border-dashed border-slate-300 px-4 py-5 text-sm text-slate-500">
-              No CBT care plans found for this counsellor yet.
-            </p>
-          ) : null}
-          {plans.map((plan) => (
-            <article key={plan.id} className="rounded-xl border border-slate-200 px-4 py-3">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <div>
+          {Array.from({ length: 4 }).map((_, index) => (
+            <article key={index} className="rounded-xl border border-slate-200 px-4 py-3">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="text-base font-semibold text-slate-900">{plan.clientName ?? 'Client'}</h3>
-                    <Badge tone={plan.status === 'active' ? 'success' : 'neutral'}>{labelFromValue(plan.status)}</Badge>
-                    <Badge tone={riskTone(plan.riskLevel)}>{labelFromValue(plan.riskLevel)} risk</Badge>
+                    <SkeletonBlock className="h-5 w-32" />
+                    <SkeletonBlock className="h-6 w-16 rounded-full" />
+                    <SkeletonBlock className="h-6 w-20 rounded-full" />
                   </div>
-                  <p className="mt-1 text-sm text-slate-500">{plan.title}</p>
-                  <p className="mt-2 text-xs text-slate-500">
-                    {Math.round(plan.completionRate)}% complete - {plan.pendingReviews} pending reviews - {plan.exerciseCount} exercises
-                  </p>
+                  <SkeletonBlock className="mt-3 h-4 w-full max-w-sm" />
+                  <SkeletonBlock className="mt-3 h-3 w-72 max-w-full" />
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Link to={`/counsellor/cbt/clients/${plan.clientId}`} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">Open client</Link>
-                  <Link to={`/counsellor/cbt/plans/${plan.id}`} className="rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700">Manage plan</Link>
+                <div className="flex gap-2">
+                  <SkeletonBlock className="h-10 w-24 rounded-lg" />
+                  <SkeletonBlock className="h-10 w-28 rounded-lg" />
                 </div>
               </div>
             </article>
@@ -89,6 +134,10 @@ export default function PractitionerCbtDashboard() {
       </section>
     </div>
   );
+}
+
+function SkeletonBlock({ className = '' }: { className?: string }) {
+  return <div className={`animate-pulse rounded-md bg-slate-100 ${className}`} />;
 }
 
 function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: string | number }) {

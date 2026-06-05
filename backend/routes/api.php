@@ -56,6 +56,7 @@ Route::prefix('v1')->group(function (): void {
         Route::patch('/notifications/{notification}', [NotificationController::class, 'update']);
         Route::get('/account/profile', [AccountProfileController::class, 'show']);
         Route::put('/account/profile', [AccountProfileController::class, 'update']);
+        Route::post('/account/profile/avatar', [AccountProfileController::class, 'updateAvatar']);
 
         Route::prefix('cbt')->group(function (): void {
             Route::get('/dashboard', [CbtController::class, 'dashboard'])->middleware('permission:counsellor.cbt.view');

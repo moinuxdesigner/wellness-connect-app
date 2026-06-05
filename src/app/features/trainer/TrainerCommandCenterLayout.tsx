@@ -24,8 +24,7 @@ import { getAuthState } from '../auth/auth';
 import { logoutRequest } from '../auth/apiAuth';
 import { getNotifications } from '../notifications/notificationsApi';
 import { liveSessionMockData } from './mockLiveSessionData';
-import { avatarForName } from './mockTrainerDashboardData';
-import { coachGreetingName } from './trainerDashboardViewModel';
+import { UserAvatar } from '../../components/UserAvatar';
 
 type TrainerNavItem = { label: string; to?: string; icon: ComponentType<{ size?: number; className?: string }> };
 
@@ -71,11 +70,9 @@ export default function TrainerCommandCenterLayout() {
   const isLiveSession = location.pathname === '/trainer/sessions/live';
   const isProgressReview = isProgressReviewPath(location.pathname);
   const trainerName = auth.user?.name ?? 'Coach Arjun';
-  const greetingName = coachGreetingName(trainerName);
   const visibleTrainerName = isLiveSession ? liveSessionMockData.trainer.name : trainerName;
-  const avatar = isLiveSession
-    ? liveSessionMockData.trainer.avatarUrl
-    : avatarForName(greetingName === 'Coach' ? 'Coach Arjun' : auth.user?.name ?? trainerName);
+  const avatar = isLiveSession ? liveSessionMockData.trainer.avatarUrl : auth.user?.avatarUrl;
+  const visibleTrainer = { ...auth.user, name: visibleTrainerName };
   const [unreadCount, setUnreadCount] = useState(0);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -133,6 +130,7 @@ export default function TrainerCommandCenterLayout() {
         <TrainerNavigation pathname={location.pathname} collapsed={sidebarCollapsed} />
         <TrainerProfileCard
           trainerName={visibleTrainerName}
+          trainer={visibleTrainer}
           avatar={avatar}
           onLogout={handleLogout}
           isLoggingOut={isLoggingOut}
@@ -148,7 +146,7 @@ export default function TrainerCommandCenterLayout() {
           </SheetHeader>
           <Brand onNavigate={() => setDrawerOpen(false)} />
           <TrainerNavigation pathname={location.pathname} onNavigate={() => setDrawerOpen(false)} />
-          <TrainerProfileCard trainerName={visibleTrainerName} avatar={avatar} onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} isLoggingOut={isLoggingOut} />
+          <TrainerProfileCard trainerName={visibleTrainerName} trainer={visibleTrainer} avatar={avatar} onNavigate={() => setDrawerOpen(false)} onLogout={handleLogout} isLoggingOut={isLoggingOut} />
         </SheetContent>
       </Sheet>
 
@@ -164,7 +162,7 @@ export default function TrainerCommandCenterLayout() {
             <Plus size={20} /> New Session <ChevronDown size={16} />
           </Link>
           <Link to="/trainer/profile" className="flex items-center gap-3 border-l border-slate-200 pl-5">
-            <img src={avatar} alt={`${visibleTrainerName} avatar`} className="h-11 w-11 rounded-full border border-slate-100 object-cover" />
+            <UserAvatar user={visibleTrainer} src={avatar} size="lg" className="h-11 w-11 border border-slate-100" />
             <ChevronDown size={16} className="text-slate-600" />
           </Link>
         </header> : null}
@@ -176,7 +174,7 @@ export default function TrainerCommandCenterLayout() {
           <div className="flex items-center gap-4">
             <NotificationButton unreadCount={unreadCount} onClick={() => navigate('/trainer/notifications')} />
             <Link to="/trainer/profile" className="relative">
-              <img src={avatar} alt={`${visibleTrainerName} avatar`} className="h-12 w-12 rounded-full border border-slate-100 object-cover shadow-sm" />
+              <UserAvatar user={visibleTrainer} src={avatar} size="lg" className="border border-slate-100 shadow-sm" />
               <span className="absolute right-0 top-0 h-3 w-3 rounded-full border-2 border-white bg-emerald-500" />
             </Link>
           </div>
@@ -316,6 +314,7 @@ function TrainerNavigation({
 
 function TrainerProfileCard({
   trainerName,
+  trainer,
   avatar,
   onNavigate,
   onLogout,
@@ -323,7 +322,8 @@ function TrainerProfileCard({
   collapsed = false,
 }: {
   trainerName: string;
-  avatar: string;
+  trainer?: { name?: string | null; email?: string | null; avatarUrl?: string | null; avatar_url?: string | null } | null;
+  avatar?: string | null;
   onNavigate?: () => void;
   onLogout: () => void;
   isLoggingOut: boolean;
@@ -333,7 +333,7 @@ function TrainerProfileCard({
     <div className={`mb-6 mt-auto rounded-2xl border border-slate-100 bg-white shadow-[0_2px_14px_rgba(30,41,59,0.06)] ${collapsed ? 'mx-3 p-3' : 'mx-4 p-4'}`}>
       <Link to="/trainer/profile" onClick={onNavigate} title={collapsed ? trainerName : undefined} className="block rounded-xl transition hover:bg-slate-50">
         <div className={`flex items-center ${collapsed ? 'justify-center' : 'gap-3'}`}>
-          <img src={avatar} alt="" className="h-12 w-12 rounded-full object-cover" />
+          <UserAvatar user={trainer ?? { name: trainerName }} src={avatar} size="lg" decorative />
           {!collapsed ? (
             <>
               <span className="min-w-0 flex-1">

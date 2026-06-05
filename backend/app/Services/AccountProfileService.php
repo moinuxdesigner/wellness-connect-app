@@ -52,6 +52,9 @@ class AccountProfileService
                 ['user_id' => $user->id],
                 [
                     'primary_goal' => $validated['primary_goal'] ?? null,
+                    'dob' => $validated['dob'] ?? null,
+                    'gender' => $validated['gender'] ?? null,
+                    'occupation' => $validated['occupation'] ?? null,
                     'timezone' => $validated['timezone'] ?? null,
                     'preferred_language' => $validated['preferred_language'] ?? null,
                 ]
@@ -79,8 +82,14 @@ class AccountProfileService
 
         return [
             'primary_goal' => $profile->primary_goal,
+            'dob' => optional($profile->dob)->format('Y-m-d'),
+            'age' => $profile->dob?->age,
+            'gender' => $profile->gender,
+            'occupation' => $profile->occupation,
             'timezone' => $profile->timezone,
             'preferred_language' => $profile->preferred_language,
+            'profilePhotoUrl' => $profile->profile_photo_url,
+            'profile_photo_url' => $profile->profile_photo_url,
         ];
     }
 
@@ -97,8 +106,14 @@ class AccountProfileService
             'email' => $user->email,
             'role' => $user->role,
             'phone' => $user->phone,
+            'avatarUrl' => $user->avatar_url ?: $user->clientProfile?->profile_photo_url,
+            'avatar_url' => $user->avatar_url,
             'wellness_goal' => $primaryGoal,
             'primary_goal' => $primaryGoal,
+            'dob' => optional($user->clientProfile?->dob)->format('Y-m-d'),
+            'age' => $user->clientProfile?->dob?->age,
+            'gender' => $user->clientProfile?->gender,
+            'occupation' => $user->clientProfile?->occupation,
             'consent_to_terms' => (bool) $user->consent_to_terms,
             'status' => $user->status ?? 'active',
             'requires_client_intake' => $requiresClientIntake,
@@ -116,6 +131,10 @@ class AccountProfileService
         if ($user->role === 'client') {
             $details['client'] = [
                 'primaryGoal' => $user->clientProfile?->primary_goal ?? $user->wellness_goal,
+                'dob' => optional($user->clientProfile?->dob)->format('Y-m-d'),
+                'age' => $user->clientProfile?->dob?->age,
+                'gender' => $user->clientProfile?->gender,
+                'occupation' => $user->clientProfile?->occupation,
                 'timezone' => $user->clientProfile?->timezone,
                 'preferredLanguage' => $user->clientProfile?->preferred_language,
             ];

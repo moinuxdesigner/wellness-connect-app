@@ -72,6 +72,8 @@ class CounsellorClientController extends Controller
                     'name' => $client->name,
                     'email' => $client->email,
                     'phone' => $client->phone,
+                    'avatarUrl' => $client->avatar_url ?: $client->clientProfile?->profile_photo_url,
+                    'avatar_url' => $client->avatar_url,
                     'profilePhotoUrl' => $client->clientProfile?->profile_photo_url,
                     'primaryGoal' => $client->clientProfile?->primary_goal ?? $client->wellness_goal,
                     'lastSession' => $lastSession?->starts_at?->toIso8601String(),

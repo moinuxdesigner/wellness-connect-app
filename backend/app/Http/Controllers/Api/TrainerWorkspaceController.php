@@ -103,7 +103,7 @@ class TrainerWorkspaceController extends Controller
         $appointments = Appointment::query()
             ->where('practitioner_id', $practitioner->id)
             ->where('service_type', 'training')
-            ->with('client:id,name,email')
+            ->with('client:id,name,email,avatar_url')
             ->get();
 
         return response()->json([
@@ -122,7 +122,7 @@ class TrainerWorkspaceController extends Controller
             'priorityQueue' => TrainerAlert::query()
                 ->where('practitioner_id', $practitioner->id)
                 ->whereNotIn('status', ['resolved'])
-                ->with('client:id,name,email')
+                ->with('client:id,name,email,avatar_url')
                 ->orderByRaw("CASE priority WHEN 'high' THEN 1 WHEN 'medium' THEN 2 ELSE 3 END")
                 ->orderBy('due_at')
                 ->latest('id')
@@ -143,6 +143,8 @@ class TrainerWorkspaceController extends Controller
                 'id' => $client->id,
                 'name' => $client->name,
                 'email' => $client->email,
+                'avatarUrl' => $client->avatar_url,
+                'avatar_url' => $client->avatar_url,
                 'eligibleForPlan' => Appointment::query()
                     ->where('practitioner_id', $practitioner->id)
                     ->where('client_user_id', $client->id)
@@ -183,7 +185,7 @@ class TrainerWorkspaceController extends Controller
         return response()->json([
             'plans' => TrainerPlan::query()
                 ->where('practitioner_id', $practitioner->id)
-                ->with(['client:id,name,email', 'activities' => fn ($query) => $query->orderBy('scheduled_for'), 'checkIns' => fn ($query) => $query->latest('checked_in_on')])
+                ->with(['client:id,name,email,avatar_url', 'activities' => fn ($query) => $query->orderBy('scheduled_for'), 'checkIns' => fn ($query) => $query->latest('checked_in_on')])
                 ->latest('id')
                 ->get()
                 ->map(fn (TrainerPlan $plan) => $this->planPayload($plan))
@@ -217,7 +219,7 @@ class TrainerWorkspaceController extends Controller
             'target_date' => $validated['targetDate'] ?? null,
             'status' => 'active',
         ]);
-        $plan->load('client:id,name,email', 'activities', 'checkIns');
+        $plan->load('client:id,name,email,avatar_url', 'activities', 'checkIns');
         $this->record($request, 'trainer_plan_created', sprintf('%s created a training plan for %s.', $request->user()->name, $plan->client->name), $plan);
 
         return response()->json(['message' => 'Training plan created.', 'plan' => $this->planPayload($plan)], 201);
@@ -239,7 +241,7 @@ class TrainerWorkspaceController extends Controller
             'status' => $validated['status'] ?? $plan->status,
         ])->save();
 
-        return response()->json(['message' => 'Training plan updated.', 'plan' => $this->planPayload($plan->fresh()->load('client:id,name,email', 'activities', 'checkIns'))]);
+        return response()->json(['message' => 'Training plan updated.', 'plan' => $this->planPayload($plan->fresh()->load('client:id,name,email,avatar_url', 'activities', 'checkIns'))]);
     }
 
     public function storeActivity(Request $request, TrainerPlan $plan): JsonResponse
@@ -289,7 +291,7 @@ class TrainerWorkspaceController extends Controller
         return response()->json([
             'checkIns' => TrainerCheckIn::query()
                 ->where('practitioner_id', $practitioner->id)
-                ->with(['client:id,name,email', 'plan:id,goal_title'])
+                ->with(['client:id,name,email,avatar_url', 'plan:id,goal_title'])
                 ->latest('checked_in_on')
                 ->latest('id')
                 ->limit(100)
@@ -340,7 +342,7 @@ class TrainerWorkspaceController extends Controller
                 'pain_notes' => $validated['painReported'] ? trim((string) ($validated['painNotes'] ?? '')) : null,
             ]);
         });
-        $checkIn->load('client:id,name,email', 'plan:id,goal_title');
+        $checkIn->load('client:id,name,email,avatar_url', 'plan:id,goal_title');
 
         foreach ($validated['activityUpdates'] ?? [] as $update) {
             if ($update['status'] === 'missed') {
@@ -377,7 +379,7 @@ class TrainerWorkspaceController extends Controller
         return response()->json([
             'tasks' => TrainerTask::query()
                 ->where('practitioner_id', $practitioner->id)
-                ->with('client:id,name,email')
+                ->with('client:id,name,email,avatar_url')
                 ->orderBy('starts_at')
                 ->get()
                 ->map(fn (TrainerTask $task) => $this->taskPayload($task))
@@ -425,7 +427,7 @@ class TrainerWorkspaceController extends Controller
         }
         $this->record($request, 'trainer_follow_up_scheduled', sprintf('%s scheduled %s.', $request->user()->name, str_replace('_', ' ', $task->type)), $task);
 
-        return response()->json(['message' => 'Schedule task created.', 'task' => $this->taskPayload($task->fresh()->load('client:id,name,email'))], 201);
+        return response()->json(['message' => 'Schedule task created.', 'task' => $this->taskPayload($task->fresh()->load('client:id,name,email,avatar_url'))], 201);
     }
 
     public function updateTask(Request $request, TrainerTask $task): JsonResponse
@@ -451,7 +453,7 @@ class TrainerWorkspaceController extends Controller
             $this->record($request, 'trainer_follow_up_completed', sprintf('%s completed %s.', $request->user()->name, str_replace('_', ' ', $task->type)), $task);
         }
 
-        return response()->json(['message' => 'Schedule task updated.', 'task' => $this->taskPayload($task->fresh()->load('client:id,name,email'))]);
+        return response()->json(['message' => 'Schedule task updated.', 'task' => $this->taskPayload($task->fresh()->load('client:id,name,email,avatar_url'))]);
     }
 
     public function updateAlert(Request $request, TrainerAlert $alert): JsonResponse
@@ -470,7 +472,7 @@ class TrainerWorkspaceController extends Controller
             $this->record($request, 'trainer_alert_resolved', sprintf('%s resolved trainer alert #%d.', $request->user()->name, $alert->id), $alert);
         } else {
             abort_unless($alert->type === 'pain_injury', 422, 'Only pain or injury alerts may be escalated.');
-            $alert->load('client:id,name,email', 'checkIn');
+            $alert->load('client:id,name,email,avatar_url', 'checkIn');
             WorkflowCase::query()->create([
                 'workflow_key' => WorkflowConfigService::TRAINER_SAFETY_ESCALATION,
                 'subject_type' => TrainerAlert::class,
@@ -493,7 +495,7 @@ class TrainerWorkspaceController extends Controller
             $this->record($request, 'trainer_pain_alert_escalated', sprintf('%s escalated a training safety alert for admin review.', $request->user()->name), $alert);
         }
 
-        return response()->json(['message' => 'Alert updated.', 'alert' => $this->alertPayload($alert->fresh()->load('client:id,name,email'))]);
+        return response()->json(['message' => 'Alert updated.', 'alert' => $this->alertPayload($alert->fresh()->load('client:id,name,email,avatar_url'))]);
     }
 
     public function updateNotification(Request $request, Notification $notification): JsonResponse
@@ -519,7 +521,7 @@ class TrainerWorkspaceController extends Controller
         return response()->json([
             'threadId' => $thread?->id,
             'messages' => $thread
-                ? $thread->messages()->with('sender:id,name,role')->orderBy('created_at')->get()->map(fn (TrainerClientMessage $message) => $this->messagePayload($message))->values()
+                ? $thread->messages()->with('sender:id,name,role,avatar_url')->orderBy('created_at')->get()->map(fn (TrainerClientMessage $message) => $this->messagePayload($message))->values()
                 : [],
         ]);
     }
@@ -552,7 +554,7 @@ class TrainerWorkspaceController extends Controller
             'attachment_size_bytes' => $validated['attachment']['sizeBytes'] ?? null,
         ]);
         $thread->touch();
-        $message->load('sender:id,name,role');
+        $message->load('sender:id,name,role,avatar_url');
         $this->record($request, 'trainer_progress_message_sent', sprintf('%s sent a progress follow-up message to %s.', $request->user()->name, $client->name), $message);
 
         return response()->json([
@@ -582,14 +584,14 @@ class TrainerWorkspaceController extends Controller
         $bookedClients = Appointment::query()
             ->where('practitioner_id', $practitioner->id)
             ->where('service_type', 'training')
-            ->with('client:id,name,email,status')
+            ->with('client:id,name,email,status,avatar_url')
             ->get()
             ->pluck('client')
             ->filter()
             ->keyBy('id');
         $assignedClients = TrainerPlan::query()
             ->where('practitioner_id', $practitioner->id)
-            ->with('client:id,name,email,status')
+            ->with('client:id,name,email,status,avatar_url')
             ->get()
             ->pluck('client')
             ->filter()
@@ -696,6 +698,8 @@ class TrainerWorkspaceController extends Controller
                 'id' => $client->id,
                 'name' => $client->name,
                 'email' => $client->email,
+                'avatarUrl' => $client->avatar_url,
+                'avatar_url' => $client->avatar_url,
                 'status' => ucfirst((string) $client->status),
                 'age' => $age,
                 'gender' => $profile?->gender,
@@ -740,7 +744,7 @@ class TrainerWorkspaceController extends Controller
             $this->notifyMissedActivity($practitioner, $activity);
         }
 
-        TrainerPlan::query()->where('practitioner_id', $practitioner->id)->where('status', 'active')->with('client:id,name')->get()->each(function (TrainerPlan $plan) use ($practitioner): void {
+        TrainerPlan::query()->where('practitioner_id', $practitioner->id)->where('status', 'active')->with('client:id,name,avatar_url')->get()->each(function (TrainerPlan $plan) use ($practitioner): void {
             $outcomes = $plan->activities()->whereDate('scheduled_for', '>=', today()->subDays(6))->whereIn('status', ['completed', 'missed'])->get();
             if ($outcomes->isEmpty()) {
                 return;
@@ -765,7 +769,7 @@ class TrainerWorkspaceController extends Controller
             }
         });
 
-        TrainerTask::query()->where('practitioner_id', $practitioner->id)->where('status', 'scheduled')->where('ends_at', '<', now())->with('client:id,name')->get()->each(function (TrainerTask $task) use ($practitioner): void {
+        TrainerTask::query()->where('practitioner_id', $practitioner->id)->where('status', 'scheduled')->where('ends_at', '<', now())->with('client:id,name,avatar_url')->get()->each(function (TrainerTask $task) use ($practitioner): void {
             if (!TrainerAlert::query()->where('practitioner_id', $practitioner->id)->where('type', 'follow_up_due')->where('summary', 'like', "%#{$task->id}%")->whereNotIn('status', ['resolved'])->exists()) {
                 $alert = TrainerAlert::query()->create([
                     'practitioner_id' => $practitioner->id,
@@ -780,7 +784,7 @@ class TrainerWorkspaceController extends Controller
             }
         });
 
-        Appointment::query()->where('practitioner_id', $practitioner->id)->where('service_type', 'training')->with('client:id,name')->get()->pluck('client')->filter()->unique('id')->each(function (User $client) use ($practitioner): void {
+        Appointment::query()->where('practitioner_id', $practitioner->id)->where('service_type', 'training')->with('client:id,name,avatar_url')->get()->pluck('client')->filter()->unique('id')->each(function (User $client) use ($practitioner): void {
             if (!Notification::query()->where('user_id', $practitioner->user_id)->where('type', 'trainer_new_client')->where('payload_json->clientId', $client->id)->exists()) {
                 $this->notify($practitioner->user, 'trainer_new_client', sprintf('%s booked their first training session with you.', $client->name), ['clientId' => $client->id]);
             }
@@ -789,18 +793,19 @@ class TrainerWorkspaceController extends Controller
 
     private function schedulePayload(Practitioner $practitioner, Carbon $from, Carbon $to): array
     {
-        $sessions = Appointment::query()->where('practitioner_id', $practitioner->id)->whereBetween('starts_at', [$from, $to])->with('client:id,name,email')->get()->map(fn (Appointment $appointment) => [
+        $sessions = Appointment::query()->where('practitioner_id', $practitioner->id)->whereBetween('starts_at', [$from, $to])->with('client:id,name,email,avatar_url')->get()->map(fn (Appointment $appointment) => [
             'id' => 'appointment-' . $appointment->id,
             'sourceId' => $appointment->id,
             'type' => 'session',
             'title' => 'Training session',
             'clientName' => optional($appointment->client)->name,
+            'clientAvatarUrl' => optional($appointment->client)->avatar_url,
             'startsAt' => optional($appointment->starts_at)->toIso8601String(),
             'endsAt' => optional($appointment->ends_at)->toIso8601String(),
             'status' => $appointment->status,
             'locationMode' => $appointment->mode,
         ]);
-        $tasks = TrainerTask::query()->where('practitioner_id', $practitioner->id)->whereBetween('starts_at', [$from, $to])->with('client:id,name,email')->get()->map(fn (TrainerTask $task) => $this->taskPayload($task));
+        $tasks = TrainerTask::query()->where('practitioner_id', $practitioner->id)->whereBetween('starts_at', [$from, $to])->with('client:id,name,email,avatar_url')->get()->map(fn (TrainerTask $task) => $this->taskPayload($task));
 
         return $sessions->concat($tasks)->sortBy('startsAt')->values()->all();
     }
@@ -982,6 +987,7 @@ class TrainerWorkspaceController extends Controller
             'clientUserId' => $plan->client_user_id,
             'clientName' => optional($plan->client)->name,
             'clientEmail' => optional($plan->client)->email,
+            'clientAvatarUrl' => optional($plan->client)->avatar_url,
             'goalTitle' => $plan->goal_title,
             'goalDescription' => $plan->goal_description,
             'startsOn' => optional($plan->starts_on)->format('Y-m-d'),
@@ -1000,17 +1006,17 @@ class TrainerWorkspaceController extends Controller
 
     private function checkInPayload(TrainerCheckIn $checkIn): array
     {
-        return ['id' => $checkIn->id, 'planId' => $checkIn->trainer_plan_id, 'planTitle' => optional($checkIn->plan)->goal_title, 'clientName' => optional($checkIn->client)->name, 'checkedInOn' => optional($checkIn->checked_in_on)->format('Y-m-d'), 'weightKg' => $checkIn->weight_kg === null ? null : (float) $checkIn->weight_kg, 'goalProgressPercent' => $checkIn->goal_progress_percent, 'notes' => $checkIn->notes, 'painReported' => $checkIn->pain_reported, 'painSeverity' => $checkIn->pain_severity, 'painNotes' => $checkIn->pain_notes];
+        return ['id' => $checkIn->id, 'planId' => $checkIn->trainer_plan_id, 'planTitle' => optional($checkIn->plan)->goal_title, 'clientName' => optional($checkIn->client)->name, 'clientAvatarUrl' => optional($checkIn->client)->avatar_url, 'checkedInOn' => optional($checkIn->checked_in_on)->format('Y-m-d'), 'weightKg' => $checkIn->weight_kg === null ? null : (float) $checkIn->weight_kg, 'goalProgressPercent' => $checkIn->goal_progress_percent, 'notes' => $checkIn->notes, 'painReported' => $checkIn->pain_reported, 'painSeverity' => $checkIn->pain_severity, 'painNotes' => $checkIn->pain_notes];
     }
 
     private function taskPayload(TrainerTask $task): array
     {
-        return ['id' => 'task-' . $task->id, 'sourceId' => $task->id, 'type' => $task->type, 'title' => $task->title, 'clientName' => optional($task->client)->name, 'startsAt' => optional($task->starts_at)->toIso8601String(), 'endsAt' => optional($task->ends_at)->toIso8601String(), 'status' => $task->status, 'notes' => $task->notes];
+        return ['id' => 'task-' . $task->id, 'sourceId' => $task->id, 'type' => $task->type, 'title' => $task->title, 'clientName' => optional($task->client)->name, 'clientAvatarUrl' => optional($task->client)->avatar_url, 'startsAt' => optional($task->starts_at)->toIso8601String(), 'endsAt' => optional($task->ends_at)->toIso8601String(), 'status' => $task->status, 'notes' => $task->notes];
     }
 
     private function alertPayload(TrainerAlert $alert): array
     {
-        return ['id' => $alert->id, 'type' => $alert->type, 'priority' => $alert->priority, 'status' => $alert->status, 'summary' => $alert->summary, 'clientName' => optional($alert->client)->name, 'dueAt' => optional($alert->due_at)->toIso8601String()];
+        return ['id' => $alert->id, 'type' => $alert->type, 'priority' => $alert->priority, 'status' => $alert->status, 'summary' => $alert->summary, 'clientName' => optional($alert->client)->name, 'clientAvatarUrl' => optional($alert->client)->avatar_url, 'dueAt' => optional($alert->due_at)->toIso8601String()];
     }
 
     private function messagePayload(TrainerClientMessage $message): array
@@ -1023,6 +1029,8 @@ class TrainerWorkspaceController extends Controller
                 'id' => $message->sender_user_id,
                 'name' => optional($message->sender)->name,
                 'role' => optional($message->sender)->role,
+                'avatarUrl' => optional($message->sender)->avatar_url,
+                'avatar_url' => optional($message->sender)->avatar_url,
             ],
             'attachment' => $message->attachment_name ? [
                 'name' => $message->attachment_name,

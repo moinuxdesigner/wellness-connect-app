@@ -1,19 +1,11 @@
 import { Bell, ChevronDown, CircleHelp, Menu, PanelLeftClose, PanelLeftOpen, Search } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router';
-import { getAuthState } from '../features/auth/auth';
+import { AUTH_STATE_CHANGED_EVENT, getAuthState, type AuthState } from '../features/auth/auth';
 import { getRoleNotificationsPath } from '../features/auth/roleRedirects';
-import { Avatar, AvatarFallback, AvatarImage } from '../components/ui/avatar';
-import { avatarForName } from '../features/trainer/mockTrainerDashboardData';
+import { UserAvatar } from '../components/UserAvatar';
 import { ThemeModeToggle } from '../features/theme/ThemeModeToggle';
-
-function initialsForName(name: string) {
-  return name
-    .split(' ')
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase() ?? '')
-    .join('') || 'WC';
-}
+import { getCounsellorNotifications, getNotifications, NOTIFICATION_UNREAD_COUNT_CHANGED } from '../features/notifications/notificationsApi';
 
 function roleLabel(role?: string | null) {
   if (!role) return 'Workspace user';
@@ -33,10 +25,55 @@ export default function Topbar({
   onToggleSidebar: () => void;
   sidebarCollapsed: boolean;
 }) {
-  const auth = getAuthState();
+  const [auth, setAuth] = useState<AuthState>(() => getAuthState());
   const navigate = useNavigate();
   const displayName = auth.user?.name ?? 'Admin';
   const displayRole = roleLabel(auth.user?.role);
+  const role = auth.user?.role;
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+  const [notificationsLoading, setNotificationsLoading] = useState(true);
+
+  useEffect(() => {
+    function refreshAuth() {
+      setAuth(getAuthState());
+    }
+
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, refreshAuth);
+    return () => window.removeEventListener(AUTH_STATE_CHANGED_EVENT, refreshAuth);
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    async function refreshUnreadCount() {
+      if (!role) {
+        setHasUnreadNotifications(false);
+        setNotificationsLoading(false);
+        return;
+      }
+
+      setNotificationsLoading(true);
+      try {
+        const unreadCount = role === 'counsellor'
+          ? (await getCounsellorNotifications()).summary.unread
+          : (await getNotifications()).unreadCount;
+
+        if (mounted) setHasUnreadNotifications(unreadCount > 0);
+      } catch {
+        if (mounted) setHasUnreadNotifications(false);
+      } finally {
+        if (mounted) setNotificationsLoading(false);
+      }
+    }
+
+    void refreshUnreadCount();
+
+    window.addEventListener(NOTIFICATION_UNREAD_COUNT_CHANGED, refreshUnreadCount);
+    return () => {
+      mounted = false;
+      window.removeEventListener(NOTIFICATION_UNREAD_COUNT_CHANGED, refreshUnreadCount);
+    };
+  }, [role]);
 
   return (
     <header className="sticky top-0 z-20 border-b border-slate-200 bg-white/90 px-4 py-5 backdrop-blur dark:border-slate-800 dark:bg-slate-950/88 lg:px-6 lg:py-3">
@@ -82,7 +119,9 @@ export default function Topbar({
             aria-label="Notifications"
           >
             <Bell size={18} />
-            <span className="absolute right-3 top-3 h-3.5 w-3.5 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 lg:right-2 lg:top-2 lg:h-2.5 lg:w-2.5" />
+            {!notificationsLoading && hasUnreadNotifications ? (
+              <span className="absolute right-3 top-3 h-3.5 w-3.5 rounded-full bg-rose-500 ring-2 ring-white dark:ring-slate-900 lg:right-2 lg:top-2 lg:h-2.5 lg:w-2.5" />
+            ) : null}
           </button>
 
           <button
@@ -98,10 +137,7 @@ export default function Topbar({
             className="inline-flex h-[58px] w-[58px] items-center justify-center gap-3 rounded-[14px] border border-slate-200 bg-white p-0 shadow-md transition hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:hover:bg-slate-800 sm:w-auto sm:px-3 sm:py-2 lg:h-auto lg:rounded-2xl lg:shadow-sm"
             aria-label="Profile"
           >
-            <Avatar className="h-10 w-10 border border-white shadow-sm dark:border-slate-700">
-              <AvatarImage src={encodeURI(avatarForName(displayName))} alt={`${displayName} avatar`} className="object-cover" />
-              <AvatarFallback className="bg-violet-100 text-sm font-semibold text-violet-700">{initialsForName(displayName)}</AvatarFallback>
-            </Avatar>
+            <UserAvatar user={auth.user ?? { name: displayName }} size="md" className="border border-white shadow-sm dark:border-slate-700" />
             <div className="hidden text-left sm:block">
               <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{displayName}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400">{displayRole}</p>

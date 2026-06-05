@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Role } from '../../types';
-import { Panel, StatCard, ToneBadge } from '../shared/components/Ui';
+import { DashboardSkeleton, Panel, StatCard, ToneBadge } from '../shared/components/Ui';
 import { getRoleShellTitle } from './RoleDashboardLayout';
 import { getRoleScenario } from '../demo/demoScenarios';
 import { getCounsellorDashboardRequest, type CounsellorDashboardResponse } from '../shared/services/api';
@@ -82,21 +82,16 @@ export function RoleDashboardPage({ role }: { role: Role }) {
   const [loadingCounsellorDashboard, setLoadingCounsellorDashboard] = useState(role === 'counsellor');
   const [counsellorDashboardError, setCounsellorDashboardError] = useState<string | null>(null);
   const scenario = role !== 'counsellor' && coreRoles.includes(role) ? getRoleScenario(role as 'client' | 'trainer' | 'helpdesk' | 'admin' | 'content') : undefined;
-  const counsellorLoadingMetrics = [
-    { title: "Today's Sessions", value: '...', hint: 'Loading live sessions' },
-    { title: 'Assigned Clients', value: '...', hint: 'Loading client assignments' },
-    { title: 'Risk Flags', value: '...', hint: 'Loading risk flags' },
-  ];
   const counsellorErrorMetrics = [
     { title: "Today's Sessions", value: '-', hint: 'Unable to load live data' },
     { title: 'Assigned Clients', value: '-', hint: 'Unable to load live data' },
     { title: 'Risk Flags', value: '-', hint: 'Unable to load live data' },
   ];
   const metrics = role === 'counsellor'
-    ? (counsellorDashboard?.metrics ?? (loadingCounsellorDashboard ? counsellorLoadingMetrics : counsellorErrorMetrics))
+    ? (counsellorDashboard?.metrics ?? counsellorErrorMetrics)
     : page.metrics;
   const actions = role === 'counsellor'
-    ? (counsellorDashboard?.actions ?? (loadingCounsellorDashboard ? ['Loading dashboard actions'] : ['Refresh dashboard data']))
+    ? (counsellorDashboard?.actions ?? ['Refresh dashboard data'])
     : page.actions;
   const flowReadiness = role === 'counsellor' ? counsellorDashboard?.flowReadiness : scenario;
 
@@ -144,7 +139,11 @@ export function RoleDashboardPage({ role }: { role: Role }) {
         </div>
       ) : null}
 
-      {metrics.length ? (
+      {role === 'counsellor' && loadingCounsellorDashboard ? (
+        <DashboardSkeleton statCount={3} panelCount={2} />
+      ) : null}
+
+      {(!loadingCounsellorDashboard || role !== 'counsellor') && metrics.length ? (
         <section className="grid gap-4 md:grid-cols-3">
           {metrics.map((item) => (
             <StatCard key={item.title} title={item.title} value={item.value} hint={item.hint} />
@@ -152,7 +151,7 @@ export function RoleDashboardPage({ role }: { role: Role }) {
         </section>
       ) : null}
 
-      {actions.length ? (
+      {(!loadingCounsellorDashboard || role !== 'counsellor') && actions.length ? (
         <Panel title="Next Actions">
           <div className="grid gap-2 sm:grid-cols-3">
             {actions.map((action) => (
@@ -164,7 +163,7 @@ export function RoleDashboardPage({ role }: { role: Role }) {
         </Panel>
       ) : null}
 
-      {flowReadiness ? (
+      {(!loadingCounsellorDashboard || role !== 'counsellor') && flowReadiness ? (
         <Panel title="Flow Readiness">
           <div className="space-y-4">
             <div>
@@ -185,12 +184,12 @@ export function RoleDashboardPage({ role }: { role: Role }) {
             </div>
           </div>
         </Panel>
-      ) : (
+      ) : !loadingCounsellorDashboard || role !== 'counsellor' ? (
         <Panel title="Implementation Status">
           <ToneBadge tone="warning">Route shell</ToneBadge>
           <p className="mt-3 text-sm text-slate-600">Domain workflows can be built behind this role after MVP demo phase.</p>
         </Panel>
-      )}
+      ) : null}
     </div>
   );
 }

@@ -6,6 +6,9 @@ export type { AlertProps } from './Alert';
 
 export { Avatar } from './Avatar';
 export type { AvatarProps } from './Avatar';
+export { UserAvatar, getUserInitials } from './UserAvatar';
+export type { UserAvatarUser } from './UserAvatar';
+export { ProfileAvatarUploader } from './ProfileAvatarUploader';
 
 export { Badge } from './Badge';
 export type { BadgeProps } from './Badge';

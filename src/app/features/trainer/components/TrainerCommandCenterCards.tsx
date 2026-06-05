@@ -33,8 +33,9 @@ import type {
   PerformanceStatDisplay,
   ScheduleRowDisplay,
 } from '../trainerDashboardViewModel';
-import { avatarForName, type TrainerRenewalDisplay } from '../mockTrainerDashboardData';
+import type { TrainerRenewalDisplay } from '../mockTrainerDashboardData';
 import type { ReactNode } from 'react';
+import { UserAvatar } from '../../../components/UserAvatar';
 
 const toneStyles = {
   purple: { circle: 'bg-indigo-50 text-indigo-600', value: 'text-indigo-700' },
@@ -101,7 +102,7 @@ export function TodayScheduleCard({ rows }: { rows: ScheduleRowDisplay[] }) {
                   <td className="px-5 py-2.5 text-slate-500">{row.time}</td>
                   <td className="px-3 py-2.5">
                     <span className="flex items-center gap-2 font-medium text-slate-800">
-                      <img src={row.avatarUrl} alt="" className="h-6 w-6 rounded-full object-cover" />
+                      <UserAvatar user={{ name: row.clientName }} src={row.avatarUrl} size="sm" className="h-6 w-6" decorative />
                       {row.clientName}
                     </span>
                   </td>
@@ -167,7 +168,7 @@ export function RecentActivityCard({ activities }: { activities: ActivityDisplay
         <div className="mt-3 space-y-3">
           {activities.map((activity) => (
             <article key={activity.id} className="flex items-center gap-3">
-              <img src={activity.avatarUrl} alt="" className="h-7 w-7 rounded-full object-cover" />
+              <UserAvatar user={{ name: activity.summary }} src={activity.avatarUrl} size="sm" className="h-7 w-7" decorative />
               <p className="min-w-0 flex-1 truncate text-xs text-slate-600">{activity.summary}</p>
               <time className="text-xs text-slate-400">{activity.timeLabel}</time>
             </article>
@@ -186,7 +187,7 @@ export function UpcomingRenewalsCard({ renewals }: { renewals: TrainerRenewalDis
         {renewals.map((renewal) => (
           <article key={renewal.id} className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2 text-xs sm:grid-cols-[minmax(0,1.2fr)_92px_70px_76px]">
             <span className="flex items-center gap-2">
-              <img src={avatarForName(renewal.clientName)} alt="" className="h-8 w-8 rounded-full object-cover" />
+              <UserAvatar user={{ name: renewal.clientName }} size="sm" decorative />
               <span>
                 <strong className="block font-medium text-slate-800">{renewal.clientName}</strong>
                 <span className="text-slate-500">{renewal.planName}</span>
@@ -282,7 +283,7 @@ export function CompactScheduleCard({ rows }: { rows: ScheduleRowDisplay[] }) {
             className="flex items-center gap-3 border-b border-slate-100 py-3.5 transition last:border-b-0 hover:bg-indigo-50/40"
           >
             <span className="w-[68px] shrink-0 text-xs font-medium text-slate-600 sm:w-[100px] sm:text-sm">{row.time}</span>
-            <img src={row.avatarUrl} alt="" className="h-10 w-10 shrink-0 rounded-full object-cover sm:h-12 sm:w-12" />
+            <UserAvatar user={{ name: row.clientName }} src={row.avatarUrl} size="lg" className="h-10 w-10 shrink-0 sm:h-12 sm:w-12" decorative />
             <span className="min-w-0 flex-1">
               <strong className="block truncate text-sm font-semibold text-[#101842] sm:text-base">{row.clientName}</strong>
               <span className="mt-1 block truncate text-sm text-slate-600">{row.sessionType}</span>
@@ -360,7 +361,7 @@ export function CompactAlertsCard({ alerts }: { alerts: AlertDisplay[] }) {
             to={`/trainer/alerts/${alert.id}`}
             className="flex items-center gap-3 rounded-2xl border border-orange-100 bg-gradient-to-r from-orange-50 to-rose-50/60 p-4 transition hover:border-orange-200"
           >
-            <img src={avatarForName(alert.clientName)} alt="" className="h-12 w-12 rounded-full object-cover" />
+            <UserAvatar user={{ name: alert.clientName }} size="lg" decorative />
             <span className="min-w-0 flex-1">
               <strong className="block truncate text-sm font-semibold text-[#101842]">{alert.clientName}</strong>
               <span className="mt-1 block truncate text-sm text-slate-600">{alert.summary}</span>

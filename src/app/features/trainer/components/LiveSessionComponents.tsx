@@ -23,6 +23,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { Textarea } from '../../../components/ui/textarea';
+import { UserAvatar } from '../../../components/UserAvatar';
 import type {
   ClientProfile,
   EnergyOption,
@@ -100,7 +101,7 @@ export function Client360Card({ client }: { client: ClientProfile }) {
         action={<button type="button" aria-label="Open client profile" className="text-slate-400 transition hover:text-indigo-600"><ExternalLink size={17} /></button>}
       />
       <div className="mt-5 flex items-center gap-4 border-b border-slate-100 pb-5">
-        <img src={client.avatarUrl} alt={`${client.name} avatar`} className="h-[76px] w-[76px] rounded-full object-cover" />
+        <UserAvatar user={client} src={client.avatarUrl} alt={`${client.name} avatar`} size="xl" className="h-[76px] w-[76px]" />
         <div>
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="text-lg font-semibold text-[#111941]">{client.name}</h3>

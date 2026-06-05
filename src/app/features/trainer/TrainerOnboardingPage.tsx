@@ -50,6 +50,7 @@ import { Input } from '../../components/ui/input';
 import { InputOTP, InputOTPGroup, InputOTPSlot } from '../../components/ui/input-otp';
 import { Textarea } from '../../components/ui/textarea';
 import { cn } from '../../components/ui/utils';
+import { UserAvatar } from '../../components/UserAvatar';
 import {
   buildTrainerSubmissionIssue,
   findTrainerApplication,
@@ -739,7 +740,6 @@ function TrainerFinalReviewScreen({
 }) {
   const avatarSrc = values.photo.file?.previewUrl;
   const fullName = values.profile.fullName || 'Personal Trainer';
-  const initials = getInitials(fullName);
   const hasSubmitted = Boolean(submittedAt);
 
   const statusConfig =
@@ -871,9 +871,7 @@ function TrainerFinalReviewScreen({
             <section className="grid shrink-0 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
             <div className="rounded-[26px] border border-[#e8e2fb] bg-white px-5 py-5 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
               <div className="flex items-center gap-5">
-                <div className="flex h-36 w-36 shrink-0 items-center justify-center overflow-hidden rounded-full border-[3px] border-[#e5dbff] bg-[linear-gradient(145deg,#eef2ff,#f6f2ff)] text-[2.2rem] font-bold tracking-[0.08em] text-[#4830cc] shadow-[0_12px_30px_rgba(123,92,255,0.16)]">
-                  {avatarSrc ? <img src={avatarSrc} alt={fullName} className="h-full w-full object-cover" /> : initials}
-                </div>
+                <UserAvatar user={{ name: fullName }} src={avatarSrc} size="xl" className="h-36 w-36 shrink-0 border-[3px] border-[#e5dbff] text-[2.2rem] tracking-[0.08em] shadow-[0_12px_30px_rgba(123,92,255,0.16)]" />
 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#6345ff]">
@@ -3227,7 +3225,9 @@ function PhotoCropEditor({
           <div className="relative overflow-hidden rounded-xl bg-slate-50 p-3">
             <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[linear-gradient(145deg,#eef2ff,#dbeafe)]">
               {file?.previewUrl ? (
-                <img src={file.previewUrl} alt="Trainer profile preview" className="h-full w-full object-cover" />
+                <div className="flex h-full w-full items-center justify-center">
+                  <UserAvatar user={{ name: 'Trainer profile' }} src={file.previewUrl} alt="Trainer profile preview" size="xl" className="h-32 w-32" />
+                </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-500">
                   <CircleUserRound size={40} />

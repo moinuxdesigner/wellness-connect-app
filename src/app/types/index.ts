@@ -37,6 +37,8 @@ export interface UserSummary {
   name: string;
   email: string;
   phone: string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
   role: Role;
   status: 'active' | 'pending' | 'suspended';
   joinedAt: string;
@@ -79,6 +81,8 @@ export interface ActivityLogActor {
   name: string | null;
   email: string | null;
   role: Role | string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
 }
 
 export interface ActivityLogSubject {
@@ -118,4 +122,6 @@ export interface ActivityLogActorOption {
   id: number;
   name: string;
   role: Role | string | null;
+  avatarUrl?: string | null;
+  avatar_url?: string | null;
 }

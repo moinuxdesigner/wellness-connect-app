@@ -1,7 +1,6 @@
 import type { ActivityLogEntry } from '../../types';
 import type { TrainerAlert, TrainerDashboard, TrainerScheduleItem } from './trainerWorkspaceApi';
 import {
-  avatarForName,
   mockCaloriesTracked,
   mockCompactFocus,
   mockCompactPriorityItems,
@@ -25,7 +24,7 @@ export type ScheduleRowDisplay = {
   id: string;
   time: string;
   clientName: string;
-  avatarUrl: string;
+  avatarUrl?: string | null;
   sessionType: string;
   location: string;
   status: string;
@@ -46,7 +45,7 @@ export type ActivityDisplay = {
   id: number;
   summary: string;
   timeLabel: string;
-  avatarUrl: string;
+  avatarUrl?: string | null;
 };
 
 export type PerformanceStatDisplay = {
@@ -140,7 +139,7 @@ export function buildScheduleRowDisplay(item: TrainerScheduleItem): ScheduleRowD
     id: item.id,
     time: new Date(item.startsAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     clientName: item.clientName ?? 'Internal task',
-    avatarUrl: avatarForName(item.clientName),
+    avatarUrl: item.clientAvatarUrl,
     sessionType: item.type === 'session' ? item.title : item.type === 'call' ? 'Client Call' : 'Follow-up',
     location: locationLabel(item),
     status: status.label,
@@ -177,7 +176,7 @@ export function buildTrainerDashboardViewModel(dashboard: TrainerDashboard, acti
       id: activity.id,
       summary: activity.summary,
       timeLabel: relativeTime(activity.occurredAt),
-      avatarUrl: avatarForName(activity.target?.name ?? activity.actor?.name),
+      avatarUrl: activity.target?.avatarUrl ?? activity.actor?.avatarUrl,
     })),
     renewals: mockUpcomingRenewals,
     performance: [
