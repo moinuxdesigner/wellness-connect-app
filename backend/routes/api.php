@@ -121,6 +121,8 @@ Route::prefix('v1')->group(function (): void {
             Route::get('/{appointment}', [CounsellorSessionController::class, 'show']);
             Route::post('/{appointment}/start', [CounsellorSessionController::class, 'start']);
             Route::put('/{appointment}/notes', [CounsellorSessionController::class, 'saveNotes']);
+            Route::put('/{appointment}/flow-steps/{stepKey}', [CounsellorSessionController::class, 'saveFlowStep']);
+            Route::put('/{appointment}/summary', [CounsellorSessionController::class, 'saveSummary']);
             Route::post('/{appointment}/complete', [CounsellorSessionController::class, 'complete']);
             Route::post('/{appointment}/follow-up', [CounsellorSessionController::class, 'followUp']);
             Route::post('/{appointment}/escalate', [CounsellorSessionController::class, 'escalate']);

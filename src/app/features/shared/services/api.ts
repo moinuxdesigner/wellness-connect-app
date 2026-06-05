@@ -211,9 +211,49 @@ export interface CounsellorSessionNotes {
 export interface CounsellorAssessmentResult {
   id: number;
   assessmentType: CounsellorAssessmentType;
+  label?: string;
   score: number;
   severity?: string | null;
+  tone?: 'danger' | 'warning' | 'success' | 'neutral' | string;
   administeredAt?: string | null;
+}
+
+export type CounsellorFlowStepStatus = 'not_started' | 'in_progress' | 'completed' | 'skipped';
+
+export interface CounsellorSessionFlowStep {
+  id: number;
+  stepKey: string;
+  phase: string;
+  title: string;
+  sortOrder: number;
+  status: CounsellorFlowStepStatus;
+  prompt?: string | null;
+  response: Record<string, unknown>;
+  clinicalNote?: string | null;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface CounsellorSessionFlowPhase {
+  phase: string;
+  steps: CounsellorSessionFlowStep[];
+}
+
+export interface CounsellorSessionGuidedFlow {
+  id: number;
+  activeStepKey?: string | null;
+  completionPercent: number;
+  requiredStepKeys: string[];
+  phases: CounsellorSessionFlowPhase[];
+}
+
+export interface CounsellorSessionSummary {
+  sessionRating?: number | null;
+  clientFeedback?: string | null;
+  clinicianSummary?: string | null;
+  clientSummary?: string | null;
+  privateSummary?: string | null;
+  nextAgenda?: string | null;
 }
 
 export interface CounsellorSessionWorkspace {
@@ -232,7 +272,24 @@ export interface CounsellorSessionWorkspace {
     treatmentPlan: string[];
   };
   notes: CounsellorSessionNotes;
+  guidedFlow?: CounsellorSessionGuidedFlow;
+  sessionSummary?: CounsellorSessionSummary;
   assessments: CounsellorAssessmentResult[];
+  homeworkReview?: Array<{
+    id: number;
+    title: string;
+    status: string;
+    dueLabel: string;
+    reviewState: string;
+  }>;
+  treatmentProgress?: {
+    title: string;
+    status: string;
+    startedAt?: string | null;
+    goalProgressPercent: number;
+    goalSummary: string;
+    riskLevel: string;
+  } | null;
   cbt: {
     activePlan?: {
       id: number;
@@ -240,6 +297,7 @@ export interface CounsellorSessionWorkspace {
       status: string;
       riskLevel: string;
       exerciseCount: number;
+      goalCount?: number;
     } | null;
     homeworkTemplates: Array<{ id: number; title: string; slug: string }>;
   };
@@ -655,6 +713,41 @@ export async function saveCounsellorSessionNotesRequest(appointmentId: number, p
   });
   const data = await readJson(response);
   if (!response.ok) throw new Error(String(data?.message ?? 'Unable to save session notes'));
+  return data as CounsellorSessionWorkspace;
+}
+
+export async function saveCounsellorSessionFlowStepRequest(appointmentId: number, stepKey: string, payload: {
+  status: CounsellorFlowStepStatus;
+  response_json?: Record<string, unknown>;
+  clinical_note?: string | null;
+}) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}/flow-steps/${stepKey}`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to save guided CBT step'));
+  return data as CounsellorSessionWorkspace;
+}
+
+export async function saveCounsellorSessionSummaryRequest(appointmentId: number, payload: {
+  session_rating?: number | null;
+  client_feedback?: string | null;
+  clinician_summary?: string | null;
+  client_summary?: string | null;
+  private_summary?: string | null;
+  next_agenda?: string | null;
+}) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/counsellor/sessions/${appointmentId}/summary`, {
+    method: 'PUT',
+    headers: authHeaders(token, true),
+    body: JSON.stringify(payload),
+  });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to save session summary'));
   return data as CounsellorSessionWorkspace;
 }
 

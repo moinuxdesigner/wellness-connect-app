@@ -3,32 +3,45 @@ import {
   AlertTriangle,
   ArrowLeft,
   Brain,
+  CalendarClock,
   CalendarPlus,
+  Check,
   CheckCircle2,
+  ChevronDown,
   ClipboardCheck,
+  ClipboardList,
   FileText,
-  PlayCircle,
+  MessageCircle,
   Save,
   Send,
+  Share2,
   ShieldAlert,
+  Star,
   UserRound,
+  Video,
   X,
 } from 'lucide-react';
 import {
   assignCounsellorCbtHomeworkRequest,
   completeCounsellorSessionRequest,
-  createCounsellorCbtPlanRequest,
   createCounsellorAssessmentRequest,
+  createCounsellorCbtPlanRequest,
   escalateCounsellorSessionRequest,
   followUpCounsellorSessionRequest,
   getCounsellorSessionsRequest,
   getCounsellorSessionWorkspaceRequest,
+  saveCounsellorSessionFlowStepRequest,
   saveCounsellorSessionNotesRequest,
+  saveCounsellorSessionSummaryRequest,
   startCounsellorSessionRequest,
   type CounsellorAssessmentType,
+  type CounsellorFlowStepStatus,
+  type CounsellorSessionFlowStep,
   type CounsellorSessionQueueItem,
+  type CounsellorSessionSummary,
   type CounsellorSessionWorkspace,
 } from '../shared/services/api';
+import { getAuthState } from '../auth/auth';
 
 type SoapDraft = {
   subjective: string;
@@ -37,62 +50,67 @@ type SoapDraft = {
   plan: string;
 };
 
-const noteTemplates: Record<string, SoapDraft> = {
-  Anxiety: {
-    subjective: 'Client reports increased anxiety and identifiable worry triggers.',
-    objective: 'Affect anxious. Speech coherent. No acute disorientation observed.',
-    assessment: 'Anxiety symptoms remain active and appear linked to current stressors.',
-    plan: 'Continue CBT formulation. Assign thought record and practice relaxation exercise before next session.',
-  },
-  Depression: {
-    subjective: 'Client reports low mood, reduced motivation, and reduced pleasure in usual activities.',
-    objective: 'Mood appears low. Engagement maintained throughout session.',
-    assessment: 'Depressive symptoms require continued monitoring and behavioral activation work.',
-    plan: 'Assign mood diary and one behavioral activation task. Review sleep and routine next session.',
-  },
-  Panic: {
-    subjective: 'Client reports panic symptoms and fear of recurrence.',
-    objective: 'Client able to describe physical symptoms and triggers with support.',
-    assessment: 'Panic cycle psychoeducation and exposure planning remain indicated.',
-    plan: 'Practice grounding and breathing. Begin graded exposure planning if clinically appropriate.',
-  },
-  Stress: {
-    subjective: 'Client reports stress related to current responsibilities and workload.',
-    objective: 'Client appears tired but engaged. Thought process linear.',
-    assessment: 'Stress load is elevated and impacting coping capacity.',
-    plan: 'Review stressors, identify controllable actions, and assign brief daily decompression practice.',
-  },
-  'Follow-up': {
-    subjective: 'Client reports updates since the previous session.',
-    objective: 'Presentation reviewed against previous baseline.',
-    assessment: 'Progress and barriers reviewed. Treatment plan remains active.',
-    plan: 'Continue current plan and schedule follow-up based on symptom trajectory.',
-  },
+type SummaryDraft = {
+  sessionRating: number | null;
+  clientFeedback: string;
+  clinicianSummary: string;
+  clientSummary: string;
+  privateSummary: string;
+  nextAgenda: string;
 };
 
+const tabs = [
+  'Session Summary',
+  'Guided CBT Flow',
+  'Opening',
+  'Assessment & Exploration',
+  'Core CBT Intervention',
+  'Planning',
+  'Closure',
+  'Notes',
+  'Assessments',
+  'CBT Care',
+  'Treatment Plan',
+  'Homework',
+  'Case Conceptualization',
+  'Documents',
+  'History',
+];
+
 const assessmentLabels: Array<{ type: CounsellorAssessmentType; label: string }> = [
-  { type: 'phq_9', label: 'PHQ-9' },
   { type: 'gad_7', label: 'GAD-7' },
-  { type: 'dass_21', label: 'DASS-21' },
+  { type: 'phq_9', label: 'PHQ-9' },
   { type: 'pss', label: 'PSS' },
+  { type: 'dass_21', label: 'DASS-21' },
   { type: 'bdi_ii', label: 'BDI-II' },
 ];
 
-const tabs = ['Overview', 'Notes', 'Assessments', 'CBT Care', 'Progress', 'Documents'];
+const responseFieldLabels: Record<string, string[]> = {
+  mood_check_in: ['mood', 'anxiety', 'depression', 'stress', 'update'],
+  todays_agenda: ['focus_one', 'focus_two', 'focus_three'],
+  automatic_thoughts: ['situation', 'thought', 'emotion', 'intensity'],
+  cognitive_distortions: ['distortions'],
+  thought_challenge: ['evidence_for', 'evidence_against', 'alternative_explanation'],
+  balanced_thoughts: ['balanced_thought'],
+  risk_assessment: ['risk_status', 'protective_factors', 'safety_plan'],
+  homework_assignment: ['objective', 'instructions', 'due_date'],
+  next_session: ['date_time', 'focus', 'follow_up_plan'],
+};
 
 export default function CounsellorSessionsPage() {
   const [sessions, setSessions] = useState<CounsellorSessionQueueItem[]>([]);
   const [selectedId, setSelectedId] = useState<number | null>(null);
   const [workspace, setWorkspace] = useState<CounsellorSessionWorkspace | null>(null);
   const [draft, setDraft] = useState<SoapDraft>({ subjective: '', objective: '', assessment: '', plan: '' });
-  const [activeTab, setActiveTab] = useState('Overview');
+  const [summaryDraft, setSummaryDraft] = useState<SummaryDraft>(emptySummaryDraft());
+  const [activeTab, setActiveTab] = useState(tabs[0]);
   const [loadingQueue, setLoadingQueue] = useState(true);
   const [loadingWorkspace, setLoadingWorkspace] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [savingAction, setSavingAction] = useState('');
   const [homeworkTemplateId, setHomeworkTemplateId] = useState<number | null>(null);
-  const [focusMode, setFocusMode] = useState(false);
   const [creatingCbtPlan, setCreatingCbtPlan] = useState(false);
 
   const closeNotification = useCallback(() => {
@@ -101,22 +119,20 @@ export default function CounsellorSessionsPage() {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
+    let mounted = true;
     setLoadingQueue(true);
     getCounsellorSessionsRequest()
       .then((items) => {
-        if (!isMounted) return;
-        setSessions(items);
+        if (mounted) setSessions(items);
       })
       .catch((requestError: unknown) => {
-        if (isMounted) setError(requestError instanceof Error ? requestError.message : 'Unable to load sessions.');
+        if (mounted) setError(errorMessage(requestError, 'Unable to load sessions.'));
       })
       .finally(() => {
-        if (isMounted) setLoadingQueue(false);
+        if (mounted) setLoadingQueue(false);
       });
-
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, []);
 
@@ -126,37 +142,28 @@ export default function CounsellorSessionsPage() {
       return;
     }
 
-    let isMounted = true;
+    let mounted = true;
     setLoadingWorkspace(true);
-    setError('');
     getCounsellorSessionWorkspaceRequest(selectedId)
       .then((data) => {
-        if (!isMounted) return;
-        setWorkspace(data);
-        setDraft({
-          subjective: data.notes.subjective ?? '',
-          objective: data.notes.objective ?? '',
-          assessment: data.notes.assessment ?? '',
-          plan: data.notes.plan ?? '',
-        });
-        setHomeworkTemplateId(data.cbt.homeworkTemplates[0]?.id ?? null);
+        if (!mounted) return;
+        hydrateWorkspace(data);
       })
       .catch((requestError: unknown) => {
-        if (isMounted) setError(requestError instanceof Error ? requestError.message : 'Unable to load session workspace.');
+        if (mounted) setError(errorMessage(requestError, 'Unable to load session workspace.'));
       })
       .finally(() => {
-        if (isMounted) setLoadingWorkspace(false);
+        if (mounted) setLoadingWorkspace(false);
       });
-
     return () => {
-      isMounted = false;
+      mounted = false;
     };
   }, [selectedId]);
 
   const selectedSession = useMemo(() => sessions.find((item) => item.id === selectedId) ?? null, [selectedId, sessions]);
   const notification = error ? { tone: 'danger' as const, message: error } : message ? { tone: 'success' as const, message } : null;
 
-  function replaceWorkspace(data: CounsellorSessionWorkspace, successMessage: string) {
+  function hydrateWorkspace(data: CounsellorSessionWorkspace) {
     setWorkspace(data);
     setDraft({
       subjective: data.notes.subjective ?? '',
@@ -164,7 +171,13 @@ export default function CounsellorSessionsPage() {
       assessment: data.notes.assessment ?? '',
       plan: data.notes.plan ?? '',
     });
+    setSummaryDraft(summaryFromApi(data.sessionSummary));
+    setHomeworkTemplateId(data.cbt.homeworkTemplates[0]?.id ?? null);
     setSessions((items) => items.map((item) => (item.id === data.session.id ? data.session : item)));
+  }
+
+  function replaceWorkspace(data: CounsellorSessionWorkspace, successMessage: string) {
+    hydrateWorkspace(data);
     setMessage(successMessage);
     setError('');
   }
@@ -177,7 +190,7 @@ export default function CounsellorSessionsPage() {
     try {
       replaceWorkspace(await action(), successMessage);
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to update session.');
+      setError(errorMessage(requestError, 'Unable to update session.'));
     } finally {
       setSavingAction('');
     }
@@ -186,30 +199,55 @@ export default function CounsellorSessionsPage() {
   async function handleQueueAction(session: CounsellorSessionQueueItem) {
     setSelectedId(session.id);
     setFocusMode(true);
+    setActiveTab(tabs[0]);
     if (session.workflowState !== 'upcoming') return;
 
     setSavingAction('start');
-    setMessage('');
-    setError('');
     try {
       replaceWorkspace(await startCounsellorSessionRequest(session.id), 'Session started.');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to start session.');
+      setError(errorMessage(requestError, 'Unable to start session.'));
     } finally {
       setSavingAction('');
     }
   }
 
+  async function handleSaveStep(step: CounsellorSessionFlowStep, clinicalNote: string, response: Record<string, unknown>, status: CounsellorFlowStepStatus) {
+    if (!workspace) return;
+    setSavingAction(step.stepKey);
+    try {
+      replaceWorkspace(await saveCounsellorSessionFlowStepRequest(workspace.session.id, step.stepKey, {
+        status,
+        clinical_note: clinicalNote,
+        response_json: response,
+      }), `${step.title} saved.`);
+    } catch (requestError) {
+      setError(errorMessage(requestError, 'Unable to save guided step.'));
+    } finally {
+      setSavingAction('');
+    }
+  }
+
+  async function handleSaveSummary() {
+    if (!workspace) return;
+    await runWorkspaceAction('summary', () => saveCounsellorSessionSummaryRequest(workspace.session.id, {
+      session_rating: summaryDraft.sessionRating,
+      client_feedback: summaryDraft.clientFeedback,
+      clinician_summary: summaryDraft.clinicianSummary,
+      client_summary: summaryDraft.clientSummary,
+      private_summary: summaryDraft.privateSummary,
+      next_agenda: summaryDraft.nextAgenda,
+    }), 'Session summary saved.');
+  }
+
   async function handleAssessment(type: CounsellorAssessmentType) {
     if (!workspace) return;
     setSavingAction(type);
-    setMessage('');
-    setError('');
     try {
       const result = await createCounsellorAssessmentRequest(workspace.session.id, { assessment_type: type, score: 0 });
       replaceWorkspace(result.workspace, 'Assessment recorded.');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to record assessment.');
+      setError(errorMessage(requestError, 'Unable to record assessment.'));
     } finally {
       setSavingAction('');
     }
@@ -220,15 +258,13 @@ export default function CounsellorSessionsPage() {
       setError('Create an active CBT plan before sending homework.');
       return;
     }
-
     setSavingAction('homework');
-    setMessage('');
-    setError('');
     try {
       await assignCounsellorCbtHomeworkRequest(workspace.cbt.activePlan.id, homeworkTemplateId);
-      setMessage('CBT homework sent.');
+      const refreshed = await getCounsellorSessionWorkspaceRequest(workspace.session.id);
+      replaceWorkspace(refreshed, 'CBT homework sent.');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to send homework.');
+      setError(errorMessage(requestError, 'Unable to send homework.'));
     } finally {
       setSavingAction('');
     }
@@ -237,8 +273,6 @@ export default function CounsellorSessionsPage() {
   async function handleCreateCbtPlan(payload: { title: string; primaryGoal: string; description: string }) {
     if (!workspace) return;
     setCreatingCbtPlan(true);
-    setMessage('');
-    setError('');
     try {
       await createCounsellorCbtPlanRequest(workspace.client.id, {
         title: payload.title,
@@ -248,18 +282,11 @@ export default function CounsellorSessionsPage() {
         start_date: new Date().toISOString().slice(0, 10),
         review_frequency: 'weekly',
         risk_level: 'low',
-        goals: [{
-          goal_title: payload.primaryGoal,
-          goal_description: payload.description,
-          baseline_score: 80,
-          target_score: 40,
-        }],
+        goals: [{ goal_title: payload.primaryGoal, goal_description: payload.description, baseline_score: 80, target_score: 40 }],
       });
-      const refreshedWorkspace = await getCounsellorSessionWorkspaceRequest(workspace.session.id);
-      replaceWorkspace(refreshedWorkspace, 'CBT plan created.');
-      setHomeworkTemplateId(refreshedWorkspace.cbt.homeworkTemplates[0]?.id ?? null);
+      replaceWorkspace(await getCounsellorSessionWorkspaceRequest(workspace.session.id), 'CBT plan created.');
     } catch (requestError) {
-      setError(requestError instanceof Error ? requestError.message : 'Unable to create CBT plan.');
+      setError(errorMessage(requestError, 'Unable to create CBT plan.'));
     } finally {
       setCreatingCbtPlan(false);
     }
@@ -269,112 +296,102 @@ export default function CounsellorSessionsPage() {
     <div className="space-y-5">
       <Snackbar tone={notification?.tone ?? 'success'} message={notification?.message ?? ''} onClose={closeNotification} />
 
-      <section className="rounded-3xl border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-indigo-50 p-5">
-        <p className="text-xs font-semibold uppercase tracking-widest text-violet-700">Counsellor command center</p>
-        <h1 className="mt-2 text-2xl font-semibold text-slate-950">Sessions</h1>
-        <p className="mt-1 text-sm text-slate-600">Today&apos;s queue, clinical context, notes, assessments, and next actions.</p>
+      <section className="rounded-2xl border border-indigo-100 bg-white p-5 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <p className="text-xs font-semibold uppercase text-indigo-600">Counsellor command center</p>
+            <h1 className="mt-2 text-2xl font-semibold text-[#111941]">Sessions</h1>
+            <p className="mt-1 text-sm text-slate-600">Today&apos;s queue, guided CBT workflow, documentation, and clinical actions.</p>
+          </div>
+          <span className="rounded-full bg-indigo-50 px-3 py-1.5 text-sm font-semibold text-indigo-700">{sessions.length} scheduled</span>
+        </div>
       </section>
 
-      <section className="rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
         <div className="flex items-center justify-between border-b border-slate-100 px-4 py-3">
-          <h2 className="text-base font-semibold text-slate-950">Today&apos;s Sessions</h2>
-          <span className="text-xs font-semibold text-slate-500">{sessions.length} scheduled</span>
+          <h2 className="text-base font-semibold text-[#111941]">Today&apos;s Sessions</h2>
+          <span className="text-xs font-semibold text-slate-500">Live clinical queue</span>
         </div>
-        {loadingQueue ? (
-          <QueueSkeleton />
-        ) : sessions.length ? (
+        {loadingQueue ? <QueueSkeleton /> : sessions.length ? (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-                <tr>
-                  <th className="px-4 py-3">Time</th>
-                  <th className="px-4 py-3">Client</th>
-                  <th className="px-4 py-3">Session Type</th>
-                  <th className="px-4 py-3">Status</th>
-                  <th className="px-4 py-3 text-right">Action</th>
-                </tr>
+              <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+                <tr><th className="px-4 py-3">Time</th><th className="px-4 py-3">Client</th><th className="px-4 py-3">Session</th><th className="px-4 py-3">Risk</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Action</th></tr>
               </thead>
               <tbody>
                 {sessions.map((session) => (
-                  <tr key={session.id} className={`border-t border-slate-100 ${selectedId === session.id ? 'bg-violet-50/70' : 'bg-white'}`}>
-                    <td className="px-4 py-3 font-semibold text-slate-900">{session.time ?? '-'}</td>
-                    <td className="px-4 py-3">
-                      <button type="button" onClick={() => void handleQueueAction(session)} className="font-semibold text-slate-900 hover:text-violet-700">
-                        {session.clientName}
-                      </button>
-                    </td>
+                  <tr key={session.id} className={`border-t border-slate-100 ${selectedId === session.id ? 'bg-indigo-50/50' : 'bg-white'}`}>
+                    <td className="px-4 py-3 font-semibold text-[#111941]">{session.time ?? '-'}</td>
+                    <td className="px-4 py-3"><button type="button" onClick={() => void handleQueueAction(session)} className="font-semibold text-[#111941] hover:text-indigo-700">{session.clientName}</button></td>
                     <td className="px-4 py-3 text-slate-600">{session.sessionType}</td>
+                    <td className="px-4 py-3"><RiskPill level={session.riskLevel ?? 'low'}>{session.riskLevel ?? 'No active risk'}</RiskPill></td>
                     <td className="px-4 py-3"><StatusBadge status={session.workflowState} /></td>
-                    <td className="px-4 py-3 text-right">
-                      <button type="button" onClick={() => void handleQueueAction(session)} className="rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700">
-                        {session.actionLabel}
-                      </button>
-                    </td>
+                    <td className="px-4 py-3 text-right"><button type="button" onClick={() => void handleQueueAction(session)} className="rounded-lg bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-700">{session.actionLabel}</button></td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-        ) : (
-          <p className="px-4 py-6 text-sm text-slate-500">No sessions scheduled for today.</p>
-        )}
+        ) : <p className="px-4 py-6 text-sm text-slate-500">No sessions scheduled for today.</p>}
       </section>
 
       {focusMode && selectedSession ? (
-        <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-50">
-          <div className="sticky top-0 z-20 border-b border-slate-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur">
-            <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <button type="button" onClick={() => setFocusMode(false)} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50">
-                  <ArrowLeft size={16} /> Back
-                </button>
-                <div>
-                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{selectedSession.time ?? '-'} - {selectedSession.sessionType}</p>
-                  <h2 className="text-xl font-semibold text-slate-950">{selectedSession.clientName}</h2>
-                </div>
-              </div>
-              <StatusBadge status={workspace?.notes.workflowState ?? selectedSession.workflowState} />
-            </div>
-          </div>
-
-          <div className="mx-auto max-w-[1500px] space-y-4 px-5 py-5 pb-28">
-            <div className="flex flex-wrap gap-2">
+        <div className="fixed inset-0 z-50 overflow-y-auto bg-[#f8fafc]">
+          <SessionWorkspaceHeader
+            session={workspace?.session ?? selectedSession}
+            onBack={() => setFocusMode(false)}
+            onFollowUp={() => workspace && void runWorkspaceAction('follow-up', () => followUpCounsellorSessionRequest(workspace.session.id), 'Follow-up marked.')}
+          />
+          <div className="border-b border-slate-200 bg-white px-5">
+            <div className="mx-auto flex max-w-[1600px] gap-6 overflow-x-auto">
               {tabs.map((tab) => (
-                <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`rounded-full px-3 py-1.5 text-xs font-semibold ${activeTab === tab ? 'bg-violet-600 text-white' : 'bg-white text-slate-600 ring-1 ring-slate-200'}`}>
+                <button key={tab} type="button" onClick={() => setActiveTab(tab)} className={`shrink-0 border-b-2 px-1 py-3 text-sm font-semibold ${activeTab === tab ? 'border-indigo-600 text-indigo-700' : 'border-transparent text-slate-600 hover:text-[#111941]'}`}>
                   {tab}
                 </button>
               ))}
             </div>
+          </div>
 
-            {loadingWorkspace ? (
-              <WorkspaceSkeleton />
-            ) : workspace ? (
-              <div className="grid min-h-[calc(100dvh-220px)] gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-                <ClientSnapshot workspace={workspace} activeTab={activeTab} />
-                <NotesPanel draft={draft} setDraft={setDraft} />
-                <ClinicalTools
+          <div className="mx-auto max-w-[1600px] px-5 py-5 pb-28">
+            {loadingWorkspace ? <WorkspaceSkeleton /> : workspace ? (
+              <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_420px]">
+                <ClientSnapshot workspace={workspace} />
+                <main className="space-y-4">
+                  <ActiveWorkspaceTab
+                    activeTab={activeTab}
+                    workspace={workspace}
+                    draft={draft}
+                    setDraft={setDraft}
+                    summaryDraft={summaryDraft}
+                    setSummaryDraft={setSummaryDraft}
+                    onSaveSummary={handleSaveSummary}
+                    onSaveNotes={() => workspace && void runWorkspaceAction('notes', () => saveCounsellorSessionNotesRequest(workspace.session.id, draft), 'SOAP notes saved.')}
+                    onSaveStep={handleSaveStep}
+                    onAssessment={handleAssessment}
+                    savingAction={savingAction}
+                  />
+                </main>
+                <RightRail
                   workspace={workspace}
                   homeworkTemplateId={homeworkTemplateId}
                   setHomeworkTemplateId={setHomeworkTemplateId}
-                onAssessment={handleAssessment}
-                savingAction={savingAction}
-                creatingCbtPlan={creatingCbtPlan}
-                onCreateCbtPlan={handleCreateCbtPlan}
-              />
+                  onAssessment={handleAssessment}
+                  onCreateCbtPlan={handleCreateCbtPlan}
+                  creatingCbtPlan={creatingCbtPlan}
+                  savingAction={savingAction}
+                />
               </div>
             ) : null}
           </div>
 
           {workspace ? (
-            <div className="fixed inset-x-0 bottom-0 z-30 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
-              <div className="mx-auto flex max-w-[1500px] flex-wrap items-center justify-end gap-2">
-                <ActionButton icon={<Save size={16} />} disabled={savingAction !== ''} onClick={() => runWorkspaceAction('save', () => saveCounsellorSessionNotesRequest(workspace.session.id, draft), 'Notes saved.')}>Save Notes</ActionButton>
-                <ActionButton icon={<CheckCircle2 size={16} />} disabled={savingAction !== ''} onClick={() => runWorkspaceAction('complete', () => completeCounsellorSessionRequest(workspace.session.id), 'Session completed.')}>Complete Session</ActionButton>
-                <ActionButton icon={<CalendarPlus size={16} />} disabled={savingAction !== ''} onClick={() => runWorkspaceAction('follow-up', () => followUpCounsellorSessionRequest(workspace.session.id), 'Follow-up marked.')}>Schedule Follow-up</ActionButton>
-                <ActionButton icon={<ShieldAlert size={16} />} disabled={savingAction !== ''} onClick={() => runWorkspaceAction('escalate', () => escalateCounsellorSessionRequest(workspace.session.id), 'Case escalated.')}>Escalate Case</ActionButton>
-                <ActionButton icon={<Send size={16} />} disabled={savingAction !== ''} onClick={handleSendHomework}>Send Homework</ActionButton>
-              </div>
-            </div>
+            <BottomActionBar
+              saving={savingAction !== ''}
+              onSaveNotes={() => void runWorkspaceAction('notes', () => saveCounsellorSessionNotesRequest(workspace.session.id, draft), 'SOAP notes saved.')}
+              onComplete={() => void runWorkspaceAction('complete', () => completeCounsellorSessionRequest(workspace.session.id), 'Session completed and locked.')}
+              onSummary={handleSaveSummary}
+              onEscalate={() => void runWorkspaceAction('escalate', () => escalateCounsellorSessionRequest(workspace.session.id), 'Case escalated.')}
+            />
           ) : null}
         </div>
       ) : null}
@@ -382,317 +399,530 @@ export default function CounsellorSessionsPage() {
   );
 }
 
-function ClientSnapshot({ workspace, activeTab }: { workspace: CounsellorSessionWorkspace; activeTab: string }) {
+function SessionWorkspaceHeader({ session, onBack, onFollowUp }: { session: CounsellorSessionQueueItem; onBack: () => void; onFollowUp: () => void }) {
+  const user = getAuthState().user;
+  return (
+    <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/95 px-5 backdrop-blur">
+      <div className="mx-auto flex min-h-[92px] max-w-[1600px] flex-wrap items-center justify-between gap-4 py-3">
+        <div className="flex min-w-0 items-center gap-4">
+          <button type="button" onClick={onBack} className="inline-flex items-center gap-2 text-sm font-semibold text-slate-600 hover:text-indigo-700"><ArrowLeft size={17} /> Back to Sessions</button>
+          <span className="hidden h-10 border-l border-slate-200 md:block" />
+          <div className="min-w-0">
+            <div className="mb-1 flex flex-wrap items-center gap-3">
+              <StatusBadge status={session.workflowState} />
+              <p className="text-sm font-semibold text-slate-600">{session.time ?? '-'} | {session.sessionType}</p>
+            </div>
+            <h1 className="truncate text-2xl font-semibold text-[#111941]">{session.clientName}</h1>
+            <p className="text-sm text-slate-500">{session.mode?.replace('_', ' ') || 'online'} session</p>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <HeaderButton icon={<Video size={16} />}>View / Join Meet</HeaderButton>
+          <HeaderButton icon={<MessageCircle size={16} />}>Message Client</HeaderButton>
+          <HeaderButton icon={<Share2 size={16} />}>Share Summary</HeaderButton>
+          <button type="button" onClick={onFollowUp} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white shadow-sm shadow-indigo-100 hover:bg-indigo-700">
+            <CalendarPlus size={16} /> Schedule Next Session <ChevronDown size={15} />
+          </button>
+          <span className="mx-2 hidden h-9 border-l border-slate-200 lg:block" />
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 place-items-center rounded-full bg-indigo-50 text-sm font-bold text-indigo-700">{initials(user?.name ?? 'Dr')}</span>
+            <span className="hidden text-sm lg:block"><strong className="block text-[#111941]">{user?.name ?? 'Counsellor'}</strong><span className="text-xs text-slate-500">Counsellor</span></span>
+          </div>
+        </div>
+      </div>
+    </header>
+  );
+}
+
+function ClientSnapshot({ workspace }: { workspace: CounsellorSessionWorkspace }) {
   const riskFlags = workspace.client.riskFlags.length ? workspace.client.riskFlags : [{ id: 0, label: 'No active risk', level: 'low' }];
   return (
-    <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-2 text-sm font-semibold text-slate-950"><UserRound size={17} /> Client Snapshot</p>
-      <div className="mt-4 space-y-4 text-sm">
-        <div>
-          <p className="text-lg font-semibold text-slate-950">{workspace.client.name}</p>
-          <p className="text-slate-500">Age: {workspace.client.age ?? 'Not recorded'}</p>
-          <p className="text-slate-500">Gender: {workspace.client.gender ?? 'Not recorded'}</p>
-          <p className="text-slate-500">Occupation: {workspace.client.occupation ?? 'Not recorded'}</p>
-        </div>
-        <div>
-          <SectionLabel icon={<AlertTriangle size={15} />}>Risk Flags</SectionLabel>
-          <div className="mt-2 flex flex-wrap gap-2">{riskFlags.map((risk) => <RiskPill key={risk.id} level={risk.level}>{risk.label}</RiskPill>)}</div>
-        </div>
-        <InfoList title="Previous Diagnoses" empty="No prior diagnoses recorded." items={workspace.client.previousDiagnoses} />
-        <div>
-          <SectionLabel icon={<FileText size={15} />}>Previous Session Summary</SectionLabel>
-          <p className="mt-2 rounded-xl bg-slate-50 p-3 text-slate-600">{workspace.client.previousSessionSummary ?? 'No previous session summary available.'}</p>
-        </div>
-        <InfoList title="Current Treatment Plan" empty="No active treatment plan recorded." items={workspace.client.treatmentPlan} />
-        <p className="rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700">Viewing: {activeTab}</p>
+    <aside className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <PanelTitle icon={<UserRound size={17} />} title="Client Snapshot" />
+      <div className="mt-5 border-b border-slate-100 pb-5">
+        <h2 className="text-xl font-semibold text-[#111941]">{workspace.client.name}</h2>
+        <p className="mt-3 text-sm leading-6 text-slate-600">Age: {workspace.client.age ?? 'Not recorded'}<br />{workspace.client.gender ?? 'Gender not recorded'} {workspace.client.occupation ? `- ${workspace.client.occupation}` : ''}</p>
       </div>
+      <SnapshotSection title="Risk Status"><div className="flex flex-wrap gap-2">{riskFlags.map((risk) => <RiskPill key={risk.id} level={risk.level}>{risk.label}</RiskPill>)}</div></SnapshotSection>
+      <SnapshotSection title="Primary Concerns"><TagList items={workspace.client.previousDiagnoses.length ? workspace.client.previousDiagnoses : ['Anxiety', 'Stress']} /></SnapshotSection>
+      <SnapshotSection title="Working Diagnosis"><p className="text-sm text-slate-700">{workspace.client.previousDiagnoses[0] ?? 'Generalized Anxiety Disorder'}<br />F41.1</p></SnapshotSection>
+      <SnapshotSection title="Therapy Approach"><p className="text-sm text-slate-700">CBT - Mindfulness - Psychoeducation</p></SnapshotSection>
+      <SnapshotSection title="Last Session" last><p className="text-sm leading-6 text-slate-600">{workspace.client.previousSessionSummary ?? 'No previous session summary available.'}</p></SnapshotSection>
     </aside>
   );
 }
 
-function QueueSkeleton() {
+function SessionSummaryPanel({ workspace, draft, setDraft, onSave, saving }: { workspace: CounsellorSessionWorkspace; draft: SummaryDraft; setDraft: (draft: SummaryDraft) => void; onSave: () => void; saving: boolean }) {
   return (
-    <div className="p-4">
-      <div className="grid gap-3">
-        {[0, 1, 2].map((item) => (
-          <div key={item} className="grid animate-pulse gap-4 rounded-xl border border-slate-100 bg-white p-4 md:grid-cols-[120px_1fr_1fr_140px_140px]">
-            <SkeletonBlock className="h-5 w-20" />
-            <SkeletonBlock className="h-5 w-36" />
-            <SkeletonBlock className="h-5 w-44" />
-            <SkeletonBlock className="h-7 w-24 rounded-full" />
-            <SkeletonBlock className="h-10 w-32 justify-self-end rounded-lg" />
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <PanelTitle icon={<CheckCircle2 size={20} />} title="Session Summary" />
+          <p className="mt-1 text-sm text-slate-500">Completion {workspace.guidedFlow?.completionPercent ?? 0}% - clinician-authored client and private summaries</p>
+        </div>
+        <button type="button" onClick={onSave} disabled={saving} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white disabled:opacity-60"><Save size={15} /> {saving ? 'Saving...' : 'Save Summary'}</button>
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-2">
+        <TextareaBlock label="Clinician summary" value={draft.clinicianSummary} onChange={(value) => setDraft({ ...draft, clinicianSummary: value })} />
+        <TextareaBlock label="Client-safe summary" value={draft.clientSummary} onChange={(value) => setDraft({ ...draft, clientSummary: value })} />
+        <TextareaBlock label="Private clinical summary" value={draft.privateSummary} onChange={(value) => setDraft({ ...draft, privateSummary: value })} />
+        <TextareaBlock label="Next agenda" value={draft.nextAgenda} onChange={(value) => setDraft({ ...draft, nextAgenda: value })} />
+      </div>
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_220px]">
+        <TextareaBlock label="Client feedback" value={draft.clientFeedback} onChange={(value) => setDraft({ ...draft, clientFeedback: value })} rows={3} />
+        <div className="rounded-lg border border-slate-200 p-3">
+          <p className="text-xs font-semibold uppercase text-slate-500">Session Rating</p>
+          <div className="mt-3 flex gap-1">
+            {[1, 2, 3, 4, 5].map((rating) => (
+              <button key={rating} type="button" aria-label={`${rating} star`} onClick={() => setDraft({ ...draft, sessionRating: rating })} className={rating <= (draft.sessionRating ?? 0) ? 'text-amber-400' : 'text-slate-300'}>
+                <Star size={24} fill="currentColor" />
+              </button>
+            ))}
+          </div>
+          <p className="mt-2 text-sm font-semibold text-[#111941]">{draft.sessionRating ?? 0} / 5</p>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function ActiveWorkspaceTab({
+  activeTab,
+  workspace,
+  draft,
+  setDraft,
+  summaryDraft,
+  setSummaryDraft,
+  onSaveSummary,
+  onSaveNotes,
+  onSaveStep,
+  onAssessment,
+  savingAction,
+}: {
+  activeTab: string;
+  workspace: CounsellorSessionWorkspace;
+  draft: SoapDraft;
+  setDraft: (draft: SoapDraft) => void;
+  summaryDraft: SummaryDraft;
+  setSummaryDraft: (draft: SummaryDraft) => void;
+  onSaveSummary: () => void;
+  onSaveNotes: () => void;
+  onSaveStep: (step: CounsellorSessionFlowStep, clinicalNote: string, response: Record<string, unknown>, status: CounsellorFlowStepStatus) => void;
+  onAssessment: (type: CounsellorAssessmentType) => void;
+  savingAction: string;
+}) {
+  if (activeTab === 'Session Summary') {
+    return <SessionSummaryPanel workspace={workspace} draft={summaryDraft} setDraft={setSummaryDraft} onSave={onSaveSummary} saving={savingAction === 'summary'} />;
+  }
+
+  if (activeTab === 'Guided CBT Flow') {
+    return <GuidedFlowPanel workspace={workspace} savingAction={savingAction} onSaveStep={onSaveStep} />;
+  }
+
+  if (['Opening', 'Assessment & Exploration', 'Core CBT Intervention', 'Planning', 'Closure'].includes(activeTab)) {
+    return <GuidedFlowPanel workspace={workspace} savingAction={savingAction} onSaveStep={onSaveStep} phaseFilter={activeTab} />;
+  }
+
+  if (activeTab === 'Notes') {
+    return <NotesPanel draft={draft} setDraft={setDraft} onSave={onSaveNotes} saving={savingAction === 'notes'} />;
+  }
+
+  if (activeTab === 'Assessments') {
+    return <AssessmentsScreen workspace={workspace} onAssessment={onAssessment} savingAction={savingAction} />;
+  }
+
+  if (activeTab === 'CBT Care') {
+    return <CbtCareScreen workspace={workspace} />;
+  }
+
+  if (activeTab === 'Treatment Plan') {
+    return <TreatmentPlanScreen workspace={workspace} />;
+  }
+
+  if (activeTab === 'Homework') {
+    return <HomeworkScreen workspace={workspace} />;
+  }
+
+  if (activeTab === 'Case Conceptualization') {
+    return <GuidedFlowPanel workspace={workspace} savingAction={savingAction} onSaveStep={onSaveStep} phaseFilter="Planning" stepKeys={['case_conceptualization']} />;
+  }
+
+  return <PlaceholderScreen title={activeTab} />;
+}
+
+function GuidedFlowPanel({
+  workspace,
+  savingAction,
+  onSaveStep,
+  phaseFilter,
+  stepKeys,
+}: {
+  workspace: CounsellorSessionWorkspace;
+  savingAction: string;
+  onSaveStep: (step: CounsellorSessionFlowStep, clinicalNote: string, response: Record<string, unknown>, status: CounsellorFlowStepStatus) => void;
+  phaseFilter?: string;
+  stepKeys?: string[];
+}) {
+  const phases = (workspace.guidedFlow?.phases ?? [])
+    .filter((phase) => !phaseFilter || phase.phase === phaseFilter)
+    .map((phase) => ({
+      ...phase,
+      steps: stepKeys ? phase.steps.filter((step) => stepKeys.includes(step.stepKey)) : phase.steps,
+    }))
+    .filter((phase) => phase.steps.length > 0);
+  const title = phaseFilter ? phaseFilter : 'Guided CBT Flow';
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PanelTitle icon={<Brain size={18} />} title={title} />
+        <div className="h-2 w-48 overflow-hidden rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${workspace.guidedFlow?.completionPercent ?? 0}%` }} /></div>
+      </div>
+      <div className="mt-4 space-y-4">
+        {phases.map((phase) => (
+          <div key={phase.phase} className="rounded-lg border border-slate-200">
+            <div className="border-b border-slate-100 bg-slate-50 px-4 py-3">
+              <h3 className="text-sm font-semibold text-[#111941]">{phase.phase}</h3>
+            </div>
+            <div className="divide-y divide-slate-100">
+              {phase.steps.map((step) => <FlowStepCard key={step.stepKey} step={step} saving={savingAction === step.stepKey} required={workspace.guidedFlow?.requiredStepKeys.includes(step.stepKey) ?? false} onSave={onSaveStep} />)}
+            </div>
           </div>
         ))}
       </div>
-    </div>
+    </section>
   );
 }
 
-function WorkspaceSkeleton() {
-  return (
-    <div className="grid min-h-[calc(100dvh-220px)] animate-pulse gap-4 xl:grid-cols-[320px_minmax(0,1fr)_340px]">
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <SkeletonBlock className="h-5 w-36" />
-        <SkeletonBlock className="mt-6 h-7 w-44" />
-        <div className="mt-4 space-y-2">
-          <SkeletonBlock className="h-4 w-32" />
-          <SkeletonBlock className="h-4 w-40" />
-          <SkeletonBlock className="h-4 w-48" />
-        </div>
-        <SkeletonBlock className="mt-8 h-24 w-full rounded-xl" />
-        <SkeletonBlock className="mt-4 h-24 w-full rounded-xl" />
-      </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <div className="flex items-center justify-between">
-          <SkeletonBlock className="h-5 w-40" />
-          <SkeletonBlock className="h-10 w-32 rounded-lg" />
-        </div>
-        <div className="mt-5 space-y-5">
-          {[0, 1, 2, 3].map((item) => (
-            <div key={item}>
-              <SkeletonBlock className="h-4 w-28" />
-              <SkeletonBlock className="mt-2 h-28 w-full rounded-xl" />
-            </div>
-          ))}
-        </div>
-      </section>
-      <section className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-        <SkeletonBlock className="h-5 w-32" />
-        <div className="mt-6 grid grid-cols-2 gap-2">
-          {[0, 1, 2, 3].map((item) => <SkeletonBlock key={item} className="h-11 rounded-lg" />)}
-        </div>
-        <SkeletonBlock className="mt-6 h-24 w-full rounded-xl" />
-        <SkeletonBlock className="mt-4 h-28 w-full rounded-xl" />
-      </section>
-    </div>
-  );
-}
+function FlowStepCard({ step, saving, required, onSave }: { step: CounsellorSessionFlowStep; saving: boolean; required: boolean; onSave: (step: CounsellorSessionFlowStep, clinicalNote: string, response: Record<string, unknown>, status: CounsellorFlowStepStatus) => void }) {
+  const [open, setOpen] = useState(required || step.status !== 'not_started');
+  const [clinicalNote, setClinicalNote] = useState(step.clinicalNote ?? '');
+  const [response, setResponse] = useState<Record<string, unknown>>(step.response ?? {});
+  const fields = responseFieldLabels[step.stepKey] ?? ['notes'];
 
-function SkeletonBlock({ className = '' }: { className?: string }) {
-  return <div className={`rounded bg-slate-200/80 ${className}`} />;
-}
-
-function NotesPanel({ draft, setDraft }: { draft: SoapDraft; setDraft: (draft: SoapDraft) => void }) {
-  function update(field: keyof SoapDraft, value: string) {
-    setDraft({ ...draft, [field]: value });
-  }
+  useEffect(() => {
+    setClinicalNote(step.clinicalNote ?? '');
+    setResponse(step.response ?? {});
+  }, [step]);
 
   return (
-    <main className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <p className="text-sm font-semibold text-slate-950">Live Session Notes</p>
-        <button type="button" onClick={() => setDraft(noteTemplates.Anxiety)} className="inline-flex items-center gap-2 rounded-lg bg-violet-600 px-3 py-2 text-xs font-semibold text-white hover:bg-violet-700">
-          <PlayCircle size={15} /> Start Session
-        </button>
-      </div>
-      <div className="mt-4 grid gap-3">
-        <SoapField label="Subjective" value={draft.subjective} onChange={(value) => update('subjective', value)} />
-        <SoapField label="Objective" value={draft.objective} onChange={(value) => update('objective', value)} />
-        <SoapField label="Assessment" value={draft.assessment} onChange={(value) => update('assessment', value)} />
-        <SoapField label="Plan" value={draft.plan} onChange={(value) => update('plan', value)} />
-      </div>
-      <div className="mt-4">
-        <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Quick Note Templates</p>
-        <div className="mt-2 flex flex-wrap gap-2">
-          {Object.entries(noteTemplates).map(([label, template]) => (
-            <button key={label} type="button" onClick={() => setDraft(template)} className="rounded-full border border-violet-200 px-3 py-1.5 text-xs font-semibold text-violet-700 hover:bg-violet-50">
-              {label} Session
-            </button>
-          ))}
+    <article className="px-4 py-3">
+      <button type="button" onClick={() => setOpen(!open)} className="flex w-full items-center gap-3 text-left">
+        <StepStatus status={step.status} />
+        <span className="min-w-0 flex-1">
+          <span className="flex flex-wrap items-center gap-2"><strong className="text-sm text-[#111941]">{step.title}</strong>{required ? <span className="rounded-full bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">Required</span> : null}</span>
+          <span className="mt-1 block text-xs leading-5 text-slate-500">{step.prompt}</span>
+        </span>
+        <ChevronDown size={16} className={`text-slate-400 transition ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open ? (
+        <div className="mt-3 grid gap-3">
+          <div className="grid gap-3 md:grid-cols-2">
+            {fields.map((field) => (
+              <label key={field} className="block">
+                <span className="text-xs font-semibold uppercase text-slate-500">{labelFromValue(field)}</span>
+                <input value={String(response[field] ?? '')} onChange={(event) => setResponse({ ...response, [field]: event.target.value })} className="mt-1 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50" />
+              </label>
+            ))}
+          </div>
+          <TextareaBlock label="Clinical note" value={clinicalNote} onChange={setClinicalNote} rows={3} />
+          <div className="flex flex-wrap justify-end gap-2">
+            <button type="button" disabled={saving} onClick={() => onSave(step, clinicalNote, response, 'in_progress')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60">Save Draft</button>
+            <button type="button" disabled={saving} onClick={() => onSave(step, clinicalNote, response, 'skipped')} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 disabled:opacity-60">Mark None</button>
+            <button type="button" disabled={saving} onClick={() => onSave(step, clinicalNote, response, 'completed')} className="rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{saving ? 'Saving...' : 'Complete Step'}</button>
+          </div>
         </div>
-      </div>
-    </main>
+      ) : null}
+    </article>
   );
 }
 
-function ClinicalTools({
-  workspace,
-  homeworkTemplateId,
-  setHomeworkTemplateId,
-  onAssessment,
-  savingAction,
-  creatingCbtPlan,
-  onCreateCbtPlan,
-}: {
+function RightRail({ workspace, homeworkTemplateId, setHomeworkTemplateId, onAssessment, onCreateCbtPlan, creatingCbtPlan, savingAction }: {
   workspace: CounsellorSessionWorkspace;
   homeworkTemplateId: number | null;
   setHomeworkTemplateId: (id: number | null) => void;
   onAssessment: (type: CounsellorAssessmentType) => void;
-  savingAction: string;
-  creatingCbtPlan: boolean;
   onCreateCbtPlan: (payload: { title: string; primaryGoal: string; description: string }) => Promise<void>;
+  creatingCbtPlan: boolean;
+  savingAction: string;
 }) {
-  const [planTitle, setPlanTitle] = useState(`${workspace.client.name} CBT Plan`);
-  const [primaryGoal, setPrimaryGoal] = useState('Build coping skills and reduce current distress.');
-  const [description, setDescription] = useState('Session-created CBT plan for structured homework and follow-up.');
-
-  useEffect(() => {
-    if (!workspace.cbt.activePlan) {
-      setPlanTitle(`${workspace.client.name} CBT Plan`);
-      setPrimaryGoal('Build coping skills and reduce current distress.');
-      setDescription('Session-created CBT plan for structured homework and follow-up.');
-    }
-  }, [workspace.client.name, workspace.cbt.activePlan]);
-
   return (
-    <aside className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <p className="flex items-center gap-2 text-sm font-semibold text-slate-950"><ClipboardCheck size={17} /> Clinical Tools</p>
-      <div className="mt-4 space-y-5">
-        <div>
-          <SectionLabel icon={<ClipboardCheck size={15} />}>Assessments</SectionLabel>
-          <div className="mt-2 grid grid-cols-2 gap-2">
-            {assessmentLabels.map((item) => (
-              <button key={item.type} type="button" disabled={savingAction !== ''} onClick={() => onAssessment(item.type)} className="rounded-lg border border-slate-200 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-                {item.label}
-              </button>
-            ))}
-          </div>
-          <div className="mt-3 space-y-2">
-            {workspace.assessments.slice(0, 3).map((assessment) => (
-              <p key={assessment.id} className="rounded-lg bg-slate-50 px-3 py-2 text-xs text-slate-600">
-                {assessment.assessmentType.toUpperCase().replace('_', '-')} - {assessment.severity ?? 'Recorded'} ({assessment.score})
-              </p>
-            ))}
-          </div>
-        </div>
-        <div>
-          <SectionLabel icon={<Brain size={15} />}>CBT Homework</SectionLabel>
-          {workspace.cbt.activePlan ? (
-            <>
-              <p className="mt-2 rounded-xl bg-violet-50 px-3 py-2 text-xs font-semibold text-violet-700">{workspace.cbt.activePlan.title}</p>
-              <select value={homeworkTemplateId ?? ''} onChange={(event) => setHomeworkTemplateId(event.target.value ? Number(event.target.value) : null)} className="mt-2 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm">
-                {workspace.cbt.homeworkTemplates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}
-              </select>
-            </>
-          ) : (
-            <div className="mt-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-sm font-semibold text-amber-900">Create CBT plan first before sending homework.</p>
-              <div className="mt-3 space-y-2">
-                <CompactInput label="Plan title" value={planTitle} onChange={setPlanTitle} />
-                <CompactInput label="Primary goal" value={primaryGoal} onChange={setPrimaryGoal} />
-                <label className="block text-xs font-semibold uppercase tracking-wide text-amber-900">
-                  Description
-                  <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-1 min-h-20 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-violet-500" />
-                </label>
-                <button
-                  type="button"
-                  disabled={creatingCbtPlan || !planTitle.trim() || !primaryGoal.trim()}
-                  onClick={() => void onCreateCbtPlan({ title: planTitle.trim(), primaryGoal: primaryGoal.trim(), description: description.trim() })}
-                  className="w-full rounded-lg bg-violet-600 px-3 py-2 text-sm font-semibold text-white hover:bg-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  {creatingCbtPlan ? 'Creating plan...' : 'Create CBT Plan'}
-                </button>
-              </div>
+    <aside className="space-y-4">
+      <Panel>
+        <RailHeader icon={<ClipboardCheck size={16} />} title="Assessments" action="View all" />
+        <div className="mt-3 divide-y divide-slate-100">
+          {(workspace.assessments.length ? workspace.assessments : assessmentLabels.map((item, index) => ({ id: index, assessmentType: item.type, label: item.label, score: 0, severity: 'Not recorded', tone: 'neutral' }))).slice(0, 4).map((assessment) => (
+            <div key={`${assessment.assessmentType}-${assessment.id}`} className="flex items-center justify-between py-3 text-sm">
+              <span><strong className="block text-[#111941]">{assessment.label ?? assessment.assessmentType.toUpperCase()}</strong><span className="text-xs text-slate-500">{assessment.administeredAt ? new Date(assessment.administeredAt).toLocaleDateString() : 'Start assessment'}</span></span>
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${assessmentToneClass(assessment.tone)}`}>{assessment.score || '-'} {assessment.severity}</span>
             </div>
-          )}
+          ))}
         </div>
-        <div>
-          <SectionLabel icon={<FileText size={15} />}>Resources</SectionLabel>
-          <div className="mt-2 grid gap-2 text-sm text-slate-600">
-            <p className="rounded-lg bg-slate-50 px-3 py-2">Worksheets</p>
-            <p className="rounded-lg bg-slate-50 px-3 py-2">Videos</p>
-            <p className="rounded-lg bg-slate-50 px-3 py-2">PDF resources</p>
-          </div>
+        <div className="mt-3 grid grid-cols-2 gap-2">
+          {assessmentLabels.slice(0, 4).map((item) => <button key={item.type} type="button" disabled={savingAction !== ''} onClick={() => onAssessment(item.type)} className="rounded-lg border border-slate-200 px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">{item.label}</button>)}
         </div>
-      </div>
+      </Panel>
+      <HomeworkPanel workspace={workspace} homeworkTemplateId={homeworkTemplateId} setHomeworkTemplateId={setHomeworkTemplateId} onCreateCbtPlan={onCreateCbtPlan} creatingCbtPlan={creatingCbtPlan} />
+      <TreatmentPlanPanel workspace={workspace} />
+      <Panel>
+        <RailHeader icon={<CalendarClock size={16} />} title="Next Session" />
+        <p className="mt-3 text-sm font-semibold text-[#111941]">{workspace.session.endsAt ? new Date(workspace.session.endsAt).toLocaleString() : 'Schedule after session'}</p>
+        <p className="mt-1 text-sm text-slate-600">{workspace.session.sessionType}</p>
+      </Panel>
     </aside>
   );
 }
 
-function SoapField({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function AssessmentsScreen({ workspace, onAssessment, savingAction }: { workspace: CounsellorSessionWorkspace; onAssessment: (type: CounsellorAssessmentType) => void; savingAction: string }) {
   return (
-    <label className="block">
-      <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</span>
-      <textarea value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-24 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-100" />
-    </label>
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <PanelTitle icon={<ClipboardCheck size={18} />} title="Assessments" />
+        <div className="flex flex-wrap gap-2">
+          {assessmentLabels.map((item) => (
+            <button key={item.type} type="button" disabled={savingAction !== ''} onClick={() => onAssessment(item.type)} className="rounded-lg border border-slate-200 px-3 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
+              {item.label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="mt-4 overflow-hidden rounded-lg border border-slate-200">
+        <div className="grid grid-cols-[1fr_120px_150px] bg-slate-50 px-4 py-3 text-xs font-semibold uppercase text-slate-500">
+          <span>Assessment</span><span>Score</span><span>Severity</span>
+        </div>
+        {(workspace.assessments.length ? workspace.assessments : []).map((assessment) => (
+          <div key={assessment.id} className="grid grid-cols-[1fr_120px_150px] border-t border-slate-100 px-4 py-3 text-sm">
+            <span className="font-semibold text-[#111941]">{assessment.label ?? assessment.assessmentType.toUpperCase()}</span>
+            <span>{assessment.score}</span>
+            <span className={`w-fit rounded-full px-2.5 py-1 text-xs font-semibold ${assessmentToneClass(assessment.tone)}`}>{assessment.severity ?? 'Recorded'}</span>
+          </div>
+        ))}
+        {!workspace.assessments.length ? <p className="border-t border-slate-100 px-4 py-6 text-sm text-slate-500">No assessments recorded yet.</p> : null}
+      </div>
+    </section>
   );
 }
 
-function CompactInput({ label, value, onChange }: { label: string; value: string; onChange: (value: string) => void }) {
+function CbtCareScreen({ workspace }: { workspace: CounsellorSessionWorkspace }) {
   return (
-    <label className="block text-xs font-semibold uppercase tracking-wide text-amber-900">
-      {label}
-      <input value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-lg border border-amber-200 bg-white px-3 py-2 text-sm normal-case tracking-normal text-slate-800 outline-none focus:border-violet-500" />
-    </label>
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <PanelTitle icon={<Brain size={18} />} title="CBT Care" />
+      {workspace.cbt.activePlan ? (
+        <div className="mt-4 grid gap-4 md:grid-cols-3">
+          <MetricTile label="Active Plan" value={workspace.cbt.activePlan.title} />
+          <MetricTile label="Exercises" value={String(workspace.cbt.activePlan.exerciseCount)} />
+          <MetricTile label="Risk Level" value={labelFromValue(workspace.cbt.activePlan.riskLevel)} />
+        </div>
+      ) : <p className="mt-4 rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-900">No active CBT care plan yet. Create one from the right-side Homework Review panel.</p>}
+    </section>
   );
+}
+
+function TreatmentPlanScreen({ workspace }: { workspace: CounsellorSessionWorkspace }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <PanelTitle icon={<FileText size={18} />} title="Treatment Plan" />
+      <div className="mt-4"><TreatmentPlanPanel workspace={workspace} /></div>
+    </section>
+  );
+}
+
+function HomeworkScreen({ workspace }: { workspace: CounsellorSessionWorkspace }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <PanelTitle icon={<ClipboardList size={18} />} title="Homework" />
+      <div className="mt-4 divide-y divide-slate-100 rounded-lg border border-slate-200">
+        {(workspace.homeworkReview ?? []).map((item) => (
+          <div key={item.id} className="flex items-center justify-between px-4 py-3 text-sm">
+            <span><strong className="block text-[#111941]">{item.title}</strong><span className="text-xs text-slate-500">{item.dueLabel}</span></span>
+            <span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{item.reviewState}</span>
+          </div>
+        ))}
+        {!(workspace.homeworkReview ?? []).length ? <p className="px-4 py-6 text-sm text-slate-500">No homework assigned yet.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function PlaceholderScreen({ title }: { title: string }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <PanelTitle icon={<FileText size={18} />} title={title} />
+      <p className="mt-4 text-sm text-slate-500">No {title.toLowerCase()} items are available for this session yet.</p>
+    </section>
+  );
+}
+
+function MetricTile({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-lg border border-slate-200 bg-slate-50 p-4"><p className="text-xs font-semibold uppercase text-slate-500">{label}</p><p className="mt-2 text-lg font-semibold text-[#111941]">{value}</p></div>;
+}
+
+function HomeworkPanel({ workspace, homeworkTemplateId, setHomeworkTemplateId, onCreateCbtPlan, creatingCbtPlan }: { workspace: CounsellorSessionWorkspace; homeworkTemplateId: number | null; setHomeworkTemplateId: (id: number | null) => void; onCreateCbtPlan: (payload: { title: string; primaryGoal: string; description: string }) => Promise<void>; creatingCbtPlan: boolean }) {
+  const [title, setTitle] = useState(`${workspace.client.name} CBT Plan`);
+  const [goal, setGoal] = useState('Reduce symptoms and strengthen CBT coping skills.');
+  const [description, setDescription] = useState('Structured CBT plan created from the session workspace.');
+
+  return (
+    <Panel>
+      <RailHeader icon={<ClipboardList size={16} />} title="Homework Review" action="View all" />
+      <div className="mt-3 divide-y divide-slate-100">
+        {(workspace.homeworkReview ?? []).length ? workspace.homeworkReview?.map((item) => (
+          <div key={item.id} className="flex items-center justify-between py-3 text-sm"><span><strong className="block text-[#111941]">{item.title}</strong><span className="text-xs text-slate-500">{item.dueLabel}</span></span><span className="rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">{item.reviewState}</span></div>
+        )) : <p className="py-3 text-sm text-slate-500">No homework assigned yet.</p>}
+      </div>
+      {workspace.cbt.activePlan ? (
+        <select value={homeworkTemplateId ?? ''} onChange={(event) => setHomeworkTemplateId(event.target.value ? Number(event.target.value) : null)} className="mt-3 h-10 w-full rounded-lg border border-slate-200 px-3 text-sm">
+          {workspace.cbt.homeworkTemplates.map((template) => <option key={template.id} value={template.id}>{template.title}</option>)}
+        </select>
+      ) : (
+        <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3">
+          <p className="text-sm font-semibold text-amber-900">Create an active CBT plan before assigning homework.</p>
+          <input value={title} onChange={(event) => setTitle(event.target.value)} className="mt-3 h-9 w-full rounded-lg border border-amber-200 px-3 text-sm" />
+          <input value={goal} onChange={(event) => setGoal(event.target.value)} className="mt-2 h-9 w-full rounded-lg border border-amber-200 px-3 text-sm" />
+          <textarea value={description} onChange={(event) => setDescription(event.target.value)} className="mt-2 min-h-16 w-full rounded-lg border border-amber-200 px-3 py-2 text-sm" />
+          <button type="button" disabled={creatingCbtPlan || !title.trim()} onClick={() => void onCreateCbtPlan({ title, primaryGoal: goal, description })} className="mt-2 w-full rounded-lg bg-indigo-600 px-3 py-2 text-sm font-semibold text-white disabled:opacity-60">{creatingCbtPlan ? 'Creating...' : 'Create CBT Plan'}</button>
+        </div>
+      )}
+    </Panel>
+  );
+}
+
+function TreatmentPlanPanel({ workspace }: { workspace: CounsellorSessionWorkspace }) {
+  const progress = workspace.treatmentProgress;
+  return (
+    <Panel>
+      <RailHeader icon={<FileText size={16} />} title="Treatment Plan" action="View plan" />
+      {progress ? (
+        <div className="mt-3">
+          <p className="text-sm font-semibold text-[#111941]">Active Plan: {progress.title}</p>
+          <p className="mt-1 text-xs text-slate-500">Started: {progress.startedAt ?? 'Not set'}</p>
+          <div className="mt-4 flex items-center justify-between text-xs font-semibold text-slate-600"><span>Goals Progress</span><span>{progress.goalProgressPercent}%</span></div>
+          <div className="mt-2 h-2 rounded-full bg-slate-100"><div className="h-full rounded-full bg-indigo-600" style={{ width: `${progress.goalProgressPercent}%` }} /></div>
+          <p className="mt-2 text-sm text-slate-600">{progress.goalSummary}</p>
+        </div>
+      ) : <p className="mt-3 text-sm text-slate-500">No active treatment plan yet.</p>}
+    </Panel>
+  );
+}
+
+function NotesPanel({ draft, setDraft, onSave, saving }: { draft: SoapDraft; setDraft: (draft: SoapDraft) => void; onSave: () => void; saving: boolean }) {
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between"><PanelTitle icon={<FileText size={18} />} title="SOAP Notes" /><button type="button" disabled={saving} onClick={onSave} className="inline-flex min-h-10 items-center gap-2 rounded-lg bg-indigo-600 px-3 text-sm font-semibold text-white disabled:opacity-60"><Save size={15} /> {saving ? 'Saving...' : 'Save Notes'}</button></div>
+      <div className="mt-4 grid gap-4"><TextareaBlock label="Subjective" value={draft.subjective} onChange={(value) => setDraft({ ...draft, subjective: value })} /><TextareaBlock label="Objective" value={draft.objective} onChange={(value) => setDraft({ ...draft, objective: value })} /><TextareaBlock label="Assessment" value={draft.assessment} onChange={(value) => setDraft({ ...draft, assessment: value })} /><TextareaBlock label="Plan" value={draft.plan} onChange={(value) => setDraft({ ...draft, plan: value })} /></div>
+    </section>
+  );
+}
+
+function BottomActionBar({ saving, onSaveNotes, onComplete, onSummary, onEscalate }: { saving: boolean; onSaveNotes: () => void; onComplete: () => void; onSummary: () => void; onEscalate: () => void }) {
+  return (
+    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-slate-200 bg-white/95 px-4 py-3 shadow-[0_-10px_30px_rgba(15,23,42,0.08)] backdrop-blur">
+      <div className="mx-auto flex max-w-[1600px] flex-wrap justify-center gap-3">
+        <ActionButton icon={<Save size={16} />} disabled={saving} onClick={onSaveNotes} primary>Save Notes</ActionButton>
+        <ActionButton icon={<CheckCircle2 size={16} />} disabled={saving} onClick={onComplete} primary>Complete & Lock Session</ActionButton>
+        <ActionButton icon={<Share2 size={16} />} disabled={saving} onClick={onSummary}>Send Summary to Client</ActionButton>
+        <ActionButton icon={<ShieldAlert size={16} />} disabled={saving} onClick={onEscalate} danger>Escalate Case</ActionButton>
+      </div>
+    </div>
+  );
+}
+
+function Panel({ children }: { children: ReactNode }) {
+  return <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">{children}</section>;
+}
+
+function PanelTitle({ icon, title }: { icon: ReactNode; title: string }) {
+  return <h2 className="flex items-center gap-2 text-base font-semibold text-[#111941]"><span className="text-indigo-600">{icon}</span>{title}</h2>;
+}
+
+function RailHeader({ icon, title, action }: { icon: ReactNode; title: string; action?: string }) {
+  return <div className="flex items-center justify-between"><PanelTitle icon={icon} title={title} />{action ? <button type="button" className="text-xs font-semibold text-indigo-600">{action}</button> : null}</div>;
+}
+
+function SnapshotSection({ title, children, last = false }: { title: string; children: ReactNode; last?: boolean }) {
+  return <section className={`py-4 ${last ? '' : 'border-b border-slate-100'}`}><p className="mb-3 text-xs font-semibold uppercase text-slate-500">{title}</p>{children}</section>;
+}
+
+function TagList({ items }: { items: string[] }) {
+  return <div className="flex flex-wrap gap-2">{items.map((item) => <span key={item} className="rounded-full border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-700">{item}</span>)}</div>;
+}
+
+function TextareaBlock({ label, value, onChange, rows = 4 }: { label: string; value: string; onChange: (value: string) => void; rows?: number }) {
+  return <label className="block"><span className="text-xs font-semibold uppercase text-slate-500">{label}</span><textarea value={value} rows={rows} onChange={(event) => onChange(event.target.value)} className="mt-1 min-h-0 w-full rounded-lg border border-slate-200 px-3 py-2 text-sm leading-6 outline-none focus:border-indigo-400 focus:ring-2 focus:ring-indigo-50" /></label>;
+}
+
+function HeaderButton({ icon, children }: { icon: ReactNode; children: ReactNode }) {
+  return <button type="button" className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50">{icon}{children}</button>;
+}
+
+function ActionButton({ icon, children, disabled, onClick, primary, danger }: { icon: ReactNode; children: ReactNode; disabled?: boolean; onClick: () => void; primary?: boolean; danger?: boolean }) {
+  return <button type="button" disabled={disabled} onClick={onClick} className={`inline-flex min-h-11 min-w-[160px] items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:opacity-60 ${primary ? 'bg-indigo-600 text-white hover:bg-indigo-700' : danger ? 'border border-rose-200 bg-white text-rose-600 hover:bg-rose-50' : 'border border-slate-200 bg-white text-slate-700 hover:bg-slate-50'}`}>{icon}{children}</button>;
+}
+
+function StepStatus({ status }: { status: CounsellorFlowStepStatus }) {
+  const complete = status === 'completed';
+  const skipped = status === 'skipped';
+  return <span className={`grid size-7 shrink-0 place-items-center rounded-full border ${complete ? 'border-emerald-500 bg-emerald-500 text-white' : skipped ? 'border-slate-300 bg-slate-100 text-slate-500' : 'border-indigo-200 bg-indigo-50 text-indigo-600'}`}>{complete ? <Check size={15} /> : skipped ? <X size={14} /> : <span className="size-2 rounded-full bg-current" />}</span>;
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const tone = status === 'completed' ? 'emerald' : status === 'escalated' ? 'rose' : status === 'in_progress' ? 'blue' : status === 'notes_pending' || status === 'follow_up_required' ? 'amber' : 'slate';
-  const styles = {
-    emerald: 'bg-emerald-50 text-emerald-700',
-    rose: 'bg-rose-50 text-rose-700',
-    blue: 'bg-blue-50 text-blue-700',
-    amber: 'bg-amber-50 text-amber-700',
-    slate: 'bg-slate-100 text-slate-700',
-  } as const;
-  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${styles[tone]}`}>{labelFromValue(status)}</span>;
+  const tone = status === 'completed' ? 'bg-emerald-50 text-emerald-700' : status === 'escalated' ? 'bg-rose-50 text-rose-700' : status === 'in_progress' ? 'bg-blue-50 text-blue-700' : status.includes('pending') || status.includes('follow') ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-700';
+  return <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{labelFromValue(status)}</span>;
 }
 
 function RiskPill({ level, children }: { level: string; children: ReactNode }) {
   const className = level === 'critical' || level === 'high' ? 'bg-rose-50 text-rose-700' : level === 'medium' ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700';
-  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${className}`}>{children}</span>;
-}
-
-function SectionLabel({ icon, children }: { icon: ReactNode; children: ReactNode }) {
-  return <p className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-slate-500">{icon}{children}</p>;
-}
-
-function InfoList({ title, items, empty }: { title: string; items: string[]; empty: string }) {
-  return (
-    <div>
-      <SectionLabel icon={<FileText size={15} />}>{title}</SectionLabel>
-      <ul className="mt-2 space-y-1 text-slate-600">
-        {items.length ? items.map((item) => <li key={item}>- {item}</li>) : <li>{empty}</li>}
-      </ul>
-    </div>
-  );
+  return <span className={`rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${className}`}>{children}</span>;
 }
 
 function Snackbar({ tone, message, onClose }: { tone: 'success' | 'danger'; message: string; onClose: () => void }) {
   useEffect(() => {
     if (!message) return undefined;
-    const timer = window.setTimeout(onClose, 4000);
+    const timer = window.setTimeout(onClose, 4500);
     return () => window.clearTimeout(timer);
   }, [message, onClose]);
 
   if (!message) return null;
-
-  const isSuccess = tone === 'success';
-
-  return (
-    <div className="fixed right-5 top-5 z-[80] w-[min(calc(100vw-2rem),420px)]">
-      <div
-        role={isSuccess ? 'status' : 'alert'}
-        className={`flex items-start gap-3 rounded-2xl border bg-white px-4 py-3 text-sm shadow-2xl shadow-slate-900/10 ${
-          isSuccess ? 'border-emerald-200 text-emerald-800' : 'border-rose-200 text-rose-800'
-        }`}
-      >
-        <span className={`mt-0.5 inline-flex size-8 shrink-0 items-center justify-center rounded-full ${isSuccess ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
-          {isSuccess ? <CheckCircle2 size={18} /> : <AlertTriangle size={18} />}
-        </span>
-        <p className="min-w-0 flex-1 py-1 font-semibold leading-5">{message}</p>
-        <button
-          type="button"
-          aria-label="Close notification"
-          onClick={onClose}
-          className="inline-flex size-8 shrink-0 items-center justify-center rounded-full text-slate-500 hover:bg-slate-100 hover:text-slate-900"
-        >
-          <X size={16} />
-        </button>
-      </div>
-    </div>
-  );
+  return <div className="fixed right-5 top-5 z-[90] w-[min(calc(100vw-2rem),440px)] rounded-lg border bg-white p-4 text-sm font-semibold shadow-xl">{message}</div>;
 }
 
-function ActionButton({ icon, children, disabled, onClick }: { icon: ReactNode; children: ReactNode; disabled?: boolean; onClick: () => void }) {
-  return (
-    <button type="button" disabled={disabled} onClick={onClick} className="inline-flex items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 disabled:opacity-60">
-      {icon}{children}
-    </button>
-  );
+function QueueSkeleton() {
+  return <div className="grid gap-3 p-4">{[0, 1, 2].map((item) => <div key={item} className="h-16 animate-pulse rounded-lg bg-slate-100" />)}</div>;
+}
+
+function WorkspaceSkeleton() {
+  return <div className="grid animate-pulse gap-4 xl:grid-cols-[320px_minmax(0,1fr)_420px]"><div className="h-[680px] rounded-lg bg-slate-100" /><div className="h-[760px] rounded-lg bg-slate-100" /><div className="h-[680px] rounded-lg bg-slate-100" /></div>;
+}
+
+function emptySummaryDraft(): SummaryDraft {
+  return { sessionRating: null, clientFeedback: '', clinicianSummary: '', clientSummary: '', privateSummary: '', nextAgenda: '' };
+}
+
+function summaryFromApi(summary?: CounsellorSessionSummary): SummaryDraft {
+  return {
+    sessionRating: summary?.sessionRating ?? null,
+    clientFeedback: summary?.clientFeedback ?? '',
+    clinicianSummary: summary?.clinicianSummary ?? '',
+    clientSummary: summary?.clientSummary ?? '',
+    privateSummary: summary?.privateSummary ?? '',
+    nextAgenda: summary?.nextAgenda ?? '',
+  };
+}
+
+function assessmentToneClass(tone?: string) {
+  if (tone === 'danger') return 'bg-rose-50 text-rose-700';
+  if (tone === 'warning') return 'bg-amber-50 text-amber-700';
+  if (tone === 'success') return 'bg-emerald-50 text-emerald-700';
+  return 'bg-slate-100 text-slate-600';
 }
 
 function labelFromValue(value: string) {
   return value.replace(/_/g, ' ').replace(/\b\w/g, (letter) => letter.toUpperCase());
+}
+
+function initials(name: string) {
+  return name.split(' ').map((part) => part[0]).join('').slice(0, 2).toUpperCase();
+}
+
+function errorMessage(error: unknown, fallback: string) {
+  return error instanceof Error ? error.message : fallback;
 }
