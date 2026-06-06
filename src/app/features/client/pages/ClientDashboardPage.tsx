@@ -108,6 +108,14 @@ function activityTone(category: string): Tone {
   return 'violet';
 }
 
+function formatAppointmentTime(startsAt?: string | null, fallback?: string | null) {
+  if (!startsAt) return fallback ?? null;
+  const date = new Date(startsAt);
+  if (Number.isNaN(date.getTime())) return fallback ?? null;
+
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
 export default function ClientDashboardPage() {
   const user = getAuthState().user;
   const navigate = useNavigate();
@@ -149,6 +157,7 @@ export default function ClientDashboardPage() {
   const activeProgramTone = serviceTone(activeProgram?.type);
   const activeProgramIcon = serviceIcon(activeProgram?.type);
   const membershipValueClass = membershipStatus?.status === 'active' ? 'text-emerald-600' : 'text-slate-950';
+  const nextSessionTime = formatAppointmentTime(nextSession?.startsAt, nextSession?.value) ?? 'No upcoming';
 
   return (
     <div className="mx-auto w-full max-w-[1500px] space-y-5 pb-6 lg:space-y-6">
@@ -170,14 +179,14 @@ export default function ClientDashboardPage() {
       ) : (
         <>
           <section className="grid gap-4 lg:hidden">
-            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSessionTime} badge={nextSession?.badge} />
             <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
             <DailyCheckInCard />
             <QuickActionsCard onNavigate={navigate} />
           </section>
 
           <section className="hidden gap-4 sm:grid-cols-2 xl:grid-cols-4 lg:grid">
-            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSession?.value ?? 'No upcoming'} badge={nextSession?.badge} />
+            <MetricCard icon={nextIcon} tone={nextTone} label="Next Session" value={nextSessionTime} badge={nextSession?.badge} />
             <MetricCard icon={ClipboardCheck} tone="blue" label="Tasks Pending" value={String(dashboard?.metrics.tasksPending ?? 0)} onClick={() => navigate('/client/tasks')} />
             <MetricCard icon={activeProgramIcon} tone={activeProgramTone} label="Active Program" value={activeProgram?.title ?? 'Not assigned'} />
             <MetricCard icon={ShieldCheck} tone="orange" label="Membership Status" value={membershipStatus?.label ?? 'Inactive'} valueClassName={membershipValueClass} />
@@ -354,10 +363,11 @@ function ScheduleRow({ item, isLast }: { item: ClientDashboardScheduleItem; isLa
   const Icon = serviceIcon(item.serviceType);
   const LocationIcon = item.mode === 'online' ? Video : MapPin;
   const styles = toneStyles[serviceTone(item.serviceType)];
+  const displayTime = formatAppointmentTime(item.startsAt, item.time) ?? '--';
 
   return (
     <article className={`grid grid-cols-[82px_20px_minmax(0,1.2fr)_minmax(96px,0.9fr)_auto] items-center gap-3 px-3 py-3 ${isLast ? '' : 'border-b border-slate-100'} max-sm:grid-cols-[72px_18px_minmax(0,1fr)_auto] max-sm:gap-2`}>
-      <p className="text-sm font-semibold text-slate-950">{item.time ?? '--'}</p>
+      <p className="text-sm font-semibold text-slate-950">{displayTime}</p>
       <div className="relative flex justify-center self-stretch">
         <span className={`mt-4 h-2.5 w-2.5 rounded-full ${styles.dot}`} />
         {!isLast ? <span className="absolute left-1/2 top-7 h-[calc(100%+1.5rem)] w-px -translate-x-1/2 bg-slate-200" /> : null}

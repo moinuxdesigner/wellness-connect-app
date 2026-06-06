@@ -87,6 +87,85 @@ export interface ClientDashboardResponse {
   };
 }
 
+export interface ClientProgressPoint {
+  date?: string | null;
+  label: string;
+  value: number;
+}
+
+export interface ClientProgressGoal {
+  id: string;
+  label: string;
+  value: number;
+  category: 'training' | 'mind' | 'streak' | string;
+  status?: string;
+}
+
+export interface ClientProgressMilestone {
+  title: string;
+  subtitle: string;
+  value: number;
+  category: 'training' | 'mind' | 'streak' | string;
+}
+
+export interface ClientProgressResource {
+  title: string;
+  subtitle: string;
+  image: string;
+  kind?: string;
+}
+
+export interface ClientProgressActivity {
+  id: number | string;
+  title: string;
+  subtitle: string;
+  time: string;
+  category?: string;
+}
+
+export interface ClientProgressMetric {
+  label: string;
+  value: string;
+  detail: string;
+  positive?: boolean;
+}
+
+export interface ClientProgressResponse {
+  source: 'database' | 'mock';
+  generatedAt?: string;
+  summary: {
+    wellnessScore: number;
+    wellnessDelta: number;
+    sessionsCompletedThisMonth: number;
+    sessionsDeltaFromLastMonth: number;
+    currentStreakDays: number;
+    goalsOnTrack: number;
+    totalGoals: number;
+    goalsOnTrackPercent: number;
+  };
+  fitness: {
+    statusLabel: string;
+    currentWeightKg: number | null;
+    weightDeltaKg: number | null;
+    latestGoalProgressPercent: number | null;
+    averageGoalProgressPercent: number | null;
+    points: ClientProgressPoint[];
+  };
+  mind: {
+    statusLabel: string;
+    weeklyCheckInsCompleted: number;
+    weeklyCheckInsTotal: number;
+    currentMood: string;
+    trendLabel: string;
+    points: ClientProgressPoint[];
+  };
+  goals: ClientProgressGoal[];
+  bodyMetrics: ClientProgressMetric[];
+  milestones: ClientProgressMilestone[];
+  resources: ClientProgressResource[];
+  recentActivity: ClientProgressActivity[];
+}
+
 export interface IntakeFlow {
   id: number;
   service_type: 'psychology' | 'training' | 'combined' | 'package';
@@ -836,6 +915,14 @@ export async function getClientDashboardRequest() {
   const data = await readJson(response);
   if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch client dashboard'));
   return data as ClientDashboardResponse;
+}
+
+export async function getClientProgressRequest() {
+  const token = getToken();
+  const response = await fetch(`${API_BASE}/client/progress`, { headers: authHeaders(token) });
+  const data = await readJson(response);
+  if (!response.ok) throw new Error(String(data?.message ?? 'Unable to fetch client progress'));
+  return data as ClientProgressResponse;
 }
 
 export async function rescheduleAppointmentRequest(id: number, slot_id: number) {

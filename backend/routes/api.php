@@ -7,6 +7,7 @@ use App\Http\Controllers\Api\ActivityLogController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ClientProfileController;
 use App\Http\Controllers\Api\ClientDashboardController;
+use App\Http\Controllers\Api\ClientProgressController;
 use App\Http\Controllers\Api\CounsellorClientController;
 use App\Http\Controllers\Api\CounsellorDashboardController;
 use App\Http\Controllers\Api\CounsellorNotificationController;
@@ -84,6 +85,7 @@ Route::prefix('v1')->group(function (): void {
         });
 
         Route::get('/client/dashboard', [ClientDashboardController::class, 'show'])->middleware('permission:client.dashboard.view');
+        Route::get('/client/progress', [ClientProgressController::class, 'show'])->middleware('permission:client.dashboard.view');
         Route::put('/client/profile', [ClientProfileController::class, 'update'])->middleware('permission:client.profile.update');
 
         Route::middleware('permission:client.intake.manage')->group(function (): void {

@@ -10,7 +10,6 @@ import {
   Check,
   CheckCircle2,
   ChevronDown,
-  ChevronLeft,
   ChevronRight,
   CircleHelp,
   Clock3,
@@ -251,23 +250,6 @@ const expectedPractitionerProfiles: PractitionerDisplayProfile[] = [
   },
 ];
 
-const bookingDateOptions = [
-  { key: '2026-06-04', eyebrow: 'Today', weekday: 'Wed', date: '4', month: 'Jun', slots: null },
-  { key: '2026-06-05', eyebrow: '', weekday: 'Thu', date: '5', month: 'Jun', slots: 6 },
-  { key: '2026-06-06', eyebrow: '', weekday: 'Fri', date: '6', month: 'Jun', slots: 8 },
-  { key: '2026-06-07', eyebrow: '', weekday: 'Sat', date: '7', month: 'Jun', slots: 6 },
-  { key: '2026-06-08', eyebrow: '', weekday: 'Sun', date: '8', month: 'Jun', slots: 5 },
-  { key: '2026-06-09', eyebrow: '', weekday: 'Mon', date: '9', month: 'Jun', slots: 7 },
-  { key: '2026-06-10', eyebrow: '', weekday: 'Tue', date: '10', month: 'Jun', slots: 6 },
-  { key: '2026-06-11', eyebrow: '', weekday: 'Wed', date: '11', month: 'Jun', slots: 4 },
-];
-
-const bookingTimeGroups = [
-  { label: 'Morning', icon: Sun, times: ['9:00 AM', '10:00 AM', '11:00 AM', '11:30 AM', '12:00 PM'] },
-  { label: 'Afternoon', icon: CalendarDays, times: ['1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'] },
-  { label: 'Evening', icon: Moon, times: ['6:00 PM', '7:00 PM', '8:00 PM'] },
-];
-
 function getDisplayProfileByKey(key: string | null) {
   return expectedPractitionerProfiles.find((profile) => profile.key === key);
 }
@@ -299,18 +281,85 @@ function getDisplayProfileForPractitioner(practitioner: PractitionerItem | undef
   return expectedPractitionerProfiles[0];
 }
 
-function getSlotForTime(slotsForPractitioner: SlotItem[], timeIndex: number) {
-  if (!slotsForPractitioner.length) return null;
-  return slotsForPractitioner[timeIndex % slotsForPractitioner.length];
-}
-
 function formatDateTime(value?: string) {
   return value ? new Date(value).toLocaleString() : '-';
+}
+
+function slotTimestamp(slot: SlotItem) {
+  return new Date(slot.starts_at).getTime();
+}
+
+function availableUpcomingSlots(slotsForPractitioner: SlotItem[]) {
+  const now = Date.now();
+
+  return slotsForPractitioner
+    .filter((slot) => slot.slot_status === 'open' && Number.isFinite(slotTimestamp(slot)) && slotTimestamp(slot) > now)
+    .sort((a, b) => slotTimestamp(a) - slotTimestamp(b));
+}
+
+function formatSlotTime(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+
+  return new Intl.DateTimeFormat(undefined, { hour: 'numeric', minute: '2-digit' }).format(date);
+}
+
+function formatSlotDate(value?: string) {
+  if (!value) return '-';
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '-';
+
+  return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).format(date);
 }
 
 function formatDateParam(value: Date) {
   const localDate = new Date(value.getTime() - value.getTimezoneOffset() * 60_000);
   return localDate.toISOString().slice(0, 10);
+}
+
+function slotDateKey(slot: SlotItem) {
+  return formatDateParam(new Date(slot.starts_at));
+}
+
+function buildSlotDateOptions(slotsForPractitioner: SlotItem[]) {
+  const grouped = new Map<string, SlotItem[]>();
+
+  slotsForPractitioner.forEach((slot) => {
+    const key = slotDateKey(slot);
+    grouped.set(key, [...(grouped.get(key) ?? []), slot]);
+  });
+
+  return Array.from(grouped.entries()).map(([key, dateSlots]) => {
+    const sortedSlots = availableUpcomingSlots(dateSlots);
+    const firstSlot = sortedSlots[0];
+    const date = new Date(firstSlot.starts_at);
+    const today = formatDateParam(new Date());
+
+    return {
+      key,
+      eyebrow: key === today ? 'Today' : '',
+      weekday: new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(date),
+      date: new Intl.DateTimeFormat(undefined, { day: 'numeric' }).format(date),
+      month: new Intl.DateTimeFormat(undefined, { month: 'short' }).format(date),
+      year: new Intl.DateTimeFormat(undefined, { year: 'numeric' }).format(date),
+      slots: sortedSlots.length,
+      firstSlot,
+    };
+  });
+}
+
+function buildSlotTimeGroups(slotsForDate: SlotItem[]) {
+  const groups = [
+    { label: 'Morning', Icon: Sun, slots: slotsForDate.filter((slot) => new Date(slot.starts_at).getHours() < 12) },
+    { label: 'Afternoon', Icon: CalendarDays, slots: slotsForDate.filter((slot) => {
+      const hour = new Date(slot.starts_at).getHours();
+      return hour >= 12 && hour < 17;
+    }) },
+    { label: 'Evening', Icon: Moon, slots: slotsForDate.filter((slot) => new Date(slot.starts_at).getHours() >= 17) },
+  ];
+
+  return groups.filter((group) => group.slots.length > 0);
 }
 
 function upcomingSlotWindow() {
@@ -490,8 +539,7 @@ export default function ClientIntakeFlowPage() {
   const [availabilityFilter, setAvailabilityFilter] = useState('');
   const [savedPractitionerIds, setSavedPractitionerIds] = useState<string[]>([]);
   const [selectedPickerProfileKey, setSelectedPickerProfileKey] = useState<string | null>(null);
-  const [selectedBookingDateKey, setSelectedBookingDateKey] = useState('2026-06-06');
-  const [selectedBookingTimeLabel, setSelectedBookingTimeLabel] = useState('11:00 AM');
+  const [selectedBookingDateKey, setSelectedBookingDateKey] = useState('');
   const [confirmation, setConfirmation] = useState<{ state: string; message?: string } | null>(null);
   const [memberships, setMemberships] = useState<ClientMembership[]>([]);
   const [useCredits, setUseCredits] = useState(false);
@@ -576,11 +624,12 @@ export default function ClientIntakeFlowPage() {
     if (!state.selectedPractitionerId) return;
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedPractitionerId, window.from, window.to).then((items) => {
-      setSlots(items);
-      if (!state.selectedSlotId && items[0]) {
-        dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: items[0].id } });
+      const available = availableUpcomingSlots(items);
+      setSlots(available);
+      if (!state.selectedSlotId && available[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: available[0].id } });
       }
-      if (state.selectedSlotId && !items.some((slot) => slot.id === state.selectedSlotId)) {
+      if (state.selectedSlotId && !available.some((slot) => slot.id === state.selectedSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedSlotId: null } });
       }
     }).catch(() => {
@@ -593,11 +642,12 @@ export default function ClientIntakeFlowPage() {
     if (!state.selectedPsychologistId) return;
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedPsychologistId, window.from, window.to).then((items) => {
-      setPsychologistSlots(items);
-      if (!state.selectedPsychologistSlotId && items[0]) {
-        dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: items[0].id } });
+      const available = availableUpcomingSlots(items);
+      setPsychologistSlots(available);
+      if (!state.selectedPsychologistSlotId && available[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: available[0].id } });
       }
-      if (state.selectedPsychologistSlotId && !items.some((slot) => slot.id === state.selectedPsychologistSlotId)) {
+      if (state.selectedPsychologistSlotId && !available.some((slot) => slot.id === state.selectedPsychologistSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedPsychologistSlotId: null } });
       }
     }).catch(() => {
@@ -610,11 +660,12 @@ export default function ClientIntakeFlowPage() {
     if (!state.selectedTrainerId) return;
     const window = upcomingSlotWindow();
     getPractitionerSlots(state.selectedTrainerId, window.from, window.to).then((items) => {
-      setTrainerSlots(items);
-      if (!state.selectedTrainerSlotId && items[0]) {
-        dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: items[0].id } });
+      const available = availableUpcomingSlots(items);
+      setTrainerSlots(available);
+      if (!state.selectedTrainerSlotId && available[0]) {
+        dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: available[0].id } });
       }
-      if (state.selectedTrainerSlotId && !items.some((slot) => slot.id === state.selectedTrainerSlotId)) {
+      if (state.selectedTrainerSlotId && !available.some((slot) => slot.id === state.selectedTrainerSlotId)) {
         dispatch({ type: 'SET_FIELD', payload: { selectedTrainerSlotId: null } });
       }
     }).catch(() => {
@@ -633,7 +684,7 @@ export default function ClientIntakeFlowPage() {
     Promise.all(
       sourceIds.map((sourceId) => (
         getPractitionerSlots(sourceId, window.from, window.to)
-          .then((items) => [sourceId, items] as const)
+          .then((items) => [sourceId, availableUpcomingSlots(items)] as const)
           .catch(() => [sourceId, []] as const)
       ))
     ).then((entries) => {
@@ -1040,8 +1091,19 @@ export default function ClientIntakeFlowPage() {
     primaryDisabled: boolean;
   }) {
     const profile = getDisplayProfileForPractitioner(practitioner, selectedPickerProfileKey);
-    const selectedDate = bookingDateOptions.find((date) => date.key === selectedBookingDateKey) ?? bookingDateOptions[2];
-    const totalTimeSlots = bookingTimeGroups.reduce((count, group) => count + group.times.length, 0);
+    const availableSlotsForPractitioner = availableUpcomingSlots(slotsForPractitioner);
+    const selectedSlot = availableSlotsForPractitioner.find((slot) => slot.id === selectedSlotId) ?? availableSlotsForPractitioner[0];
+    const dateOptions = buildSlotDateOptions(availableSlotsForPractitioner);
+    const selectedDateKey = selectedSlot ? slotDateKey(selectedSlot) : selectedBookingDateKey;
+    const selectedDateSlots = availableSlotsForPractitioner.filter((slot) => slotDateKey(slot) === selectedDateKey);
+    const timeGroups = buildSlotTimeGroups(selectedDateSlots);
+    const totalTimeSlots = availableSlotsForPractitioner.length;
+    const selectedMonthLabel = selectedSlot
+      ? new Intl.DateTimeFormat(undefined, { month: 'long', year: 'numeric' }).format(new Date(selectedSlot.starts_at))
+      : dateOptions[0]
+        ? `${dateOptions[0].month} ${dateOptions[0].year}`
+        : 'Available slots';
+    const timezoneLabel = Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'your local time';
 
     return (
       <div className="min-h-[calc(100vh-150px)] rounded-lg bg-[linear-gradient(135deg,#ffffff_0%,#fbfaff_48%,#f8f7ff_100%)] px-3 py-4 text-[#101735] sm:px-5 lg:px-7">
@@ -1149,38 +1211,44 @@ export default function ClientIntakeFlowPage() {
                   Select a date
                 </h2>
                 <div className="flex items-center gap-4 text-sm font-semibold text-[#101735]">
-                  June 2026 <ChevronDown className="h-4 w-4" />
-                  <span className="inline-flex gap-2">
-                    <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-[#dfe4ef] text-[#647391]"><ChevronLeft className="h-4 w-4" /></button>
-                    <button type="button" className="grid h-9 w-9 place-items-center rounded-full border border-[#dfe4ef] text-[#647391]"><ChevronRight className="h-4 w-4" /></button>
-                  </span>
+                  {selectedMonthLabel} <ChevronDown className="h-4 w-4" />
                 </div>
               </div>
 
-              <div className="flex gap-4 overflow-x-auto pb-5">
-                {bookingDateOptions.map((date) => {
-                  const selected = date.key === selectedBookingDateKey;
-                  return (
-                    <button
-                      key={date.key}
-                      type="button"
-                      onClick={() => setSelectedBookingDateKey(date.key)}
-                      className={`grid h-[116px] min-w-[90px] place-items-center rounded-lg border px-4 py-3 text-center transition ${
-                        selected
-                          ? 'border-[#6746e8] bg-[linear-gradient(180deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_14px_28px_rgba(103,70,232,0.28)]'
-                          : 'border-[#e0e5ef] bg-white text-[#101735] hover:border-[#b9a8f6]'
-                      }`}
-                    >
-                      <span className={`text-xs font-semibold ${selected ? 'text-white/80' : 'text-[#8a94aa]'}`}>{date.eyebrow || date.weekday}</span>
-                      <span className={`text-sm font-bold ${date.eyebrow && !selected ? 'text-[#52617d]' : ''}`}>{date.eyebrow ? date.weekday : date.date}</span>
-                      <span className="text-2xl font-extrabold">{date.eyebrow ? date.date : null}</span>
-                      <span className={`text-xs font-semibold ${selected ? 'text-white/85' : 'text-[#52617d]'}`}>{date.month}</span>
-                      <span className={`mt-1 text-xs font-bold ${selected ? 'text-white' : 'text-[#6746e8]'}`}>{date.slots ? `${date.slots} slots` : '-'}</span>
-                    </button>
-                  );
-                })}
-                <button type="button" className="my-auto grid h-9 w-9 shrink-0 place-items-center rounded-full border border-[#deddf8] text-[#6746e8]"><ChevronRight className="h-4 w-4" /></button>
-              </div>
+              {dateOptions.length ? (
+                <div className="flex gap-4 overflow-x-auto pb-5">
+                  {dateOptions.map((date) => {
+                    const selected = date.key === selectedDateKey;
+                    const nextSlot = date.firstSlot;
+
+                    return (
+                      <button
+                        key={date.key}
+                        type="button"
+                        onClick={() => {
+                          setSelectedBookingDateKey(date.key);
+                          onSelectSlot(nextSlot.id);
+                        }}
+                        className={`grid h-[116px] min-w-[90px] place-items-center rounded-lg border px-4 py-3 text-center transition ${
+                          selected
+                            ? 'border-[#6746e8] bg-[linear-gradient(180deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_14px_28px_rgba(103,70,232,0.28)]'
+                            : 'border-[#e0e5ef] bg-white text-[#101735] hover:border-[#b9a8f6]'
+                        }`}
+                      >
+                        <span className={`text-xs font-semibold ${selected ? 'text-white/80' : 'text-[#8a94aa]'}`}>{date.eyebrow || date.weekday}</span>
+                        <span className={`text-sm font-bold ${date.eyebrow && !selected ? 'text-[#52617d]' : ''}`}>{date.eyebrow ? date.weekday : date.date}</span>
+                        <span className="text-2xl font-extrabold">{date.eyebrow ? date.date : null}</span>
+                        <span className={`text-xs font-semibold ${selected ? 'text-white/85' : 'text-[#52617d]'}`}>{date.month}</span>
+                        <span className={`mt-1 text-xs font-bold ${selected ? 'text-white' : 'text-[#6746e8]'}`}>{date.slots} slots</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <p className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-700">
+                  No future available slots for this practitioner.
+                </p>
+              )}
 
               <div className="border-t border-[#edf0f6] pt-5">
                 <div className="mb-5 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -1188,47 +1256,53 @@ export default function ClientIntakeFlowPage() {
                     <span className="grid h-6 w-6 place-items-center rounded-full border border-[#6746e8] text-sm text-[#6746e8]">2</span>
                     Select a time
                   </h2>
-                  <p className="text-xs font-semibold text-[#52617d]">Times are shown in your local time (IST)</p>
+                  <p className="text-xs font-semibold text-[#52617d]">Times are shown in {timezoneLabel}</p>
                 </div>
 
-                <div className="grid gap-4">
-                  {bookingTimeGroups.map((group) => {
-                    const Icon = group.icon;
-                    return (
-                      <div key={group.label} className="grid gap-3 border-b border-[#edf0f6] pb-4 last:border-b-0 last:pb-0 sm:grid-cols-[120px_1fr] sm:items-center">
-                        <div className="flex items-center gap-3">
-                          <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f5f7fb] text-[#101735]"><Icon className="h-5 w-5" /></span>
-                          <span className="text-sm font-extrabold text-[#101735]">{group.label}</span>
+                {timeGroups.length ? (
+                  <div className="grid gap-4">
+                    {timeGroups.map((group) => {
+                      const Icon = group.Icon;
+                      return (
+                        <div key={group.label} className="grid gap-3 border-b border-[#edf0f6] pb-4 last:border-b-0 last:pb-0 sm:grid-cols-[120px_1fr] sm:items-center">
+                          <div className="flex items-center gap-3">
+                            <span className="grid h-9 w-9 place-items-center rounded-full bg-[#f5f7fb] text-[#101735]"><Icon className="h-5 w-5" /></span>
+                            <span className="text-sm font-extrabold text-[#101735]">{group.label}</span>
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
+                            {group.slots.map((slot) => {
+                              const selected = selectedSlot?.id === slot.id;
+                              const time = formatSlotTime(slot.starts_at);
+
+                              return (
+                                <button
+                                  key={slot.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setSelectedBookingDateKey(slotDateKey(slot));
+                                    onSelectSlot(slot.id);
+                                  }}
+                                  className={`relative h-10 rounded-lg border px-4 text-sm font-bold transition ${
+                                    selected
+                                      ? 'border-[#6746e8] bg-[linear-gradient(90deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_10px_22px_rgba(103,70,232,0.22)]'
+                                      : 'border-[#cdbff7] bg-white text-[#6746e8] hover:bg-[#f7f5ff]'
+                                  }`}
+                                >
+                                  {time}
+                                  {selected ? <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-white text-[#6746e8]" /> : null}
+                                </button>
+                              );
+                            })}
+                          </div>
                         </div>
-                        <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-5">
-                          {group.times.map((time) => {
-                            const timeIndex = bookingTimeGroups.flatMap((item) => item.times).indexOf(time);
-                            const selected = selectedBookingTimeLabel === time;
-                            return (
-                              <button
-                                key={time}
-                                type="button"
-                                onClick={() => {
-                                  const nextSlot = getSlotForTime(slotsForPractitioner, timeIndex);
-                                  setSelectedBookingTimeLabel(time);
-                                  onSelectSlot(nextSlot?.id ?? selectedSlotId);
-                                }}
-                                className={`relative h-10 rounded-lg border px-4 text-sm font-bold transition ${
-                                  selected
-                                    ? 'border-[#6746e8] bg-[linear-gradient(90deg,#7447f3_0%,#5f39df_100%)] text-white shadow-[0_10px_22px_rgba(103,70,232,0.22)]'
-                                    : 'border-[#cdbff7] bg-white text-[#6746e8] hover:bg-[#f7f5ff]'
-                                }`}
-                              >
-                                {time}
-                                {selected ? <CheckCircle2 className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 fill-white text-[#6746e8]" /> : null}
-                              </button>
-                            );
-                          })}
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <p className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-semibold text-[#52617d]">
+                    Select another date to see available times.
+                  </p>
+                )}
               </div>
             </section>
           </div>
@@ -1249,11 +1323,11 @@ export default function ClientIntakeFlowPage() {
               <div className="grid gap-4 p-4 text-sm">
                 <div className="flex items-center justify-between gap-4">
                   <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><CalendarDays className="h-4 w-4" />Date</span>
-                  <span className="font-bold text-[#101735]">{selectedDate.weekday}, {selectedDate.date} Jun 2026</span>
+                  <span className="font-bold text-[#101735]">{formatSlotDate(selectedSlot?.starts_at)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><Clock3 className="h-4 w-4" />Time</span>
-                  <span className="font-bold text-[#101735]">{selectedBookingTimeLabel}</span>
+                  <span className="font-bold text-[#101735]">{formatSlotTime(selectedSlot?.starts_at)}</span>
                 </div>
                 <div className="flex items-center justify-between gap-4">
                   <span className="inline-flex items-center gap-2 font-semibold text-[#52617d]"><CalendarCheck2 className="h-4 w-4" />Session Type</span>
