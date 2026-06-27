@@ -148,6 +148,87 @@ const trainerWelcomeGenderOptions = [
   { label: 'Prefer not to say', value: 'Prefer not to say', icon: LockKeyhole, tone: 'text-[#7c5cff]' },
 ] as const;
 
+type TrainerResponsiveSegment =
+  | 'all'
+  | 'showcasePhotos'
+  | 'showcaseVideos'
+  | 'trainingPhilosophy'
+  | 'trainingVideo'
+  | 'identityRequired'
+  | 'identityOptional'
+  | 'reviewProfile'
+  | 'reviewCredentials'
+  | 'reviewOperations'
+  | 'reviewSubmit';
+
+type TrainerAccountStep = 'name' | 'email' | 'mobile' | 'password';
+
+// Compact account screens walk through one required field at a time on phones/tablets.
+const trainerAccountSteps: TrainerAccountStep[] = ['name', 'email', 'mobile', 'password'];
+
+function useTrainerViewportMode() {
+  const [viewport, setViewport] = useState(() => ({
+    width: typeof window === 'undefined' ? 1280 : window.innerWidth,
+    height: typeof window === 'undefined' ? 900 : window.innerHeight,
+  }));
+
+  useEffect(() => {
+    const updateViewport = () => setViewport({ width: window.innerWidth, height: window.innerHeight });
+    updateViewport();
+    window.addEventListener('resize', updateViewport);
+    window.addEventListener('orientationchange', updateViewport);
+    return () => {
+      window.removeEventListener('resize', updateViewport);
+      window.removeEventListener('orientationchange', updateViewport);
+    };
+  }, []);
+
+  return {
+    isNarrow: viewport.width < 768,
+    isTablet: viewport.width >= 768 && viewport.width < 1024,
+    isCompactAccount: viewport.width < 1024,
+    isShort: viewport.height < 760,
+  };
+}
+
+function getResponsiveSegments(screenId: TrainerOnboardingScreenId, isSegmented: boolean): TrainerResponsiveSegment[] {
+  // Dense onboarding screens are split into smaller chunks only on constrained screens.
+  if (!isSegmented) return ['all'];
+
+  switch (screenId) {
+    case 'showcase':
+      return ['showcasePhotos', 'showcaseVideos'];
+    case 'training':
+      return ['trainingPhilosophy', 'trainingVideo'];
+    case 'identity':
+      return ['identityRequired', 'identityOptional'];
+    case 'review':
+      return ['reviewProfile', 'reviewCredentials', 'reviewOperations', 'reviewSubmit'];
+    default:
+      return ['all'];
+  }
+}
+
+function getSegmentFields(segment: TrainerResponsiveSegment): FieldPath<TrainerOnboardingFormValues>[] {
+  // Only segments with required form values need validation before moving forward.
+  switch (segment) {
+    case 'showcasePhotos':
+      return [];
+    case 'showcaseVideos':
+      return [];
+    case 'trainingPhilosophy':
+      return ['training.philosophy'];
+    case 'trainingVideo':
+      return [];
+    case 'identityRequired':
+      return ['identity.aadhaar', 'identity.pan'];
+    case 'identityOptional':
+      return ['identity.passport', 'identity.drivingLicense'];
+    default:
+      return [];
+  }
+}
+
 const animationIcons: Record<TrainerAnimationKey, typeof Sparkles> = {
   personalInfo: UserRound,
   certification: GraduationCap,
@@ -345,8 +426,11 @@ export default function TrainerOnboardingPage() {
   const isTrainerApplicant = auth.isAuthenticated && auth.user?.role === 'trainer';
   const editMode = searchParams.get('mode') === 'edit';
   const prefersReducedMotion = useReducedMotion();
+  const viewportMode = useTrainerViewportMode();
+  const isSegmented = viewportMode.isNarrow || (viewportMode.isTablet && viewportMode.isShort);
   const restoredState = useMemo(readStoredState, []);
   const [screenIndex, setScreenIndex] = useState(restoredState.screenIndex);
+  const [segmentIndex, setSegmentIndex] = useState(0);
   const [direction, setDirection] = useState(1);
   const [submitted, setSubmitted] = useState(restoredState.submitted);
   const [submittedAt, setSubmittedAt] = useState<string | null>(restoredState.submittedAt);
@@ -370,6 +454,15 @@ export default function TrainerOnboardingPage() {
 
   const values = useWatch({ control: form.control });
   const currentScreen = trainerOnboardingScreens[screenIndex];
+  const responsiveSegments = getResponsiveSegments(currentScreen.id, isSegmented);
+  const activeSegment = responsiveSegments[Math.min(segmentIndex, responsiveSegments.length - 1)] ?? 'all';
+  const hasSegmentBack = segmentIndex > 0;
+  const hasSegmentNext = segmentIndex < responsiveSegments.length - 1;
+
+  // Reset the micro-step whenever the user reaches a new major onboarding screen.
+  useEffect(() => {
+    setSegmentIndex(0);
+  }, [currentScreen.id, isSegmented]);
 
   useEffect(() => {
     if (!isTrainerApplicant) return;
@@ -392,6 +485,7 @@ export default function TrainerOnboardingPage() {
         setReviewHistory(application.reviewHistory);
         setSubmitted(false);
         setScreenIndex(nextIndex >= 0 ? nextIndex : 0);
+        setSegmentIndex(0);
         setSavedAt(application.updatedAt);
         setIsDraftReady(true);
       })
@@ -442,22 +536,39 @@ export default function TrainerOnboardingPage() {
   async function moveNext() {
     if (currentScreen.id === 'review' && applicationStatus === 'rejected') return;
 
-    if (currentScreen.id === 'review') {
+    // The review screen submits only after the final responsive review segment.
+    if (currentScreen.id === 'review' && !hasSegmentNext) {
       void form.handleSubmit(submitApplication, showSubmissionValidationErrors)();
       return;
     }
 
-    const isValid = currentScreen.fields.length
-      ? await form.trigger([...currentScreen.fields], { shouldFocus: true })
+    // On segmented screens, validate only the fields that are visible in the active chunk.
+    const fieldsToValidate = activeSegment === 'all' ? [...currentScreen.fields] : getSegmentFields(activeSegment);
+    const isValid = fieldsToValidate.length
+      ? await form.trigger(fieldsToValidate, { shouldFocus: true })
       : true;
 
     if (!isValid) return;
 
     setDirection(1);
+    // Move within the current responsive screen before advancing the main workflow.
+    if (hasSegmentNext) {
+      setSegmentIndex((index) => Math.min(index + 1, responsiveSegments.length - 1));
+      return;
+    }
+
+    setSegmentIndex(0);
     setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
   }
 
   function moveBack() {
+    // Back navigation mirrors moveNext: micro-step first, then major screen.
+    if (hasSegmentBack) {
+      setDirection(-1);
+      setSegmentIndex((index) => Math.max(index - 1, 0));
+      return;
+    }
+
     if (currentScreen.id === 'success') {
       setDirection(-1);
       setScreenIndex(reviewScreenIndex);
@@ -470,6 +581,7 @@ export default function TrainerOnboardingPage() {
     }
 
     setDirection(-1);
+    setSegmentIndex(0);
     setScreenIndex((index) => Math.max(index - 1, 0));
   }
 
@@ -592,12 +704,16 @@ export default function TrainerOnboardingPage() {
   );
 
   const footerLabel = currentScreen.id === 'review'
-    ? applicationStatus === 'needs_resubmission'
+    ? hasSegmentNext
+      ? 'Review Next Section'
+      : applicationStatus === 'needs_resubmission'
       ? 'Resubmit Application'
       : applicationStatus === 'rejected'
         ? 'Application Rejected'
         : currentScreen.buttonLabel
-    : currentScreen.buttonLabel;
+    : hasSegmentNext
+      ? 'Continue'
+      : currentScreen.buttonLabel;
 
   async function saveAndLogout() {
     setIsSavingAndLeaving(true);
@@ -655,6 +771,8 @@ export default function TrainerOnboardingPage() {
         footerLabel={footerLabel}
         loading={isSubmitting || isSavingAndLeaving}
         disabled={applicationStatus === 'rejected'}
+        activeSegment={activeSegment}
+        isSegmented={isSegmented}
         onBack={moveBack}
         onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
         onPrimaryAction={moveNext}
@@ -673,6 +791,7 @@ export default function TrainerOnboardingPage() {
       footerLabel={footerLabel}
       loading={isSubmitting || isSavingAndLeaving}
       footerDisabled={applicationStatus === 'rejected' && currentScreen.id === 'review'}
+      viewportMode={viewportMode}
       onBack={moveBack}
       onClose={() => navigate(editMode ? '/trainer/submitted-profile' : submitted ? '/trainer' : '/')}
       onPrimaryAction={moveNext}
@@ -690,14 +809,18 @@ export default function TrainerOnboardingPage() {
         submittedAt,
         submissionError,
         submissionIssues,
+        activeSegment,
+        isSegmented,
         onSkipShowcase: () => {
           setDirection(1);
+          setSegmentIndex(0);
           setScreenIndex((index) => Math.min(index + 1, successScreenIndex));
         },
         onJumpToScreen: (screenId) => {
           const nextIndex = trainerOnboardingScreens.findIndex((screen) => screen.id === screenId);
           if (nextIndex < 0) return;
           setDirection(-1);
+          setSegmentIndex(0);
           setScreenIndex(nextIndex);
         },
       })}
@@ -717,6 +840,8 @@ function TrainerFinalReviewScreen({
   footerLabel,
   loading,
   disabled,
+  activeSegment,
+  isSegmented,
   onBack,
   onClose,
   onPrimaryAction,
@@ -733,6 +858,8 @@ function TrainerFinalReviewScreen({
   footerLabel: string;
   loading: boolean;
   disabled?: boolean;
+  activeSegment: TrainerResponsiveSegment;
+  isSegmented: boolean;
   onBack: () => void;
   onClose: () => void;
   onPrimaryAction: () => void;
@@ -741,6 +868,10 @@ function TrainerFinalReviewScreen({
   const avatarSrc = values.photo.file?.previewUrl;
   const fullName = values.profile.fullName || 'Personal Trainer';
   const hasSubmitted = Boolean(submittedAt);
+  const showReviewProfile = !isSegmented || activeSegment === 'reviewProfile';
+  const showReviewCredentials = !isSegmented || activeSegment === 'reviewCredentials';
+  const showReviewOperations = !isSegmented || activeSegment === 'reviewOperations';
+  const showReviewSubmit = !isSegmented || activeSegment === 'reviewSubmit';
 
   const statusConfig =
     applicationStatus === 'needs_resubmission'
@@ -838,14 +969,14 @@ function TrainerFinalReviewScreen({
   ] as const;
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
-      <div className="flex h-screen flex-col overflow-hidden bg-[#fcfbff]">
-        <header className="shrink-0 border-b border-[#ece7fb] bg-white/82 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+    <div className="min-h-dvh overflow-y-auto bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F] lg:h-screen lg:overflow-hidden">
+      <div className="flex min-h-dvh flex-col bg-[#fcfbff] lg:h-screen lg:overflow-hidden">
+        <header className="shrink-0 border-b border-[#ece7fb] bg-white/82 px-3 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7 lg:py-3 [@media(max-height:760px)]:lg:py-2">
+          <div className="grid grid-cols-[42px_1fr_42px] items-center gap-3 sm:grid-cols-[46px_1fr_46px]">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Go back"
             >
               <ArrowLeft size={20} />
@@ -858,7 +989,7 @@ function TrainerFinalReviewScreen({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Close onboarding"
             >
               <X size={20} />
@@ -866,24 +997,24 @@ function TrainerFinalReviewScreen({
           </div>
         </header>
 
-        <main className="flex min-h-0 flex-1 flex-col overflow-hidden px-5 py-5 lg:px-6 lg:py-5">
-          <div className="min-h-0 flex-1 overflow-y-auto pr-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <section className="grid shrink-0 gap-4 lg:grid-cols-[minmax(0,1fr)_390px]">
-            <div className="rounded-[26px] border border-[#e8e2fb] bg-white px-5 py-5 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
+        <main className="flex min-h-0 flex-1 flex-col px-4 py-4 sm:px-5 lg:overflow-hidden lg:px-5 lg:py-4 [@media(max-height:760px)]:lg:py-3">
+          <div className="min-h-0 flex-1 lg:overflow-hidden">
+            <section className="grid shrink-0 gap-3 lg:grid-cols-[minmax(0,1fr)_360px] [@media(max-height:760px)]:lg:grid-cols-[minmax(0,1fr)_320px]">
+            <div className="rounded-[20px] border border-[#e8e2fb] bg-white px-4 py-4 shadow-[0_18px_46px_rgba(102,75,212,0.08)] [@media(max-height:760px)]:lg:py-3">
               <div className="flex items-center gap-5">
-                <UserAvatar user={{ name: fullName }} src={avatarSrc} size="xl" className="h-36 w-36 shrink-0 border-[3px] border-[#e5dbff] text-[2.2rem] tracking-[0.08em] shadow-[0_12px_30px_rgba(123,92,255,0.16)]" />
+                <UserAvatar user={{ name: fullName }} src={avatarSrc} size="xl" className="h-24 w-24 shrink-0 border-[3px] border-[#e5dbff] text-[1.7rem] tracking-[0.08em] shadow-[0_12px_30px_rgba(123,92,255,0.16)] sm:h-28 sm:w-28 [@media(max-height:760px)]:lg:h-20 [@media(max-height:760px)]:lg:w-20" />
 
                 <div className="min-w-0 flex-1">
                   <p className="text-sm font-bold uppercase tracking-[0.22em] text-[#6345ff]">
                     {hasSubmitted ? 'Submitted Profile' : 'Profile Review'}
                   </p>
-                  <h1 className="mt-2 text-[2.2rem] font-bold uppercase leading-none tracking-[-0.045em] text-[#182062]">
+                  <h1 className="mt-1 text-[1.65rem] font-bold uppercase leading-none tracking-[-0.045em] text-[#182062] sm:text-[1.9rem] [@media(max-height:760px)]:lg:text-[1.45rem]">
                     {fullName}
                   </h1>
-                  <p className="mt-4 text-[1.05rem] font-medium text-[#586695]">
+                  <p className="mt-2 text-[0.95rem] font-medium text-[#586695]">
                     {applicationId ? `Application ${applicationId}` : 'Draft application'}
                   </p>
-                  <div className="mt-3 inline-flex items-center gap-2 text-[1rem] font-medium text-[#59679a]">
+                  <div className="mt-2 inline-flex items-center gap-2 text-[0.9rem] font-medium text-[#59679a]">
                     <CalendarDays className="h-4 w-4 text-[#7b5cff]" strokeWidth={2.1} />
                     <span>{hasSubmitted && submittedAt ? `submitted on ${formatDate(submittedAt)}` : savedLabel}</span>
                   </div>
@@ -891,14 +1022,14 @@ function TrainerFinalReviewScreen({
               </div>
             </div>
 
-            <div className={cn('rounded-[26px] border px-5 py-5 shadow-[0_18px_46px_rgba(102,75,212,0.08)]', statusConfig.border, statusConfig.surface)}>
+            <div className={cn('rounded-[20px] border px-4 py-4 shadow-[0_18px_46px_rgba(102,75,212,0.08)] [@media(max-height:760px)]:lg:py-3', statusConfig.border, statusConfig.surface)}>
               <div className="flex items-start gap-4">
-                <div className={cn('inline-flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-white/80', statusConfig.tone)}>
-                  <statusConfig.Icon size={30} strokeWidth={2} />
+                <div className={cn('inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-white/80', statusConfig.tone)}>
+                  <statusConfig.Icon size={24} strokeWidth={2} />
                 </div>
                 <div className="min-w-0">
-                  <h2 className={cn('text-[1.8rem] font-semibold leading-tight tracking-[-0.03em]', statusConfig.tone)}>{statusConfig.title}</h2>
-                  <p className="mt-3 text-[1.05rem] leading-8 text-[#5b6697]">{statusConfig.description}</p>
+                  <h2 className={cn('text-[1.35rem] font-semibold leading-tight tracking-[-0.03em]', statusConfig.tone)}>{statusConfig.title}</h2>
+                  <p className="mt-2 text-[0.92rem] leading-6 text-[#5b6697] [@media(max-height:760px)]:lg:line-clamp-2">{statusConfig.description}</p>
                 </div>
               </div>
             </div>
@@ -920,16 +1051,16 @@ function TrainerFinalReviewScreen({
               </div>
             ) : null}
 
-            <section className="mt-4 grid gap-4 lg:grid-cols-[1fr_1fr_1.95fr]">
-              <ReviewSummaryCard title="Personal Details" icon={UserRound}>
+            <section className="mt-3 grid gap-3 lg:grid-cols-[0.95fr_0.95fr_1.65fr]">
+              {showReviewProfile ? <ReviewSummaryCard title="Personal Details" icon={UserRound}>
                 <div className="space-y-2">
                   {personalRows.map((row) => (
                     <ReviewInfoRow key={row.label} icon={row.icon} label={row.label} value={row.value} />
                   ))}
                 </div>
-              </ReviewSummaryCard>
+              </ReviewSummaryCard> : null}
 
-              <ReviewSummaryCard title="Qualifications & Expertise" icon={GraduationCap}>
+              {showReviewCredentials ? <ReviewSummaryCard title="Qualifications & Expertise" icon={GraduationCap}>
                 <div className="space-y-2">
                   {qualificationRows.map((row) => (
                     <ReviewInfoRow
@@ -951,9 +1082,10 @@ function TrainerFinalReviewScreen({
                     {values.clientPitch || 'Not added yet'}
                   </p>
                 </div>
-              </ReviewSummaryCard>
+              </ReviewSummaryCard> : null}
 
-              <div className="grid content-start gap-4">
+              {showReviewOperations || showReviewSubmit ? <div className="grid content-start gap-3">
+                {showReviewOperations ? (
                 <ReviewSummaryCard title="Coaching & Rates" icon={Dumbbell}>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {coachingRows.map((row) => (
@@ -969,7 +1101,9 @@ function TrainerFinalReviewScreen({
                     ))}
                   </div>
                 </ReviewSummaryCard>
+                ) : null}
 
+                {showReviewSubmit ? (
                 <ReviewSummaryCard title="Portfolio & Verification" icon={ShieldCheck}>
                   <div className="grid gap-3 sm:grid-cols-2">
                     {verificationRows.map((row) => (
@@ -984,12 +1118,13 @@ function TrainerFinalReviewScreen({
                     ))}
                   </div>
                 </ReviewSummaryCard>
-              </div>
+                ) : null}
+              </div> : null}
             </section>
           </div>
 
-          <footer className="mt-4 shrink-0 border-t border-[#ece7fb] pt-4">
-            <div className="flex items-center justify-between gap-4">
+          <footer className="mt-3 shrink-0 border-t border-[#ece7fb] pt-3 [@media(max-height:760px)]:lg:pt-2">
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <p className="text-[0.96rem] font-medium text-[#6975a6]">Review the details once more, then submit your trainer profile.</p>
                 <button
@@ -1006,7 +1141,7 @@ function TrainerFinalReviewScreen({
                 type="button"
                 onClick={onPrimaryAction}
                 disabled={loading || disabled}
-                className="h-[60px] min-w-[280px] rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] px-8 text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                className="h-14 w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] px-8 text-[1.02rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03] sm:w-auto sm:min-w-[240px] [@media(max-height:760px)]:lg:h-12"
               >
                 {loading ? (
                   'Please wait...'
@@ -1035,14 +1170,14 @@ function ReviewSummaryCard({
   children: React.ReactNode;
 }) {
   return (
-    <section className="min-h-0 rounded-[24px] border border-[#e8e2fb] bg-white px-5 py-4 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
+    <section className="min-h-0 rounded-[20px] border border-[#e8e2fb] bg-white px-4 py-3 shadow-[0_18px_46px_rgba(102,75,212,0.08)]">
       <div className="flex items-center gap-3">
-        <div className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-[#f5f1ff] text-[#6d48ff]">
-          <Icon size={21} strokeWidth={2} />
+        <div className="inline-flex h-9 w-9 items-center justify-center rounded-2xl bg-[#f5f1ff] text-[#6d48ff]">
+          <Icon size={18} strokeWidth={2} />
         </div>
-        <h3 className="text-[1.1rem] font-semibold tracking-[-0.02em] text-[#1d256c]">{title}</h3>
+        <h3 className="text-[1rem] font-semibold tracking-[-0.02em] text-[#1d256c]">{title}</h3>
       </div>
-      <div className="mt-4 min-h-0">{children}</div>
+      <div className="mt-3 min-h-0">{children}</div>
     </section>
   );
 }
@@ -1059,15 +1194,15 @@ function ReviewInfoRow({
   downloadable?: boolean;
 }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-[#f0ecfb] py-2.5 last:border-b-0">
+    <div className="flex items-center justify-between gap-3 border-b border-[#f0ecfb] py-1.5 last:border-b-0">
       <div className="flex min-w-0 items-center gap-3">
-        <div className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
-          <Icon size={18} strokeWidth={2} />
+        <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+          <Icon size={15} strokeWidth={2} />
         </div>
-        <p className="text-[0.97rem] font-medium text-[#6a749f]">{label}</p>
+        <p className="text-[0.86rem] font-medium text-[#6a749f]">{label}</p>
       </div>
       <div className="flex min-w-0 items-center gap-2">
-        <p className="truncate text-right text-[0.98rem] font-semibold text-[#182062]">{value}</p>
+        <p className="truncate text-right text-[0.88rem] font-semibold text-[#182062]">{value}</p>
         {downloadable ? <Download className="h-4 w-4 shrink-0 text-[#7352ff]" strokeWidth={2} /> : null}
       </div>
     </div>
@@ -1090,16 +1225,16 @@ function ReviewStatTile({
   quiet?: boolean;
 }) {
   return (
-    <div className="flex min-h-[88px] gap-3 rounded-[18px] border border-[#f0ecfb] bg-[#fcfbff] px-3.5 py-3">
-      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
-        <Icon size={18} strokeWidth={2} />
+    <div className="flex min-h-[68px] gap-2 rounded-[16px] border border-[#f0ecfb] bg-[#fcfbff] px-3 py-2.5">
+      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+        <Icon size={15} strokeWidth={2} />
       </div>
       <div className="min-w-0">
-        <p className="text-[0.92rem] font-medium text-[#7480ad]">{label}</p>
+        <p className="text-[0.82rem] font-medium text-[#7480ad]">{label}</p>
         <div className="mt-1 flex min-w-0 items-start gap-2">
           <p className={cn(
-            'min-w-0 text-[1rem] font-semibold text-[#1b246b]',
-            multiline && '[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:3] overflow-hidden',
+            'min-w-0 text-[0.88rem] font-semibold leading-5 text-[#1b246b]',
+            multiline && '[display:-webkit-box] [-webkit-box-orient:vertical] [-webkit-line-clamp:2] overflow-hidden',
             quiet && 'text-[#7f86aa]',
           )}>
             {value}
@@ -1125,15 +1260,15 @@ function ReviewFileTile({
   quiet?: boolean;
 }) {
   return (
-    <div className="flex min-h-[76px] items-start gap-3 rounded-[18px] border border-[#f0ecfb] bg-[#fcfbff] px-3.5 py-3">
-      <div className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
-        <Icon size={18} strokeWidth={2} />
+    <div className="flex min-h-[62px] items-start gap-2 rounded-[16px] border border-[#f0ecfb] bg-[#fcfbff] px-3 py-2.5">
+      <div className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-[#f7f3ff] text-[#7654ff]">
+        <Icon size={15} strokeWidth={2} />
       </div>
       <div className="min-w-0 flex-1">
-        <p className="text-[0.92rem] font-medium text-[#7480ad]">{label}</p>
+        <p className="text-[0.82rem] font-medium text-[#7480ad]">{label}</p>
         <div className="mt-1 flex items-center gap-2">
           <span className={cn(
-            'inline-flex max-w-full items-center rounded-full px-3 py-1 text-[0.92rem] font-semibold',
+            'inline-flex max-w-full items-center rounded-full px-2.5 py-0.5 text-[0.82rem] font-semibold',
             quiet ? 'bg-[#efedf8] text-[#7f86aa]' : 'bg-[#f1ebff] text-[#5f3dff]',
           )}>
             <span className="truncate">{value}</span>
@@ -1157,6 +1292,8 @@ function renderCurrentScreen({
   submittedAt,
   submissionError,
   submissionIssues,
+  activeSegment,
+  isSegmented,
   onSkipShowcase,
   onJumpToScreen,
 }: {
@@ -1171,6 +1308,8 @@ function renderCurrentScreen({
   submittedAt: string | null;
   submissionError: string;
   submissionIssues: TrainerSubmissionIssue[];
+  activeSegment: TrainerResponsiveSegment;
+  isSegmented: boolean;
   onSkipShowcase: () => void;
   onJumpToScreen: (screenId: TrainerOnboardingScreenId) => void;
 }) {
@@ -1185,7 +1324,7 @@ function renderCurrentScreen({
   switch (screen.id) {
     case 'personalInfo':
       return (
-        <div className="space-y-5">
+        <div className="space-y-4 [@media(max-height:760px)]:lg:space-y-3">
           <FormInput
             label="Full name"
             placeholder="Enter your full name"
@@ -1221,30 +1360,32 @@ function renderCurrentScreen({
 
     case 'contact':
       return (
-        <div className="space-y-5">
-          <FormInput
-            label="Email"
-            type="email"
-            placeholder="coach@example.com"
-            inputProps={register('profile.email')}
-            error={findErrorMessage(errors, 'profile.email')}
-          />
+        <div className="space-y-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormInput
+              label="Email"
+              type="email"
+              placeholder="coach@example.com"
+              inputProps={register('profile.email')}
+              error={findErrorMessage(errors, 'profile.email')}
+            />
 
-          <FormInput
-            label="Mobile number"
-            type="tel"
-            inputMode="tel"
-            placeholder="+91 98765 43210"
-            inputProps={register('profile.mobile')}
-            error={findErrorMessage(errors, 'profile.mobile')}
-          />
-          <p className="text-sm text-slate-500">Use the mobile number where clients and the Aura team can reach you.</p>
+            <FormInput
+              label="Mobile number"
+              type="tel"
+              inputMode="tel"
+              placeholder="+91 98765 43210"
+              inputProps={register('profile.mobile')}
+              error={findErrorMessage(errors, 'profile.mobile')}
+            />
+          </div>
+          <p className="text-xs text-slate-500">Use the mobile number where clients and the Aura team can reach you.</p>
         </div>
       );
 
     case 'location':
       return (
-        <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormInput
             label="City"
             placeholder="Hyderabad"
@@ -1276,20 +1417,22 @@ function renderCurrentScreen({
 
     case 'certification':
       return (
-        <div className="space-y-5">
-          <FormInput
-            label="Certification institute"
-            placeholder="K11 Academy of Fitness Sciences"
-            inputProps={register('certification.institute')}
-            error={findErrorMessage(errors, 'certification.institute')}
-          />
+        <div className="space-y-4 [@media(max-height:760px)]:lg:space-y-3">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <FormInput
+              label="Certification institute"
+              placeholder="K11 Academy of Fitness Sciences"
+              inputProps={register('certification.institute')}
+              error={findErrorMessage(errors, 'certification.institute')}
+            />
 
-          <FormInput
-            label="Certification type"
-            placeholder="Personal Trainer Certification"
-            inputProps={register('certification.type')}
-            error={findErrorMessage(errors, 'certification.type')}
-          />
+            <FormInput
+              label="Certification type"
+              placeholder="Personal Trainer Certification"
+              inputProps={register('certification.type')}
+              error={findErrorMessage(errors, 'certification.type')}
+            />
+          </div>
 
           <SingleUploadField
             label="Certificate file"
@@ -1327,7 +1470,7 @@ function renderCurrentScreen({
 
     case 'experience':
       return (
-        <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormInput
             label="Years experience"
             type="number"
@@ -1358,58 +1501,62 @@ function renderCurrentScreen({
 
     case 'showcase':
       return (
-        <div className="space-y-5">
-          <MultiUploadField
-            label="Transformation photos"
-            hint="Upload before and after images or progress snapshots"
-            icon={ImagePlus}
-            files={values.showcase.transformationPhotos}
-            previewKind="image"
-            accept="image/*"
-            error={findErrorMessage(errors, 'showcase.transformationPhotos')}
-            onSelect={async (files) => {
-              const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'image', true)));
-              setValue('showcase.transformationPhotos', [...values.showcase.transformationPhotos, ...nextItems], {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-              clearErrors('showcase.transformationPhotos');
-            }}
-            onRemove={(id) =>
-              setValue(
-                'showcase.transformationPhotos',
-                values.showcase.transformationPhotos.filter((item) => item.id !== id),
-                { shouldDirty: true, shouldValidate: true },
-              )
-            }
-          />
+        <div className="space-y-4">
+          {(!isSegmented || activeSegment === 'showcasePhotos') ? (
+            <MultiUploadField
+              label="Transformation photos"
+              hint="Upload before and after images or progress snapshots"
+              icon={ImagePlus}
+              files={values.showcase.transformationPhotos}
+              previewKind="image"
+              accept="image/*"
+              error={findErrorMessage(errors, 'showcase.transformationPhotos')}
+              onSelect={async (files) => {
+                const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'image', true)));
+                setValue('showcase.transformationPhotos', [...values.showcase.transformationPhotos, ...nextItems], {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                clearErrors('showcase.transformationPhotos');
+              }}
+              onRemove={(id) =>
+                setValue(
+                  'showcase.transformationPhotos',
+                  values.showcase.transformationPhotos.filter((item) => item.id !== id),
+                  { shouldDirty: true, shouldValidate: true },
+                )
+              }
+            />
+          ) : null}
 
-          <MultiUploadField
-            label="Videos"
-            hint="Upload a coaching reel, demo set, or client story"
-            icon={Video}
-            files={values.showcase.videos}
-            previewKind="video"
-            accept="video/*"
-            error={findErrorMessage(errors, 'showcase.videos')}
-            onSelect={async (files) => {
-              const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'video', true)));
-              setValue('showcase.videos', [...values.showcase.videos, ...nextItems], {
-                shouldDirty: true,
-                shouldValidate: true,
-              });
-              clearErrors('showcase.videos');
-            }}
-            onRemove={(id) => {
-              const item = values.showcase.videos.find((entry) => entry.id === id);
-              revokeUploadPreview(item);
-              setValue(
-                'showcase.videos',
-                values.showcase.videos.filter((entry) => entry.id !== id),
-                { shouldDirty: true, shouldValidate: true },
-              );
-            }}
-          />
+          {(!isSegmented || activeSegment === 'showcaseVideos') ? (
+            <MultiUploadField
+              label="Videos"
+              hint="Upload a coaching reel, demo set, or client story"
+              icon={Video}
+              files={values.showcase.videos}
+              previewKind="video"
+              accept="video/*"
+              error={findErrorMessage(errors, 'showcase.videos')}
+              onSelect={async (files) => {
+                const nextItems = await Promise.all(files.map((file) => toUploadValue(file, 'video', true)));
+                setValue('showcase.videos', [...values.showcase.videos, ...nextItems], {
+                  shouldDirty: true,
+                  shouldValidate: true,
+                });
+                clearErrors('showcase.videos');
+              }}
+              onRemove={(id) => {
+                const item = values.showcase.videos.find((entry) => entry.id === id);
+                revokeUploadPreview(item);
+                setValue(
+                  'showcase.videos',
+                  values.showcase.videos.filter((entry) => entry.id !== id),
+                  { shouldDirty: true, shouldValidate: true },
+                );
+              }}
+            />
+          ) : null}
 
           <Button type="button" variant="outline" onClick={onSkipShowcase} className="h-12 w-full rounded-xl border-slate-300">
             Skip for now
@@ -1419,33 +1566,37 @@ function renderCurrentScreen({
 
     case 'training':
       return (
-        <div className="space-y-5">
-          <FormTextArea
-            label="Training philosophy"
-            placeholder="Example: I focus on sustainable progress, strong movement fundamentals, and coaching clients in a way that fits their real life."
-            textAreaProps={register('training.philosophy')}
-            error={findErrorMessage(errors, 'training.philosophy')}
-          />
+        <div className="space-y-4">
+          {(!isSegmented || activeSegment === 'trainingPhilosophy') ? (
+            <FormTextArea
+              label="Training philosophy"
+              placeholder="Example: I focus on sustainable progress, strong movement fundamentals, and coaching clients in a way that fits their real life."
+              textAreaProps={register('training.philosophy')}
+              error={findErrorMessage(errors, 'training.philosophy')}
+            />
+          ) : null}
 
-          <SingleUploadField
-            label="Introduction video (optional)"
-            hint="A short self-introduction helps the review team understand your energy and clarity"
-            icon={Video}
-            file={values.training.introductionVideo}
-            previewKind="video"
-            accept="video/*"
-            error={findErrorMessage(errors, 'training.introductionVideo')}
-            onSelect={async (file) => {
-              revokeUploadPreview(values.training.introductionVideo);
-              const upload = await toUploadValue(file, 'video', true);
-              setValue('training.introductionVideo', upload, { shouldDirty: true, shouldValidate: true });
-              clearErrors('training.introductionVideo');
-            }}
-            onClear={() => {
-              revokeUploadPreview(values.training.introductionVideo);
-              setValue('training.introductionVideo', null, { shouldDirty: true, shouldValidate: true });
-            }}
-          />
+          {(!isSegmented || activeSegment === 'trainingVideo') ? (
+            <SingleUploadField
+              label="Introduction video (optional)"
+              hint="A short self-introduction helps the review team understand your energy and clarity"
+              icon={Video}
+              file={values.training.introductionVideo}
+              previewKind="video"
+              accept="video/*"
+              error={findErrorMessage(errors, 'training.introductionVideo')}
+              onSelect={async (file) => {
+                revokeUploadPreview(values.training.introductionVideo);
+                const upload = await toUploadValue(file, 'video', true);
+                setValue('training.introductionVideo', upload, { shouldDirty: true, shouldValidate: true });
+                clearErrors('training.introductionVideo');
+              }}
+              onClear={() => {
+                revokeUploadPreview(values.training.introductionVideo);
+                setValue('training.introductionVideo', null, { shouldDirty: true, shouldValidate: true });
+              }}
+            />
+          ) : null}
         </div>
       );
 
@@ -1484,7 +1635,7 @@ function renderCurrentScreen({
 
     case 'pricing':
       return (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <FormTextArea
             label="Pricing notes (optional)"
             placeholder="Add package details, online coaching options, or other pricing notes."
@@ -1515,13 +1666,14 @@ function renderCurrentScreen({
 
     case 'identity':
       return (
-        <div className="space-y-5">
+        <div className="space-y-4">
           <p className="border-l-2 border-slate-300 pl-4 text-sm text-slate-600">
             PAN plus one primary ID is required. You can add the others now if you have them handy.
           </p>
 
           <div className="grid gap-4 sm:grid-cols-2">
-            <SingleUploadField
+            {(!isSegmented || activeSegment === 'identityRequired') ? <>
+              <SingleUploadField
               label="Aadhaar"
               hint="Front image or PDF"
               icon={ShieldCheck}
@@ -1550,8 +1702,10 @@ function renderCurrentScreen({
               }}
               onClear={() => setValue('identity.pan', null, { shouldDirty: true, shouldValidate: true })}
             />
+            </> : null}
 
-            <SingleUploadField
+            {(!isSegmented || activeSegment === 'identityOptional') ? <>
+              <SingleUploadField
               label="Passport"
               hint="Optional alternate primary ID"
               icon={MapPin}
@@ -1578,13 +1732,14 @@ function renderCurrentScreen({
               }}
               onClear={() => setValue('identity.drivingLicense', null, { shouldDirty: true, shouldValidate: true })}
             />
+            </> : null}
           </div>
         </div>
       );
 
     case 'payout':
       return (
-        <div className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2">
           <FormInput
             label="Bank name"
             placeholder="HDFC Bank"
@@ -1756,7 +1911,9 @@ function renderCurrentScreen({
 
 function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   const navigate = useNavigate();
+  const viewportMode = useTrainerViewportMode();
   const [screen, setScreen] = useState<'account' | 'otp'>('account');
+  const [accountStep, setAccountStep] = useState<TrainerAccountStep>('name');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -1779,6 +1936,45 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   const resendSeconds = challenge ? Math.max(0, Math.ceil((new Date(challenge.resendAvailableAt).getTime() - clock) / 1000)) : 0;
   const expired = challenge ? new Date(challenge.expiresAt).getTime() <= clock : false;
   const isAccountDisabled = !consent || password.length < 8 || !name || !email || !mobile;
+  const accountStepIndex = Math.max(0, trainerAccountSteps.indexOf(accountStep));
+  const hasAccountStepBack = viewportMode.isCompactAccount && screen === 'account' && accountStepIndex > 0;
+  const hasAccountStepNext = viewportMode.isCompactAccount && screen === 'account' && accountStepIndex < trainerAccountSteps.length - 1;
+  // Desktop validates the whole account form; compact screens validate the currently visible field.
+  const isCurrentAccountStepDisabled =
+    accountStep === 'name'
+      ? !name.trim()
+      : accountStep === 'email'
+        ? !email.trim()
+        : accountStep === 'mobile'
+          ? !mobile.trim()
+          : !consent || password.length < 8;
+  const accountPrimaryLabel = hasAccountStepNext ? 'Continue' : 'Send verification code';
+
+  function goBack() {
+    // OTP is a separate screen; compact account fields are sub-steps of the account screen.
+    if (screen === 'otp') {
+      setScreen('account');
+      return;
+    }
+    if (hasAccountStepBack) {
+      setAccountStep(trainerAccountSteps[accountStepIndex - 1]);
+      return;
+    }
+    navigate('/');
+  }
+
+  function handleAccountPrimaryAction() {
+    // Compact screens advance field-by-field before requesting the OTP.
+    if (screen === 'otp') {
+      void verifyOtp();
+      return;
+    }
+    if (hasAccountStepNext) {
+      setAccountStep(trainerAccountSteps[accountStepIndex + 1]);
+      return;
+    }
+    void sendOtp();
+  }
 
   async function sendOtp() {
     setLoading(true);
@@ -1832,17 +2028,17 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
   }
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] px-0 py-0 text-[#090B3F]">
+    <div className="min-h-dvh overflow-y-auto bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] px-0 py-0 text-[#090B3F] lg:h-screen lg:overflow-hidden">
       <div
-        className="flex h-screen flex-col overflow-hidden bg-white"
+        className="flex min-h-dvh flex-col bg-white lg:h-screen lg:overflow-hidden"
         style={{ background: trainerEntryShellBackground }}
       >
-        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+        <header className="shrink-0 border-b border-[#ece7fb] bg-white/72 px-3 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7 lg:py-3 [@media(max-height:760px)]:lg:py-2">
+          <div className="grid grid-cols-[42px_1fr_42px] items-center gap-3 sm:grid-cols-[46px_1fr_46px]">
             <button
               type="button"
-              onClick={() => (screen === 'otp' ? setScreen('account') : navigate('/'))}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              onClick={goBack}
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Go back"
             >
               <ArrowLeft size={20} />
@@ -1855,7 +2051,7 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
             <button
               type="button"
               onClick={() => navigate('/')}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Close onboarding"
             >
               <X size={20} />
@@ -1863,72 +2059,75 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.08fr_0.92fr]">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[0.94fr_1.06fr] xl:grid-cols-[1fr_1fr]">
+          {/* Keep the desktop illustration in a fixed-height band so it cannot clip under the header. */}
           <section
-            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            className="relative flex h-[30dvh] min-h-[205px] max-h-[250px] shrink-0 overflow-hidden border-b border-[#ebe6fb] px-4 py-2.5 sm:h-[44dvh] sm:min-h-[320px] sm:max-h-[430px] sm:py-3 lg:h-auto lg:max-h-none lg:border-b-0 lg:border-r lg:px-5 lg:py-4 xl:px-8 [@media(max-height:700px)]:h-[28dvh] [@media(max-height:700px)]:min-h-[185px] [@media(max-height:760px)]:lg:py-3"
             style={{ background: trainerEntryHeroBackground }}
           >
-            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
-              <div className="relative mx-auto w-full max-w-[680px]">
+            <div className="relative mx-auto flex h-full w-full max-w-[720px] flex-col justify-center lg:justify-start">
+              <div className="relative mx-auto flex w-full max-w-[620px] items-center justify-center lg:h-[300px] xl:h-[360px] [@media(max-height:760px)]:lg:h-[250px]">
                 <div className="pointer-events-none absolute left-[10%] top-[20%] hidden h-48 w-48 rounded-full bg-[radial-gradient(circle,_rgba(182,161,255,0.25)_0%,_rgba(182,161,255,0)_72%)] blur-xl lg:block" />
                 <div className="pointer-events-none absolute right-[8%] top-[10%] hidden h-40 w-40 rounded-full bg-[radial-gradient(circle,_rgba(255,255,255,0.95)_0%,_rgba(255,255,255,0)_72%)] blur-xl lg:block" />
 
-                <div className="relative overflow-visible">
+                <div className="relative flex h-full w-full items-center justify-center overflow-visible">
                   <img
                     src={trainerOnboardingIllustration}
                     alt="Personal trainer onboarding illustration"
-                    className="relative z-10 mx-auto w-full max-w-[760px] object-contain"
+                    className="relative z-10 mx-auto h-auto max-h-[14dvh] w-full max-w-[420px] object-contain sm:max-h-[25dvh] sm:max-w-[520px] lg:h-full lg:max-h-full lg:w-auto lg:max-w-full [@media(max-height:700px)]:max-h-[13dvh]"
                   />
 
                   <TrainerEntryHeroBadge
-                    className="left-[6%] top-[34%] hidden md:flex lg:left-[10%] lg:top-[27%]"
+                    className="left-[6%] top-[34%] hidden lg:left-[10%] lg:top-[27%] lg:flex"
                     icon={BarChart3}
                     label="Analytics"
                   />
                   <TrainerEntryHeroBadge
-                    className="right-[10%] top-[28%] hidden md:flex lg:right-[12%] lg:top-[22%]"
+                    className="right-[10%] top-[28%] hidden lg:right-[12%] lg:top-[22%] lg:flex"
                     icon={Heart}
                     label="Care"
                   />
                   <TrainerEntryHeroBadge
-                    className="right-[2%] top-[50%] hidden md:flex lg:right-[6%] lg:top-[44%]"
+                    className="right-[2%] top-[50%] hidden lg:right-[6%] lg:top-[44%] lg:flex"
                     icon={CircleUserRound}
                     label="Profile"
                   />
                 </div>
               </div>
 
-              <div className="mx-auto mt-2 max-w-[620px] text-center">
-                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.45rem]">
+              <div className="mx-auto mt-0.5 max-w-[580px] text-center sm:mt-1 lg:mt-2 [@media(max-height:760px)]:lg:mt-1">
+                <h2 className="text-[1.12rem] font-bold leading-[1.04] tracking-[-0.02em] text-[#12186d] sm:text-[1.55rem] sm:tracking-[-0.035em] lg:text-[1.65rem] xl:text-[2.2rem] [@media(max-height:760px)]:lg:text-[1.55rem]">
                   {screen === 'account' ? 'Start your trainer journey' : 'Secure your trainer journey'}
                 </h2>
-                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                <p className="mx-auto mt-1 max-w-[520px] text-[0.74rem] font-medium leading-4 text-[#5b6697] sm:mt-1.5 sm:text-[0.9rem] sm:leading-5 lg:text-[0.9rem] xl:text-[0.98rem] [@media(max-height:760px)]:lg:line-clamp-2">
                   {screen === 'account'
                     ? 'Empower lives, build lasting habits, and grow your impact with tools designed for your success.'
                     : 'Confirm your mobile number to unlock the full trainer application and continue building your profile.'}
                 </p>
               </div>
 
-              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:mt-8 xl:grid-cols-3">
+              <div className="mx-auto mt-3 hidden w-full max-w-[720px] gap-2 lg:grid lg:grid-cols-3 xl:mt-4 [@media(max-height:760px)]:lg:mt-2">
                 {trainerEntryHighlights.map(({ title, description, icon: Icon }) => (
                   <div
                     key={title}
-                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                    className="flex items-center gap-2 rounded-[18px] border border-white/70 bg-white/55 px-3 py-2 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px] xl:block xl:py-3"
                   >
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
-                      <Icon size={20} strokeWidth={2.1} />
+                    <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)] xl:h-10 xl:w-10">
+                      <Icon size={18} strokeWidth={2.1} />
                     </div>
-                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
-                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                    <div>
+                      <p className="text-[0.86rem] font-semibold leading-tight text-[#182062] xl:mt-3 xl:text-[0.94rem]">{title}</p>
+                      <p className="mt-1 hidden text-xs leading-5 text-[#6674a7] xl:block">{description}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </section>
 
-          <section className="flex min-h-0 items-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
+          <section className="flex min-h-0 items-start px-4 py-4 sm:px-6 lg:items-center lg:overflow-hidden lg:px-8 lg:py-4 xl:px-12 [@media(max-height:760px)]:lg:py-3">
             <div
-              className="mx-auto flex h-full w-full max-w-[760px] flex-col justify-center"
+              className="mx-auto flex w-full max-w-[680px] flex-col justify-center lg:h-full"
               style={{ background: trainerEntryPanelBackground }}
             >
               <AnimatePresence mode="wait" initial={false}>
@@ -1941,86 +2140,115 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
                 >
                   {screen === 'account' ? (
                     <>
-                      <div className="space-y-3">
-                        <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6345ff]">Personal trainer application</p>
-                        <h1 className="text-[2rem] font-bold leading-[1.03] tracking-[-0.045em] text-[#12186d] sm:text-[2.6rem] xl:text-[2.9rem]">
+                      <div className="space-y-2 sm:space-y-3">
+                        <p className="text-[0.68rem] font-bold uppercase tracking-[0.17em] text-[#6345ff] sm:text-xs sm:tracking-[0.22em]">Personal trainer application</p>
+                        <h1 className="text-[1.45rem] font-bold leading-[1.03] tracking-[-0.03em] text-[#12186d] sm:text-[2.25rem] sm:tracking-[-0.045em] xl:text-[2.55rem] [@media(max-height:760px)]:lg:text-[2.15rem]">
                           Create your trainer account
                         </h1>
-                        <p className="max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] sm:text-[1.04rem]">
+                        <p className="max-w-[540px] text-[0.82rem] font-medium leading-5 text-[#5b6697] sm:text-[1rem] sm:leading-6 [@media(max-height:760px)]:lg:line-clamp-2">
                           Set up your secure account before building your professional profile.
                         </p>
                       </div>
 
-                      <div className="mt-7 space-y-4.5">
-                        <FormInput
-                          label="Full name"
-                          placeholder="Your full name"
-                          value={name}
-                          onChange={(event) => setName(event.target.value)}
-                          icon={<UserRound className="h-5 w-5" strokeWidth={2.05} />}
-                          inputProps={{ autoComplete: 'name' }}
-                        />
-                        <FormInput
-                          label="Email"
-                          type="email"
-                          placeholder="you@example.com"
-                          value={email}
-                          onChange={(event) => setEmail(event.target.value)}
-                          icon={<Mail className="h-5 w-5" strokeWidth={2.05} />}
-                          inputProps={{ autoComplete: 'email' }}
-                        />
-                        <FormInput
-                          label="Mobile number"
-                          type="tel"
-                          inputMode="tel"
-                          placeholder="+91 98765 43210"
-                          value={mobile}
-                          onChange={(event) => setMobile(event.target.value)}
-                          icon={<Phone className="h-5 w-5" strokeWidth={2.05} />}
-                          inputProps={{ autoComplete: 'tel' }}
-                        />
-                        <FormInput
-                          label="Password"
-                          type={showPassword ? 'text' : 'password'}
-                          placeholder="Minimum 8 characters"
-                          value={password}
-                          onChange={(event) => setPassword(event.target.value)}
-                          icon={<LockKeyhole className="h-5 w-5" strokeWidth={2.05} />}
-                          inputProps={{ autoComplete: 'new-password' }}
-                          trailing={
+                      <div className="mt-4 space-y-3 sm:mt-5 sm:space-y-3.5 [@media(max-height:760px)]:lg:mt-4 [@media(max-height:760px)]:lg:space-y-3">
+                        {viewportMode.isCompactAccount ? (
+                          // Progress bars map to name, email, mobile, and password/consent micro-steps.
+                          <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-[#7d6bd4]">
+                            {trainerAccountSteps.map((step) => (
+                              <span
+                                key={step}
+                                className={cn(
+                                  'h-1.5 flex-1 rounded-full bg-[#e5ddff]',
+                                  step === accountStep && 'bg-[#7654ff]',
+                                  trainerAccountSteps.indexOf(step) < accountStepIndex && 'bg-[#a58cff]',
+                                )}
+                              />
+                            ))}
+                          </div>
+                        ) : null}
+
+                        {(!viewportMode.isCompactAccount || accountStep === 'name') ? (
+                          <FormInput
+                            label="Full name"
+                            placeholder="Your full name"
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            icon={<UserRound className="h-5 w-5" strokeWidth={2.05} />}
+                            inputProps={{ autoComplete: 'name' }}
+                          />
+                        ) : null}
+
+                        {(!viewportMode.isCompactAccount || accountStep === 'email') ? (
+                          <FormInput
+                            label="Email"
+                            type="email"
+                            placeholder="you@example.com"
+                            value={email}
+                            onChange={(event) => setEmail(event.target.value)}
+                            icon={<Mail className="h-5 w-5" strokeWidth={2.05} />}
+                            inputProps={{ autoComplete: 'email' }}
+                          />
+                        ) : null}
+
+                        {(!viewportMode.isCompactAccount || accountStep === 'mobile') ? (
+                          <FormInput
+                            label="Mobile number"
+                            type="tel"
+                            inputMode="tel"
+                            placeholder="+91 98765 43210"
+                            value={mobile}
+                            onChange={(event) => setMobile(event.target.value)}
+                            icon={<Phone className="h-5 w-5" strokeWidth={2.05} />}
+                            inputProps={{ autoComplete: 'tel' }}
+                          />
+                        ) : null}
+
+                        {(!viewportMode.isCompactAccount || accountStep === 'password') ? (
+                          <>
+                            <FormInput
+                              label="Password"
+                              type={showPassword ? 'text' : 'password'}
+                              placeholder="Minimum 8 characters"
+                              value={password}
+                              onChange={(event) => setPassword(event.target.value)}
+                              icon={<LockKeyhole className="h-5 w-5" strokeWidth={2.05} />}
+                              inputProps={{ autoComplete: 'new-password' }}
+                              trailing={
+                                <button
+                                  type="button"
+                                  onClick={() => setShowPassword((value) => !value)}
+                                  className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#6f63b7] transition hover:bg-[#f3efff] hover:text-[#4c2cff]"
+                                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                                >
+                                  {showPassword ? <EyeOff className="h-5 w-5" strokeWidth={2} /> : <Eye className="h-5 w-5" strokeWidth={2} />}
+                                </button>
+                              }
+                            />
+
                             <button
                               type="button"
-                              onClick={() => setShowPassword((value) => !value)}
-                              className="inline-flex h-9 w-9 items-center justify-center rounded-full text-[#6f63b7] transition hover:bg-[#f3efff] hover:text-[#4c2cff]"
-                              aria-label={showPassword ? 'Hide password' : 'Show password'}
+                              onClick={() => setConsent((value) => !value)}
+                              className="inline-flex items-start gap-3 text-left text-[0.95rem] text-[#566497]"
                             >
-                              {showPassword ? <EyeOff className="h-5 w-5" strokeWidth={2} /> : <Eye className="h-5 w-5" strokeWidth={2} />}
+                              <span className="pt-0.5 text-[#7b5cff]">
+                                {consent ? <SquareCheck className="h-5 w-5" strokeWidth={2} /> : <Square className="h-5 w-5" strokeWidth={2} />}
+                              </span>
+                              <span>
+                                I agree to the{' '}
+                                <Link to="/terms-of-service" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
+                                  terms
+                                </Link>{' '}
+                                and{' '}
+                                <Link to="/privacy-policy" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
+                                  privacy policy
+                                </Link>
+                                .
+                              </span>
                             </button>
-                          }
-                        />
+                          </>
+                        ) : null}
 
-                        <button
-                          type="button"
-                          onClick={() => setConsent((value) => !value)}
-                          className="inline-flex items-start gap-3 text-left text-[0.98rem] text-[#566497]"
-                        >
-                          <span className="pt-0.5 text-[#7b5cff]">
-                            {consent ? <SquareCheck className="h-5 w-5" strokeWidth={2} /> : <Square className="h-5 w-5" strokeWidth={2} />}
-                          </span>
-                          <span>
-                            I agree to the{' '}
-                            <Link to="/terms-of-service" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
-                              terms
-                            </Link>{' '}
-                            and{' '}
-                            <Link to="/privacy-policy" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
-                              privacy policy
-                            </Link>
-                            .
-                          </span>
-                        </button>
-
-                        <p className="text-[0.98rem] text-[#566497]">
+                        <p className="text-[0.88rem] text-[#566497] sm:text-[0.98rem]">
                           Already started?{' '}
                           <Link to="/login" className="font-semibold text-[#5a32ff] transition hover:text-[#4018e0]">
                             Sign in to continue
@@ -2091,18 +2319,18 @@ function TrainerApplicantAccessPage({ onCreated }: { onCreated: () => void }) {
                     </p>
                   ) : null}
 
-                  <div className="mt-7">
+                  <div className="mt-4 sm:mt-5 [@media(max-height:760px)]:lg:mt-4">
                     <Button
                       type="button"
-                      onClick={() => void (screen === 'account' ? sendOtp() : verifyOtp())}
-                      disabled={loading || (screen === 'account' ? isAccountDisabled : otp.length !== 6 || expired)}
-                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                      onClick={handleAccountPrimaryAction}
+                      disabled={loading || (screen === 'account' ? (viewportMode.isCompactAccount ? isCurrentAccountStepDisabled : isAccountDisabled) : otp.length !== 6 || expired)}
+                      className="h-12 w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[0.98rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03] sm:h-14 sm:text-[1.02rem] [@media(max-height:760px)]:lg:h-12"
                     >
                       {loading ? (
                         'Please wait...'
                       ) : (
                         <span className="inline-flex items-center gap-3">
-                          {screen === 'account' ? 'Send verification code' : 'Verify & start application'}
+                          {screen === 'account' ? accountPrimaryLabel : 'Verify & start application'}
                           <ArrowRight size={19} />
                         </span>
                       )}
@@ -2144,14 +2372,14 @@ function TrainerWelcomeScreen({
   } = form;
 
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
-      <div className="flex h-screen flex-col overflow-hidden bg-white" style={{ background: trainerEntryShellBackground }}>
-        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+    <div className="min-h-dvh overflow-y-auto bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F] lg:h-screen lg:overflow-hidden">
+      <div className="flex min-h-dvh flex-col bg-white lg:h-screen lg:overflow-hidden" style={{ background: trainerEntryShellBackground }}>
+        <header className="shrink-0 border-b border-[#ece7fb] bg-white/72 px-3 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7 lg:py-3 [@media(max-height:760px)]:lg:py-2">
+          <div className="grid grid-cols-[42px_1fr_42px] items-center gap-3 sm:grid-cols-[46px_1fr_46px]">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Go back"
             >
               <ArrowLeft size={20} />
@@ -2164,7 +2392,7 @@ function TrainerWelcomeScreen({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Close onboarding"
             >
               <X size={20} />
@@ -2172,48 +2400,51 @@ function TrainerWelcomeScreen({
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.06fr_0.94fr]">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[0.94fr_1.06fr] xl:grid-cols-[1fr_1fr]">
+          {/* Same hero sizing contract as the public account screen: image first, compact copy below. */}
           <section
-            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            className="relative flex h-[30dvh] min-h-[205px] max-h-[250px] shrink-0 overflow-hidden border-b border-[#ebe6fb] px-4 py-2.5 sm:h-[44dvh] sm:min-h-[320px] sm:max-h-[430px] sm:py-3 lg:h-auto lg:max-h-none lg:border-b-0 lg:border-r lg:px-5 lg:py-4 xl:px-8 [@media(max-height:700px)]:h-[28dvh] [@media(max-height:700px)]:min-h-[185px] [@media(max-height:760px)]:lg:py-3"
             style={{ background: trainerEntryHeroBackground }}
           >
-            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
-              <div className="relative mx-auto w-full max-w-[720px]">
+            <div className="relative mx-auto flex h-full w-full max-w-[720px] flex-col justify-center lg:justify-start">
+              <div className="relative mx-auto flex w-full max-w-[620px] items-center justify-center lg:h-[300px] xl:h-[360px] [@media(max-height:760px)]:lg:h-[250px]">
                 <img
                   src={trainerWelcomeIllustration}
                   alt="Trainer onboarding welcome illustration"
-                  className="mx-auto w-full max-w-[760px] object-contain"
+                  className="mx-auto h-auto max-h-[14dvh] w-full max-w-[420px] object-contain sm:max-h-[25dvh] sm:max-w-[520px] lg:h-full lg:max-h-full lg:w-auto lg:max-w-full [@media(max-height:700px)]:max-h-[13dvh]"
                 />
               </div>
 
-              <div className="mx-auto mt-3 max-w-[620px] text-center">
-                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.5rem]">
+              <div className="mx-auto mt-0.5 max-w-[580px] text-center sm:mt-2">
+                <h2 className="text-[1.12rem] font-bold leading-[1.04] tracking-[-0.02em] text-[#12186d] sm:text-[1.55rem] sm:tracking-[-0.035em] lg:text-[1.65rem] xl:text-[2.2rem] [@media(max-height:760px)]:lg:text-[1.55rem]">
                   Let&apos;s begin your trainer journey
                 </h2>
-                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                <p className="mx-auto mt-1 max-w-[520px] text-[0.74rem] font-medium leading-4 text-[#5b6697] sm:mt-1.5 sm:text-[0.9rem] sm:leading-5 lg:text-[0.9rem] xl:text-[0.98rem] [@media(max-height:760px)]:lg:line-clamp-2">
                   Create a polished and trustworthy profile that helps clients know who you are and how you can help.
                 </p>
               </div>
 
-              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:grid-cols-3">
+              <div className="mx-auto mt-3 hidden w-full max-w-[720px] gap-2 lg:grid lg:grid-cols-3 xl:mt-4 [@media(max-height:760px)]:lg:mt-2">
                 {trainerWelcomeHighlights.map(({ title, description, icon: Icon }) => (
                   <div
                     key={title}
-                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                    className="flex items-center gap-2 rounded-[18px] border border-white/70 bg-white/55 px-3 py-2 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px] xl:block xl:py-3"
                   >
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
-                      <Icon size={20} strokeWidth={2.1} />
+                    <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)] xl:h-10 xl:w-10">
+                      <Icon size={18} strokeWidth={2.1} />
                     </div>
-                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
-                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                    <div>
+                      <p className="text-[0.86rem] font-semibold leading-tight text-[#182062] xl:mt-3 xl:text-[0.94rem]">{title}</p>
+                      <p className="mt-1 hidden text-xs leading-5 text-[#6674a7] xl:block">{description}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </section>
 
-          <section className="flex min-h-0 items-center overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
-            <div className="mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
+          <section className="flex min-h-0 items-start px-4 py-4 sm:px-6 lg:items-center lg:overflow-hidden lg:px-8 lg:py-4 xl:px-12 [@media(max-height:760px)]:lg:py-3">
+            <div className="mx-auto flex w-full max-w-[680px] flex-col justify-center lg:h-full">
               <AnimatePresence mode="wait" initial={false}>
                 <motion.section
                   key="trainer-welcome-step"
@@ -2224,16 +2455,16 @@ function TrainerWelcomeScreen({
                 >
                   <div className="space-y-3">
                     <p className="text-xs font-bold uppercase tracking-[0.22em] text-[#6345ff]">Welcome</p>
-                    <h1 className="text-[2rem] font-bold leading-[1.03] tracking-[-0.045em] text-[#12186d] sm:text-[2.6rem] xl:text-[2.9rem]">
+                    <h1 className="text-[1.85rem] font-bold leading-[1.03] tracking-[-0.045em] text-[#12186d] sm:text-[2.25rem] xl:text-[2.55rem] [@media(max-height:760px)]:lg:text-[2.15rem]">
                       Let&apos;s get started
                     </h1>
-                    <p className="max-w-[560px] text-[0.98rem] font-medium leading-7 text-[#5b6697] sm:text-[1.04rem]">
+                    <p className="max-w-[560px] text-[0.94rem] font-medium leading-6 text-[#5b6697] sm:text-[1rem] [@media(max-height:760px)]:lg:line-clamp-2">
                       We&apos;ll help you create a trainer profile that feels polished, trustworthy, and easy for clients to understand.
                     </p>
                     <p className="text-[0.98rem] font-medium text-[#5b6697]">Two quick details to begin.</p>
                   </div>
 
-                  <div className="mt-7 space-y-5">
+                  <div className="mt-5 space-y-4 [@media(max-height:760px)]:lg:mt-4 [@media(max-height:760px)]:lg:space-y-3">
                     <FormInput
                       label="Full name"
                       placeholder="Enter your full name"
@@ -2272,12 +2503,12 @@ function TrainerWelcomeScreen({
                     </p>
                   ) : null}
 
-                  <div className="mt-7">
+                  <div className="mt-5 [@media(max-height:760px)]:lg:mt-4">
                     <Button
                       type="button"
                       onClick={onPrimaryAction}
                       disabled={loading}
-                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                      className="h-14 w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.02rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03] [@media(max-height:760px)]:lg:h-12"
                     >
                       {loading ? (
                         'Please wait...'
@@ -2319,6 +2550,7 @@ function TrainerApplicationScreenShell({
   footerLabel,
   loading,
   footerDisabled,
+  viewportMode,
   onBack,
   onClose,
   onPrimaryAction,
@@ -2333,6 +2565,7 @@ function TrainerApplicationScreenShell({
   footerLabel: string;
   loading: boolean;
   footerDisabled?: boolean;
+  viewportMode: ReturnType<typeof useTrainerViewportMode>;
   onBack: () => void;
   onClose: () => void;
   onPrimaryAction: () => void;
@@ -2340,14 +2573,14 @@ function TrainerApplicationScreenShell({
   children: React.ReactNode;
 }) {
   return (
-    <div className="h-screen overflow-hidden bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F]">
-      <div className="flex h-screen flex-col overflow-hidden bg-white" style={{ background: trainerEntryShellBackground }}>
-        <header className="border-b border-[#ece7fb] bg-white/72 px-4 py-4 backdrop-blur-xl sm:px-6 lg:px-8">
-          <div className="grid grid-cols-[48px_1fr_48px] items-center gap-3">
+    <div className="min-h-dvh overflow-y-auto bg-[radial-gradient(circle_at_top_left,_#ffffff_0%,_#f8f4ff_42%,_#f1ecff_100%)] text-[#090B3F] lg:h-screen lg:overflow-hidden">
+      <div className="flex min-h-dvh flex-col bg-white lg:h-screen lg:overflow-hidden" style={{ background: trainerEntryShellBackground }}>
+        <header className="shrink-0 border-b border-[#ece7fb] bg-white/72 px-3 py-2.5 backdrop-blur-xl sm:px-5 lg:px-7 lg:py-3 [@media(max-height:760px)]:lg:py-2">
+          <div className="grid grid-cols-[42px_1fr_42px] items-center gap-3 sm:grid-cols-[46px_1fr_46px]">
             <button
               type="button"
               onClick={onBack}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#5d49de] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Go back"
             >
               <ArrowLeft size={20} />
@@ -2362,7 +2595,7 @@ function TrainerApplicationScreenShell({
             <button
               type="button"
               onClick={onClose}
-              className="inline-flex h-12 w-12 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9]"
+              className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#ede8ff] bg-white text-[#7a69cf] shadow-[0_10px_24px_rgba(123,92,255,0.12)] transition hover:-translate-y-0.5 hover:text-[#4526d9] sm:h-11 sm:w-11"
               aria-label="Close onboarding"
             >
               <X size={20} />
@@ -2370,51 +2603,57 @@ function TrainerApplicationScreenShell({
           </div>
         </header>
 
-        <div className="grid min-h-0 flex-1 lg:grid-cols-[1.06fr_0.94fr]">
+        <div className="grid min-h-0 flex-1 lg:grid-cols-[0.9fr_1.1fr] xl:grid-cols-[0.96fr_1.04fr]">
+          {/* Authenticated steps reuse the visual rail, but the right side owns all form progression. */}
           <section
-            className="relative hidden overflow-hidden border-r border-[#ebe6fb] px-8 py-8 lg:flex xl:px-10"
+            className={cn(
+              'relative flex h-[30dvh] min-h-[205px] max-h-[250px] shrink-0 overflow-hidden border-b border-[#ebe6fb] px-4 py-2.5 sm:h-[44dvh] sm:min-h-[320px] sm:max-h-[430px] sm:py-3 lg:h-auto lg:max-h-none lg:border-b-0 lg:border-r lg:px-5 lg:py-4 xl:px-8 [@media(max-height:700px)]:h-[28dvh] [@media(max-height:700px)]:min-h-[185px] [@media(max-height:760px)]:lg:py-3',
+              viewportMode.isShort && 'lg:px-4',
+            )}
             style={{ background: trainerEntryHeroBackground }}
           >
-            <div className="relative mx-auto flex h-full w-full max-w-[760px] flex-col justify-center">
-              <div className="relative mx-auto w-full max-w-[720px]">
+            <div className="relative mx-auto flex h-full w-full max-w-[700px] flex-col justify-center lg:justify-start">
+              <div className="relative mx-auto flex w-full max-w-[600px] items-center justify-center lg:h-[280px] xl:h-[340px] [@media(max-height:760px)]:lg:h-[230px]">
                 <img
                   src={trainerWelcomeIllustration}
                   alt="Trainer onboarding illustration"
-                  className="mx-auto w-full max-w-[760px] object-contain"
+                  className="mx-auto h-auto max-h-[14dvh] w-full max-w-[420px] object-contain sm:max-h-[25dvh] sm:max-w-[520px] lg:h-full lg:max-h-full lg:w-auto lg:max-w-full [@media(max-height:700px)]:max-h-[13dvh]"
                 />
               </div>
 
-              <div className="mx-auto mt-3 max-w-[620px] text-center">
-                <h2 className="text-[2rem] font-bold leading-[1.04] tracking-[-0.045em] text-[#12186d] xl:text-[2.5rem]">
+              <div className="mx-auto mt-0.5 max-w-[580px] text-center sm:mt-2">
+                <h2 className="text-[1.12rem] font-bold leading-[1.04] tracking-[-0.02em] text-[#12186d] sm:text-[1.55rem] sm:tracking-[-0.035em] lg:text-[1.55rem] xl:text-[2.1rem] [@media(max-height:760px)]:lg:text-[1.45rem]">
                   {screen.id === 'success' ? 'Your trainer application is in' : "Let's build your trainer profile"}
                 </h2>
-                <p className="mx-auto mt-3 max-w-[540px] text-[0.98rem] font-medium leading-7 text-[#5b6697] xl:text-[1.04rem]">
+                <p className="mx-auto mt-1 max-w-[520px] text-[0.74rem] font-medium leading-4 text-[#5b6697] sm:mt-1.5 sm:text-[0.9rem] sm:leading-5 lg:text-[0.88rem] xl:text-[0.96rem] [@media(max-height:760px)]:lg:line-clamp-2">
                   {screen.id === 'success'
                     ? 'You&apos;re all set. Our team will review your details and guide you through the next step shortly.'
                     : 'Complete each step to create a polished and trustworthy profile clients can understand quickly.'}
                 </p>
               </div>
 
-              <div className="mx-auto mt-7 grid w-full max-w-[760px] gap-3 xl:grid-cols-3">
+              <div className="mx-auto mt-3 hidden w-full max-w-[700px] gap-2 lg:grid lg:grid-cols-3 xl:mt-4 [@media(max-height:760px)]:lg:mt-2">
                 {trainerWelcomeHighlights.map(({ title, description, icon: Icon }) => (
                   <div
                     key={title}
-                    className="rounded-[24px] border border-white/70 bg-white/55 px-4 py-4 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px]"
+                    className="flex items-center gap-2 rounded-[18px] border border-white/70 bg-white/55 px-3 py-2 shadow-[0_14px_28px_rgba(114,90,220,0.08)] backdrop-blur-[10px] xl:block xl:py-3"
                   >
-                    <div className="inline-flex h-12 w-12 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)]">
-                      <Icon size={20} strokeWidth={2.1} />
+                    <div className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl bg-[linear-gradient(180deg,#ffffff_0%,#f4eeff_100%)] text-[#7b5cff] shadow-[0_10px_22px_rgba(123,92,255,0.14)] xl:h-10 xl:w-10">
+                      <Icon size={18} strokeWidth={2.1} />
                     </div>
-                    <p className="mt-4 text-[1rem] font-semibold text-[#182062]">{title}</p>
-                    <p className="mt-1.5 text-sm leading-6 text-[#6674a7]">{description}</p>
+                    <div>
+                      <p className="text-[0.86rem] font-semibold leading-tight text-[#182062] xl:mt-3 xl:text-[0.94rem]">{title}</p>
+                      <p className="mt-1 hidden text-xs leading-5 text-[#6674a7] xl:block">{description}</p>
+                    </div>
                   </div>
                 ))}
               </div>
             </div>
           </section>
 
-          <section className="flex min-h-0 overflow-hidden px-4 py-5 sm:px-6 lg:px-10 lg:py-6 xl:px-14">
-            <div className="mx-auto flex h-full w-full max-w-[760px] flex-col">
-              <div className="min-h-0 flex-1 overflow-y-scroll pr-1 [scrollbar-gutter:stable] [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <section className="flex min-h-0 px-4 py-4 sm:px-6 lg:overflow-hidden lg:px-7 lg:py-4 xl:px-10 [@media(max-height:760px)]:lg:py-3">
+            <div className="mx-auto flex min-h-0 w-full max-w-[760px] flex-1 flex-col">
+              <div className="min-h-0 flex-1 pr-0 lg:overflow-hidden">
                 <AnimatePresence custom={direction} initial={false} mode="wait">
                   <motion.section
                     key={screen.id}
@@ -2423,7 +2662,7 @@ function TrainerApplicationScreenShell({
                     animate={prefersReducedMotion ? { opacity: 1 } : { opacity: 1, x: 0 }}
                     exit={prefersReducedMotion ? { opacity: 0 } : { opacity: 0, x: direction > 0 ? -20 : 20 }}
                     transition={{ duration: 0.28, ease: [0.22, 1, 0.36, 1] }}
-                    className="mx-auto w-full max-w-[760px] pb-6"
+                    className="mx-auto w-full max-w-[760px] pb-4 lg:h-full lg:pb-0"
                   >
                     <QuestionScreen screen={screen}>{children}</QuestionScreen>
                   </motion.section>
@@ -2431,7 +2670,7 @@ function TrainerApplicationScreenShell({
               </div>
 
               {screen.id !== 'success' ? (
-                <div className="shrink-0 pt-4">
+                <div className="shrink-0 pt-3 [@media(max-height:760px)]:lg:pt-2">
                   <div className="flex items-center gap-4">
                     <div className="h-px flex-1 bg-[#ddd5f6]" />
                     <div className="inline-flex items-center gap-2 text-[0.92rem] font-medium text-[#7582b3]">
@@ -2447,12 +2686,12 @@ function TrainerApplicationScreenShell({
                     </p>
                   ) : null}
 
-                  <div className="mt-5">
+                  <div className="mt-3 [@media(max-height:760px)]:lg:mt-2">
                     <Button
                       type="button"
                       onClick={onPrimaryAction}
                       disabled={loading || footerDisabled}
-                      className="h-[60px] w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.08rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03]"
+                      className="h-14 w-full rounded-[18px] bg-[linear-gradient(90deg,#5b2dff_0%,#7a43ff_100%)] text-[1.02rem] font-semibold text-white shadow-[0_20px_40px_rgba(91,45,255,0.28)] transition hover:brightness-[1.03] [@media(max-height:760px)]:lg:h-12"
                     >
                       {loading ? (
                         'Please wait...'
@@ -2465,7 +2704,7 @@ function TrainerApplicationScreenShell({
                     </Button>
                   </div>
 
-                  <div className="mt-4 text-center">
+                  <div className="mt-3 text-center [@media(max-height:760px)]:lg:mt-2">
                     <button
                       type="button"
                       onClick={onSaveAndLogout}
@@ -2618,15 +2857,15 @@ function MetricTile({ label, value }: { label: string; value: string }) {
 
 function QuestionScreen({ screen, children }: { screen: TrainerOnboardingScreen; children: React.ReactNode }) {
   return (
-    <div className="px-0 py-3 sm:py-4">
-      <div className="space-y-3">
-        <p className="text-xs font-semibold uppercase tracking-[0.24em] text-[var(--ds-brand)]">{screen.eyebrow}</p>
-        <h1 className="text-[1.9rem] font-semibold leading-tight text-slate-950 sm:text-[2.2rem]">{screen.title}</h1>
-        <p className="text-[15px] leading-7 text-slate-600">{screen.description}</p>
-        <p className="text-sm font-medium text-slate-500">{screen.helper}</p>
+    <div className="flex min-h-0 flex-col px-0 py-2 sm:py-3 lg:h-full [@media(max-height:760px)]:lg:py-1">
+      <div className="space-y-2 [@media(max-height:760px)]:lg:space-y-1.5">
+        <p className="text-[0.68rem] font-semibold uppercase tracking-[0.22em] text-[var(--ds-brand)]">{screen.eyebrow}</p>
+        <h1 className="text-[1.7rem] font-semibold leading-tight text-slate-950 sm:text-[1.95rem] xl:text-[2.1rem] [@media(max-height:760px)]:lg:text-[1.65rem]">{screen.title}</h1>
+        <p className="text-sm leading-6 text-slate-600 [@media(max-height:760px)]:lg:line-clamp-2">{screen.description}</p>
+        <p className="text-xs font-medium text-slate-500">{screen.helper}</p>
       </div>
 
-      <div className="mt-6">{children}</div>
+      <div className="mt-4 min-h-0 flex-1 [@media(max-height:760px)]:lg:mt-3">{children}</div>
     </div>
   );
 }
@@ -2693,11 +2932,11 @@ function FormInput({
   trailing?: React.ReactNode;
 }) {
   return (
-    <label className="block space-y-2">
+    <label className="block space-y-1.5">
       <span className="text-sm font-semibold text-slate-800">{label}</span>
       <div
         className={cn(
-          'group flex min-h-14 items-center gap-3 rounded-[18px] border border-slate-300 bg-white px-4 shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition focus-within:border-[#8d6bff] focus-within:ring-4 focus-within:ring-[#7c5cff1a]',
+          'group flex min-h-12 items-center gap-3 rounded-[16px] border border-slate-300 bg-white px-4 shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition focus-within:border-[#8d6bff] focus-within:ring-4 focus-within:ring-[#7c5cff1a] sm:min-h-[52px] [@media(max-height:760px)]:lg:min-h-11',
           error && 'border-rose-300 focus-within:ring-[rgba(244,63,94,0.12)]',
         )}
       >
@@ -2707,7 +2946,7 @@ function FormInput({
           inputMode={inputMode}
           placeholder={placeholder}
           className={cn(
-            'h-auto flex-1 border-0 bg-transparent px-0 py-0 text-base font-medium text-[#151a5f] shadow-none placeholder:text-[#9aa3c2] focus-visible:ring-0',
+            'h-auto flex-1 border-0 bg-transparent px-0 py-0 text-[0.98rem] font-medium text-[#151a5f] shadow-none placeholder:text-[#9aa3c2] focus-visible:ring-0',
             trailing ? 'pr-0' : '',
           )}
           value={onChange || value !== undefined ? (value ?? '') : undefined}
@@ -2716,7 +2955,7 @@ function FormInput({
         />
         {trailing ? <div className="shrink-0">{trailing}</div> : null}
       </div>
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </label>
   );
 }
@@ -2733,17 +2972,17 @@ function FormTextArea({
   textAreaProps?: React.TextareaHTMLAttributes<HTMLTextAreaElement>;
 }) {
   return (
-    <label className="block space-y-2">
+    <label className="block space-y-1.5">
       <span className="text-sm font-semibold text-slate-800">{label}</span>
       <Textarea
         placeholder={placeholder}
         className={cn(
-          'min-h-36 rounded-xl border-slate-300 bg-white px-4 py-4 text-base leading-7 transition focus-visible:ring-[3px] focus-visible:ring-[rgba(47,79,136,0.12)]',
+          'min-h-28 rounded-xl border-slate-300 bg-white px-4 py-3 text-[0.98rem] leading-6 transition focus-visible:ring-[3px] focus-visible:ring-[rgba(47,79,136,0.12)] [@media(max-height:760px)]:lg:min-h-24',
           error && 'border-rose-300 focus-visible:ring-[rgba(244,63,94,0.12)]',
         )}
         {...textAreaProps}
       />
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </label>
   );
 }
@@ -2762,9 +3001,9 @@ function ChoiceCardGroup({
   error?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <p className="text-sm font-semibold text-slate-800">{label}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
           const active = option.value === value;
 
@@ -2774,7 +3013,7 @@ function ChoiceCardGroup({
               type="button"
               onClick={() => onChange(option.value)}
               className={cn(
-                'flex min-h-14 items-center justify-between rounded-xl border px-4 py-3.5 text-left transition',
+                'flex min-h-12 items-center justify-between rounded-xl border px-4 py-3 text-left transition',
                 active ? 'border-[var(--ds-brand)] bg-transparent text-[var(--ds-brand)]' : 'border-slate-300 bg-white text-slate-700 hover:border-slate-400',
               )}
             >
@@ -2784,7 +3023,7 @@ function ChoiceCardGroup({
           );
         })}
       </div>
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
@@ -2808,9 +3047,9 @@ function WelcomeChoiceGrid({
   error?: string;
 }) {
   return (
-    <div className="space-y-2.5">
+    <div className="space-y-2">
       <p className="text-sm font-semibold text-slate-800">{label}</p>
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-2 sm:grid-cols-2">
         {options.map((option) => {
           const active = option.value === value;
           const Icon = option.icon;
@@ -2821,15 +3060,15 @@ function WelcomeChoiceGrid({
               type="button"
               onClick={() => onChange(option.value)}
               className={cn(
-                'flex min-h-[72px] items-center justify-between rounded-[18px] border bg-white px-5 py-4 text-left shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition',
+                'flex min-h-[60px] items-center justify-between rounded-[16px] border bg-white px-4 py-3 text-left shadow-[0_10px_24px_rgba(86,74,164,0.06)] transition',
                 active ? 'border-[#b297ff] bg-[#fcfaff]' : 'border-slate-200 hover:border-[#d6cbff]',
               )}
             >
               <span className="flex items-center gap-3">
-                <span className={cn('inline-flex h-10 w-10 items-center justify-center rounded-full bg-[#f7f3ff]', option.tone)}>
+                <span className={cn('inline-flex h-9 w-9 items-center justify-center rounded-full bg-[#f7f3ff]', option.tone)}>
                   <Icon size={20} strokeWidth={2} />
                 </span>
-                <span className="text-[1rem] font-semibold text-[#182062]">{option.label}</span>
+                <span className="text-[0.95rem] font-semibold text-[#182062]">{option.label}</span>
               </span>
               <span
                 className={cn(
@@ -2843,7 +3082,7 @@ function WelcomeChoiceGrid({
           );
         })}
       </div>
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
@@ -2862,9 +3101,9 @@ function ChipSelector({
             error?: string;
 }) {
   return (
-    <div className="space-y-2">
+    <div className="space-y-1.5">
       <p className="text-sm font-semibold text-slate-800">{label}</p>
-      <div className="flex flex-wrap gap-3">
+      <div className="flex flex-wrap gap-2">
         {options.map((option) => {
           const active = value.includes(option);
 
@@ -2874,7 +3113,7 @@ function ChipSelector({
               type="button"
               onClick={() => onChange(active ? value.filter((item) => item !== option) : [...value, option])}
               className={cn(
-                'rounded-full border px-4 py-3 text-sm font-semibold transition',
+                'rounded-full border px-3.5 py-2.5 text-sm font-semibold transition [@media(max-height:760px)]:lg:py-2',
                 active
                   ? 'border-[#6b3dff] bg-[linear-gradient(135deg,#6b3dff_0%,#7f52ff_100%)] text-white shadow-[0_10px_22px_rgba(107,61,255,0.24)]'
                   : 'border-slate-300 bg-white text-slate-700 hover:border-[#c7bbff] hover:bg-[#faf8ff]',
@@ -2885,7 +3124,7 @@ function ChipSelector({
           );
         })}
       </div>
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
@@ -2930,24 +3169,24 @@ function SingleUploadField({
       <label
         htmlFor={inputId}
         className={cn(
-          'block cursor-pointer rounded-xl border border-dashed px-4 py-4 transition',
+          'block cursor-pointer rounded-xl border border-dashed px-4 py-3 transition',
           error ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-transparent hover:border-slate-400',
         )}
       >
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
             <Icon size={20} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-slate-900">{label}</span>
-            <span className="mt-1 block text-sm text-slate-500">{hint}</span>
+            <span className="mt-0.5 block text-xs text-slate-500">{hint}</span>
             {file ? (
-              <span className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-700">
+              <span className="mt-2 flex flex-wrap items-center gap-2 text-xs text-slate-700">
                 <span className="font-medium">{file.name}</span>
                 <span className="text-slate-400">{formatBytes(file.size)}</span>
               </span>
             ) : (
-              <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
+              <span className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
                 <Upload size={16} />
                 Choose file
               </span>
@@ -2959,9 +3198,9 @@ function SingleUploadField({
       {file?.previewUrl && previewKind ? (
         <div className="overflow-hidden rounded-xl border border-slate-200 bg-slate-50">
           {previewKind === 'image' ? (
-            <img src={file.previewUrl} alt={`${label} preview`} className="h-56 w-full object-cover" />
+            <img src={file.previewUrl} alt={`${label} preview`} className="h-36 w-full object-cover sm:h-44 [@media(max-height:760px)]:lg:h-32" />
           ) : (
-            <video src={file.previewUrl} controls preload="metadata" className="h-56 w-full bg-slate-950 object-cover" />
+            <video src={file.previewUrl} controls preload="metadata" className="h-36 w-full bg-slate-950 object-cover sm:h-44 [@media(max-height:760px)]:lg:h-32" />
           )}
         </div>
       ) : null}
@@ -2972,7 +3211,7 @@ function SingleUploadField({
         </button>
       ) : null}
 
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
@@ -3001,7 +3240,7 @@ function MultiUploadField({
   const inputId = useId();
 
   return (
-    <div className="space-y-3">
+    <div className="space-y-2.5">
       <input
         id={inputId}
         type="file"
@@ -3018,18 +3257,18 @@ function MultiUploadField({
       <label
         htmlFor={inputId}
         className={cn(
-          'block cursor-pointer rounded-xl border border-dashed px-4 py-4 transition',
+          'block cursor-pointer rounded-xl border border-dashed px-4 py-3 transition',
           error ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-transparent hover:border-slate-400',
         )}
       >
         <div className="flex items-start gap-3">
-          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
+          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
             <Icon size={20} />
           </span>
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-slate-900">{label}</span>
-            <span className="mt-1 block text-sm text-slate-500">{hint}</span>
-            <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
+            <span className="mt-0.5 block text-xs text-slate-500">{hint}</span>
+            <span className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
               <Upload size={16} />
               Add files
             </span>
@@ -3038,16 +3277,16 @@ function MultiUploadField({
       </label>
 
       {files.length ? (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid gap-2 sm:grid-cols-2">
           {files.map((file) => (
             <div key={file.id} className="overflow-hidden rounded-xl border border-slate-200 bg-white">
               {file.previewUrl && previewKind === 'image' ? (
-                <img src={file.previewUrl} alt={`${file.name} preview`} className="h-40 w-full object-cover" />
+                <img src={file.previewUrl} alt={`${file.name} preview`} className="h-24 w-full object-cover sm:h-28 [@media(max-height:760px)]:lg:h-20" />
               ) : null}
               {file.previewUrl && previewKind === 'video' ? (
-                <video src={file.previewUrl} controls preload="metadata" className="h-40 w-full bg-slate-950 object-cover" />
+                <video src={file.previewUrl} controls preload="metadata" className="h-24 w-full bg-slate-950 object-cover sm:h-28 [@media(max-height:760px)]:lg:h-20" />
               ) : null}
-              <div className="flex items-center justify-between gap-3 p-4">
+              <div className="flex items-center justify-between gap-3 p-3">
                 <div className="min-w-0">
                   <p className="truncate text-sm font-semibold text-slate-900">{file.name}</p>
                   <p className="text-sm text-slate-500">{formatBytes(file.size)}</p>
@@ -3061,7 +3300,7 @@ function MultiUploadField({
         </div>
       ) : null}
 
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }
@@ -3159,7 +3398,7 @@ function PhotoCropEditor({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       <input
         id={inputId}
         type="file"
@@ -3174,7 +3413,7 @@ function PhotoCropEditor({
 
       {source ? (
         <section className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
-          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-4 py-2.5">
             <div>
               <h3 className="text-sm font-semibold text-slate-950">Frame your profile photo</h3>
               <p className="mt-0.5 text-sm text-slate-500">Professional 4:5 portrait</p>
@@ -3184,8 +3423,8 @@ function PhotoCropEditor({
             </button>
           </header>
 
-          <div className="grid gap-5 p-4 lg:grid-cols-[minmax(0,1fr)_180px]">
-            <div className="h-[390px] overflow-hidden rounded-lg bg-slate-950 sm:h-[480px]">
+          <div className="grid gap-4 p-3 lg:grid-cols-[minmax(0,1fr)_160px]">
+            <div className="h-[280px] overflow-hidden rounded-lg bg-slate-950 sm:h-[340px] lg:h-[320px] [@media(max-height:760px)]:lg:h-[240px] [@media(max-height:680px)]:lg:h-[200px]">
               <img
                 ref={imageRef}
                 src={source.previewUrl}
@@ -3195,10 +3434,10 @@ function PhotoCropEditor({
               />
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-3">
               <div>
                 <p className="text-xs font-semibold uppercase text-slate-500">Profile preview</p>
-                <div className="trainer-photo-crop-preview mt-2 aspect-[4/5] overflow-hidden rounded-lg border border-slate-200 bg-slate-100" />
+                <div className="trainer-photo-crop-preview mt-2 aspect-[4/5] max-h-44 overflow-hidden rounded-lg border border-slate-200 bg-slate-100 [@media(max-height:760px)]:lg:max-h-32" />
               </div>
 
               <div className="grid grid-cols-3 gap-2" aria-label="Crop controls">
@@ -3221,12 +3460,12 @@ function PhotoCropEditor({
           </div>
         </section>
       ) : (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,220px)_minmax(0,1fr)]">
+        <div className="grid gap-4 lg:grid-cols-[minmax(0,190px)_minmax(0,1fr)]">
           <div className="relative overflow-hidden rounded-xl bg-slate-50 p-3">
             <div className="relative aspect-[4/5] overflow-hidden rounded-xl bg-[linear-gradient(145deg,#eef2ff,#dbeafe)]">
               {file?.previewUrl ? (
                 <div className="flex h-full w-full items-center justify-center">
-                  <UserAvatar user={{ name: 'Trainer profile' }} src={file.previewUrl} alt="Trainer profile preview" size="xl" className="h-32 w-32" />
+                  <UserAvatar user={{ name: 'Trainer profile' }} src={file.previewUrl} alt="Trainer profile preview" size="xl" className="h-24 w-24 sm:h-28 sm:w-28" />
                 </div>
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3 text-center text-slate-500">
@@ -3237,22 +3476,22 @@ function PhotoCropEditor({
             </div>
           </div>
 
-          <div className="space-y-4">
+          <div className="space-y-3">
             <label
               htmlFor={inputId}
               className={cn(
-                'block cursor-pointer rounded-xl border border-dashed px-4 py-4 transition',
+                'block cursor-pointer rounded-xl border border-dashed px-4 py-3 transition',
                 error ? 'border-rose-300 bg-rose-50/30' : 'border-slate-300 bg-transparent hover:border-slate-400',
               )}
             >
               <div className="flex items-start gap-3">
-                <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
+                <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-slate-50 text-[var(--ds-brand)]">
                   <Camera size={20} />
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="block text-sm font-semibold text-slate-900">Upload a clear portrait</span>
-                  <span className="mt-1 block text-sm text-slate-500">Clear, front-facing JPG or PNG portrait.</span>
-                  <span className="mt-3 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
+                  <span className="mt-0.5 block text-xs text-slate-500">Clear, front-facing JPG or PNG portrait.</span>
+                  <span className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-[var(--ds-brand)]">
                     <Upload size={16} />
                     {file ? 'Replace photo' : 'Choose photo'}
                   </span>
@@ -3275,7 +3514,7 @@ function PhotoCropEditor({
         </div>
       )}
 
-      {error ? <p className="text-sm text-rose-600">{error}</p> : null}
+      {error ? <p className="text-xs text-rose-600">{error}</p> : null}
     </div>
   );
 }

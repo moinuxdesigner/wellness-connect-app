@@ -14,6 +14,7 @@ export default function PwaInstallPrompt() {
   const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [visible, setVisible] = useState(false);
   const [showManualHelp, setShowManualHelp] = useState(false);
+  const isSuppressedRoute = location.pathname === '/client/appointments' || location.pathname.startsWith('/trainer/onboarding');
 
   useEffect(() => {
     const dismissed = localStorage.getItem(DISMISS_KEY);
@@ -48,7 +49,7 @@ export default function PwaInstallPrompt() {
     };
   }, []);
 
-  if (!visible || location.pathname === '/client/appointments') {
+  if (!visible || isSuppressedRoute) {
     return null;
   }
 
